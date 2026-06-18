@@ -38,8 +38,9 @@ export default async function PastaCliente({ params, searchParams }: { params: P
   const { id } = await params;
   const query = await searchParams;
   const { supabase, profile } = await getCurrentProfile();
+  const admin = createAdminSupabase();
 
-  const { data: client } = await supabase
+  const { data: client } = await admin
     .from('clients')
     .select('*')
     .eq('id', id)
@@ -72,7 +73,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       .select('full_name,email,phone,oab_number')
       .eq('law_firm_id', profile.law_firm_id)
       .order('full_name'),
-    supabase
+    admin
       .from('legal_services')
       .select('*')
       .eq('law_firm_id', profile.law_firm_id)

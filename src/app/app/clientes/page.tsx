@@ -3,16 +3,19 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
-export default async function Clientes(){
-  const {supabase,profile}=await getCurrentProfile();
+export default async function Clientes({ searchParams }: { searchParams?: Promise<Record<string, string>> }){
+  const query = await searchParams;
+  const {profile}=await getCurrentProfile();
+  const admin = createAdminSupabase();
   const [clientsRes, servicesRes] = await Promise.all([
-    supabase
+    admin
       .from('clients')
       .select('*, legal_services(name)')
       .eq('law_firm_id',profile.law_firm_id)
       .order('created_at',{ascending:false}),
-    supabase
+    admin
       .from('legal_services')
       .select('id,name,active')
       .eq('law_firm_id',profile.law_firm_id)
@@ -23,6 +26,9 @@ export default async function Clientes(){
 
   return <div>
     <PageHeader title="Clientes" subtitle="Cadastro central do escritório. Clique no cliente para abrir a pasta em nuvem, gerar documentos e criar cobranças."/>
+    {query?.salvo && <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">Cliente salvo com sucesso.</section>}
+    {query?.erro && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao salvar cliente: {decodeURIComponent(query.erro)}</section>}
+    {servicesRes.error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao carregar serviços: {servicesRes.error.message}. Confira se o SQL <b>v8_migration.sql</b> foi rodado no Supabase.</section>}
     <section className="card mb-6 p-5">
       <form action="/api/clients" method="post" className="grid gap-4 md:grid-cols-3">
         <input className="input" name="name" placeholder="Nome completo" required/>
