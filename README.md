@@ -1,22 +1,48 @@
 # AdvOS V1
 
-Sistema jurídico interno, desktop-first, para escritório familiar de advocacia.
+Sistema jurídico interno, desktop-first, para escritórios de advocacia.
 
-## Stack
-- Next.js App Router
-- Supabase Auth
-- Supabase Database
-- Supabase Storage-ready
-- Tailwind CSS
+## Fluxo desta versão
 
-## Como subir
-1. Crie um projeto no Supabase.
-2. Rode o SQL em `supabase/schema.sql` no SQL Editor.
-3. Em Authentication > Users, crie o primeiro usuário manualmente.
-4. Copie o `id` do usuário criado.
-5. No SQL, insira um `law_firm`, uma `subscription` e um `profile` usando o `auth_user_id` do usuário.
-6. Configure as variáveis `.env` na Vercel.
-7. Suba no GitHub e faça deploy na Vercel.
+- Não existe cadastro público aberto.
+- O primeiro usuário é criado manualmente no Supabase Auth.
+- Depois do primeiro login, o próprio site abre a tela `/configuracao-inicial`.
+- Nessa tela você define o escritório, dados do usuário inicial e período de acesso.
+- Depois disso, os demais usuários são criados dentro do painel em `/app/usuarios`.
+- Na V1, todos os usuários têm o mesmo nível de acesso: `membro`.
 
-## Regra da V1
-Todos os usuários internos possuem o mesmo nível de acesso. O primeiro usuário é criado no Supabase. Depois disso, qualquer usuário ativo do escritório pode criar outros usuários dentro do painel.
+## Instalação
+
+1. Crie o projeto no Supabase.
+2. Rode `supabase/schema.sql` no SQL Editor.
+3. Configure as variáveis de ambiente da `.env.example` na Vercel.
+4. Crie o primeiro usuário em Authentication > Users.
+5. Faça login no AdvOS com esse usuário.
+6. Preencha a tela de configuração inicial.
+7. Entre no painel e crie os outros usuários pelo menu Usuários.
+
+## Variáveis de ambiente
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+A `SUPABASE_SERVICE_ROLE_KEY` é necessária para criar usuários internos e salvar a configuração inicial. Ela deve ficar somente no servidor/Vercel, nunca exposta no navegador.
+
+## Módulos incluídos
+
+- Dashboard
+- Clientes
+- Processos
+- Prazos
+- Documentos
+- Financeiro
+- Tarefas
+- Usuários
+- Configurações
+
+## Observação
+
+A integração com ZapSign ficou preparada na estrutura do banco, mas a chamada real da API deve entrar em uma V2.

@@ -221,17 +221,10 @@ create policy "financial_installments_same_firm_all" on financial_installments f
 create policy "tasks_same_firm_all" on tasks for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 create policy "activity_logs_same_firm_all" on activity_logs for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 
--- MODELO DE CRIAÇÃO DO PRIMEIRO ESCRITÓRIO/USUÁRIO
--- 1) Crie o primeiro usuário em Authentication > Users.
--- 2) Copie o UUID dele.
--- 3) Rode o bloco abaixo ajustando os dados:
-
--- insert into law_firms (name, cnpj, oab_responsible, phone, email, address)
--- values ('Nome do Escritório', null, 'OAB/UF 000000', '(00) 00000-0000', 'email@escritorio.com', 'Endereço')
--- returning id;
-
--- insert into subscriptions (law_firm_id, plan, status, current_period_start, current_period_end, grace_until)
--- values ('COLE_AQUI_O_ID_DO_ESCRITORIO', 'interno', 'ativa', current_date, current_date + 30, current_date + 33);
-
--- insert into profiles (auth_user_id, law_firm_id, full_name, email, phone, role, status)
--- values ('COLE_AQUI_O_UUID_DO_AUTH_USER', 'COLE_AQUI_O_ID_DO_ESCRITORIO', 'Administrador', 'email@escritorio.com', '(00) 00000-0000', 'membro', 'ativo');
+-- CONFIGURAÇÃO INICIAL DA V1
+-- 1) Crie apenas o primeiro usuário em Authentication > Users.
+-- 2) Faça login no AdvOS com esse usuário.
+-- 3) O sistema abrirá /configuracao-inicial.
+-- 4) Preencha os dados do escritório, do usuário inicial e do acesso.
+-- 5) O AdvOS criará automaticamente os registros em law_firms, subscriptions e profiles.
+-- 6) Os demais usuários devem ser criados dentro do painel em /app/usuarios.
