@@ -1,6 +1,6 @@
 {
-  "name": "advos-v3",
-  "version": "3.0.0",
+  "name": "advos-v4",
+  "version": "4.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,16 +13,16 @@
     "autoprefixer": "10.4.20",
     "clsx": "2.1.1",
     "lucide-react": "0.468.0",
-    "next": "15.5.9",
+    "next": "14.2.30",
     "postcss": "8.4.49",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "tailwindcss": "3.4.17"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
-    "@types/react": "19.0.2",
-    "@types/react-dom": "19.0.2",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
     "typescript": "5.7.2"
   }
 }

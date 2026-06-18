@@ -1,17 +1,24 @@
-# AdvOS V3
+# AdvOS V4
 
 Sistema jurídico interno, desktop-first, para escritórios de advocacia.
 
-## O que mudou na V3
+## O que mudou na V4
 
 - Abre direto no login.
 - Sem página pública, planos ou módulos comerciais.
 - Card de “Fluxo interno” removido.
 - Dados do escritório e usuário ficam apenas em `/app/configuracoes`.
-- Nova aba `/app/integracoes`.
-- Integração opcional com ZapSign para assinatura digital.
-- Integração opcional com Asaas para gerar cobranças.
-- Webhooks prontos para ZapSign e Asaas.
+- Aba `/app/integracoes` com ZapSign e Asaas.
+- Nova aba `/app/contratos` para gerar contrato de honorários e procurações.
+- Formulário de contratos baseado na aba `Dados Contrato` da planilha do escritório.
+- Modelos disponíveis:
+  - contrato de honorários;
+  - procuração sem hipossuficiência econômica;
+  - procuração com declaração de hipossuficiência econômica;
+  - kit contrato + procuração sem hipossuficiência;
+  - kit contrato + procuração com hipossuficiência.
+- Geração de arquivo Word editável `.doc` diretamente pelo navegador.
+- Histórico de documentos gerados em `generated_contracts`.
 - Sem `package-lock.json`.
 
 ## Instalação nova
@@ -23,15 +30,31 @@ Sistema jurídico interno, desktop-first, para escritórios de advocacia.
 5. Faça deploy.
 6. Entre no AdvOS e vá em Configurações para criar o escritório/perfil inicial.
 
-## Atualização de V1/V2 para V3
+## Atualização de V3 para V4
 
-Se você já rodou o schema antigo, rode apenas:
+Se você já rodou o schema da V3, rode apenas:
+
+```sql
+-- arquivo: supabase/v4_migration.sql
+```
+
+Depois substitua os arquivos no GitHub e faça redeploy na Vercel.
+
+## Atualização de V1/V2 para V4
+
+Rode primeiro:
 
 ```sql
 -- arquivo: supabase/v3_migration.sql
 ```
 
-Depois substitua os arquivos no GitHub e faça redeploy na Vercel.
+Depois rode:
+
+```sql
+-- arquivo: supabase/v4_migration.sql
+```
+
+Em seguida substitua os arquivos no GitHub e faça redeploy na Vercel.
 
 ## Variáveis obrigatórias
 
@@ -62,6 +85,15 @@ ZapSign: https://SEU-DOMINIO/api/webhooks/zapsign
 Asaas:   https://SEU-DOMINIO/api/webhooks/asaas
 ```
 
+## Como usar contratos e procurações
+
+1. Vá em `Contratos`.
+2. Escolha o tipo de documento.
+3. Preencha os dados do autor/contratante.
+4. Preencha os honorários quando for contrato ou kit.
+5. Clique em `Gerar arquivo Word`.
+6. O navegador baixa um arquivo `.doc` editável.
+
 ## Como usar ZapSign
 
 1. Vá em Integrações e salve o token da ZapSign.
@@ -76,4 +108,3 @@ Asaas:   https://SEU-DOMINIO/api/webhooks/asaas
 3. Vá em Financeiro.
 4. Cadastre uma cobrança.
 5. Clique em Gerar Asaas.
-
