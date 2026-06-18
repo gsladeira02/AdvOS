@@ -108,3 +108,48 @@ Asaas:   https://SEU-DOMINIO/api/webhooks/asaas
 3. Vá em Financeiro.
 4. Cadastre uma cobrança.
 5. Clique em Gerar Asaas.
+
+## AdvOS V5 - PDF + ZapSign + Asaas
+
+Esta versão altera a aba **Contratos** para trabalhar com o fluxo completo:
+
+1. preencher os dados do contrato/procuração;
+2. gerar o documento em **PDF**;
+3. salvar o PDF no bucket privado `documents` do Supabase Storage;
+4. enviar o PDF para a ZapSign quando a integração estiver configurada;
+5. criar o contrato financeiro, entrada e parcelas no AdvOS;
+6. criar as cobranças correspondentes no Asaas quando a integração estiver configurada.
+
+### Migração necessária
+
+Se você já estava na V4, rode apenas:
+
+```sql
+supabase/v5_migration.sql
+```
+
+Se estiver instalando do zero, rode a sequência:
+
+```text
+supabase/schema.sql
+supabase/v3_migration.sql
+supabase/v4_migration.sql
+supabase/v5_migration.sql
+```
+
+### Configuração das integrações
+
+Dentro do sistema, acesse:
+
+```text
+/app/integracoes
+```
+
+Configure:
+
+- Token da ZapSign;
+- API Key do Asaas;
+- ambiente sandbox ou produção;
+- tipo de cobrança padrão.
+
+Se a integração não estiver configurada, o sistema ainda gera o PDF e cria os registros internos, mas marca ZapSign/Asaas como configuração pendente.
