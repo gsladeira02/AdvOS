@@ -442,6 +442,7 @@ export async function POST(req: Request) {
     due_day: str(f.get('due_day')),
     payment_notes: str(f.get('payment_notes')),
     billing_type: str(f.get('billing_type')) || 'BOLETO',
+    redirect_to: str(f.get('redirect_to')),
   };
 
   const admin = createAdminSupabase();
@@ -476,7 +477,7 @@ export async function POST(req: Request) {
     title: filename,
     doc_type: data.document_type,
     storage_path: storagePath,
-    notes: 'PDF gerado automaticamente pela aba Contratos do AdvOS.',
+    notes: 'PDF gerado automaticamente pela pasta do cliente no AdvOS.',
     signature_status: 'preparando_zapsign',
   }).select('id').single();
 
@@ -561,5 +562,6 @@ export async function POST(req: Request) {
     entity_id: generated?.id || null,
   });
 
-  return NextResponse.redirect(new URL('/app/contratos?gerado=1', req.url), 303);
+  const redirectTo = data.redirect_to || (data.client_id ? `/app/clientes/${data.client_id}?gerado=1` : '/app/clientes?gerado=1');
+  return NextResponse.redirect(new URL(redirectTo, req.url), 303);
 }

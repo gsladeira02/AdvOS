@@ -1,8 +1,8 @@
-# AdvOS V6
+# AdvOS V7
 
 Sistema jurídico interno, desktop-first, com login direto, geração de PDF, ZapSign, Asaas, WhatsApp e pasta em nuvem por cliente.
 
-## Principais mudanças da V6
+## Principais mudanças da V7
 
 - O usuário consegue acessar as abas mesmo sem preencher os dados cadastrais do escritório.
 - No primeiro login, o AdvOS cria automaticamente um escritório provisório chamado **Escritório sem cadastro**.
@@ -10,7 +10,7 @@ Sistema jurídico interno, desktop-first, com login direto, geração de PDF, Za
 - A lista de clientes agora abre uma **pasta do cliente**.
 - A pasta do cliente mostra documentos gerados, documentos enviados manualmente, processos vinculados e contratos gerados.
 - A pasta do cliente permite upload de arquivos para o Supabase Storage privado.
-- A aba Contratos gera PDF, salva na pasta do cliente, envia para ZapSign, cria cobranças no Asaas e prepara botão de WhatsApp.
+- Dentro da pasta de cada cliente é possível gerar PDF de contrato/procuração, enviar para ZapSign, criar cobranças no Asaas e preparar botão de WhatsApp.
 - O botão de WhatsApp usa o número cadastrado no cliente e envia mensagem com link da ZapSign e links das cobranças Asaas.
 
 ## Instalação para quem já está na V5

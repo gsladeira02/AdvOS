@@ -15,12 +15,28 @@ async function signedUrl(path?: string | null) {
   return data?.signedUrl || '';
 }
 
+function docLabel(type?: string) {
+  if (type === 'procuracao_hipossuficiencia') return 'Procuração com hipossuficiência';
+  if (type === 'procuracao_simples') return 'Procuração sem hipossuficiência';
+  if (type === 'kit_hipossuficiencia') return 'Kit contrato + procuração com hipossuficiência';
+  if (type === 'kit_simples') return 'Kit contrato + procuração sem hipossuficiência';
+  return 'Contrato de honorários';
+}
+
+function statusClass(status?: string) {
+  const s = String(status || '');
+  if (s.includes('criada') || s.includes('enviado') || s.includes('assinado')) return 'badge-ok';
+  if (s.includes('erro')) return 'badge-danger';
+  return 'badge-warn';
+}
+
 function linkFromInstallment(i: any) {
   return i?.invoice_url || i?.payment_url || i?.bank_slip_url || '';
 }
 
-export default async function PastaCliente({ params }: { params: Promise<{ id: string }> }) {
+export default async function PastaCliente({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string>> }) {
   const { id } = await params;
+  const query = await searchParams;
   const { supabase, profile } = await getCurrentProfile();
 
   const { data: client } = await supabase
@@ -32,7 +48,7 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
 
   if (!client) notFound();
 
-  const [docsRes, generatedRes, casesRes] = await Promise.all([
+  const [docsRes, generatedRes, casesRes, profilesRes] = await Promise.all([
     supabase
       .from('documents')
       .select('*, cases(case_number,area,action_type), document_signatures(signature_url,status)')
@@ -51,6 +67,11 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
       .eq('law_firm_id', profile.law_firm_id)
       .eq('client_id', id)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('profiles')
+      .select('full_name,email,phone,oab_number')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('full_name'),
   ]);
 
   const generated = generatedRes.data || [];
@@ -70,8 +91,21 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
     download_url: d.external_url || await signedUrl(d.storage_path),
   })));
 
+  const lawyers = (profilesRes.data || []).filter((p: any) => p.full_name);
+  const defaultOutorgados = lawyers
+    .map((p: any) => `${p.full_name}${p.oab_number ? `, OAB ${p.oab_number}` : ''}`)
+    .join('; ');
+  const responsible = lawyers[0] as any;
+  const clientPhone = client.whatsapp || client.phone || '';
+
   return <div>
-    <PageHeader title={`Pasta do cliente: ${client.name}`} subtitle="Documentos gerados, arquivos enviados, processos e cobranças do cliente em uma pasta única." />
+    <PageHeader title={`Pasta do cliente: ${client.name}`} subtitle="Gere documentos, crie cobranças, envie links pelo WhatsApp e salve arquivos na pasta em nuvem do cliente." />
+
+    {query?.gerado && (
+      <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">
+        Documento gerado em PDF. O AdvOS tentou enviar para a ZapSign, criar as cobranças no Asaas e salvar tudo na pasta deste cliente.
+      </section>
+    )}
 
     <section className="card mb-6 p-5">
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -80,16 +114,113 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
           <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
             <p><b>Documento:</b> {client.doc || '-'}</p>
             <p><b>Tipo:</b> {client.client_type || '-'}</p>
-            <p><b>WhatsApp:</b> {client.whatsapp || client.phone || '-'}</p>
+            <p><b>WhatsApp:</b> {clientPhone || '-'}</p>
             <p><b>E-mail:</b> {client.email || '-'}</p>
             <p className="md:col-span-2"><b>Endereço:</b> {client.address || '-'}</p>
           </div>
         </div>
         <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-sm text-slate-600">
           <b>Pasta em nuvem</b>
-          <p className="mt-2">Tudo que for gerado em Contratos e todo arquivo enviado manualmente para este cliente aparecerá aqui.</p>
+          <p className="mt-2">Esta tela concentra documentos gerados, arquivos enviados manualmente, links de assinatura, cobranças e processos do cliente.</p>
         </div>
       </div>
+    </section>
+
+    <section className="card mb-6 p-6">
+      <div className="mb-5">
+        <h2 className="text-2xl font-black">Gerar documentos e cobrança</h2>
+        <p className="mt-2 max-w-4xl text-sm text-slate-600">
+          Use esta área dentro da pasta do cliente para gerar contrato, procuração, enviar o PDF para a ZapSign, criar entrada/parcelas no Asaas e depois mandar os links pelo WhatsApp cadastrado.
+        </p>
+      </div>
+
+      <form action="/api/contracts/generate" method="post" className="space-y-6">
+        <input type="hidden" name="client_id" value={client.id} />
+        <input type="hidden" name="redirect_to" value={`/app/clientes/${client.id}?gerado=1`} />
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="label">Tipo de documento</label>
+            <select className="input mt-1" name="document_type" defaultValue="kit_hipossuficiencia">
+              <option value="contrato_honorarios">Contrato de honorários</option>
+              <option value="procuracao_simples">Procuração sem hipossuficiência</option>
+              <option value="procuracao_hipossuficiencia">Procuração com hipossuficiência econômica</option>
+              <option value="kit_simples">Kit: contrato + procuração sem hipossuficiência</option>
+              <option value="kit_hipossuficiencia">Kit: contrato + procuração com hipossuficiência</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Processo vinculado</label>
+            <select className="input mt-1" name="case_id">
+              <option value="">Opcional</option>
+              {(casesRes.data || []).map((c: any) => <option value={c.id} key={c.id}>{c.case_number || c.action_type || c.area}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Forma de cobrança Asaas</label>
+            <select className="input mt-1" name="billing_type" defaultValue="BOLETO">
+              <option value="BOLETO">Boleto</option>
+              <option value="PIX">Pix</option>
+              <option value="UNDEFINED">Cliente escolhe</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-lg font-black">Dados do contratante/outorgante</h3>
+          <div className="grid gap-4 md:grid-cols-4">
+            <input className="input md:col-span-2" name="client_name" defaultValue={client.name || ''} placeholder="Nome do contratante/outorgante" />
+            <input className="input" name="nationality" placeholder="Nacionalidade" defaultValue="brasileiro(a)" />
+            <input className="input" name="civil_status" placeholder="Estado civil" />
+            <input className="input" name="profession" placeholder="Profissão" />
+            <input className="input" name="rg" placeholder="RG" />
+            <input className="input" name="rg_uf" placeholder="Órgão/UF do RG" />
+            <input className="input" name="cpf" defaultValue={client.doc || ''} placeholder="CPF/CNPJ" />
+            <input className="input" name="phone" defaultValue={clientPhone || ''} placeholder="WhatsApp/telefone para ZapSign" />
+            <input className="input md:col-span-3" name="address" defaultValue={client.address || ''} placeholder="Endereço completo" />
+            <input className="input" name="email" defaultValue={client.email || ''} placeholder="E-mail para ZapSign/Asaas" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-lg font-black">Local, foro, data e objeto</h3>
+          <div className="grid gap-4 md:grid-cols-4">
+            <input className="input" name="local" placeholder="Local" defaultValue="Vila Velha/ES" />
+            <input className="input" name="forum" placeholder="Foro" defaultValue="Vila Velha/ES" />
+            <input className="input" name="contract_date" type="date" />
+            <input className="input" name="due_day" type="number" min="1" max="31" placeholder="Dia vencimento" />
+            <input className="input md:col-span-4" name="object" defaultValue="propositura de ação judicial e/ou atuação administrativa relacionada a infrações de trânsito, CNH, suspensão ou cassação do direito de dirigir" placeholder="Objeto do serviço" />
+            <textarea className="input md:col-span-4" name="attorneys" rows={3} defaultValue={defaultOutorgados} placeholder="Outorgados/contratados: nome, OAB e qualificação" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-lg font-black">Assinantes ZapSign</h3>
+          <div className="grid gap-4 md:grid-cols-3">
+            <input className="input" name="responsible_signer_name" defaultValue={responsible?.full_name || ''} placeholder="Nome do responsável do escritório" />
+            <input className="input" name="responsible_signer_email" defaultValue={responsible?.email || ''} placeholder="E-mail do responsável" />
+            <input className="input" name="responsible_signer_phone" defaultValue={responsible?.phone || ''} placeholder="WhatsApp do responsável" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-lg font-black">Honorários e cobranças Asaas</h3>
+          <div className="grid gap-4 md:grid-cols-6">
+            <input className="input" name="total_amount" type="number" step="0.01" placeholder="Valor total" />
+            <input className="input" name="entry_amount" type="number" step="0.01" placeholder="Entrada" />
+            <input className="input" name="entry_date" type="date" placeholder="Data da entrada" />
+            <input className="input" name="installment_count" type="number" placeholder="Nº parcelas" />
+            <input className="input" name="installment_amount" type="number" step="0.01" placeholder="Valor parcela" />
+            <input className="input md:col-span-6" name="payment_notes" placeholder="Observações do pagamento" />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Ao gerar, a entrada e as parcelas serão cadastradas no financeiro e enviadas ao Asaas se a integração estiver configurada.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="btn btn-primary">Gerar PDF + ZapSign + Asaas</button>
+          <span className="text-sm text-slate-500">O documento e as cobranças aparecerão no histórico desta pasta.</span>
+        </div>
+      </form>
     </section>
 
     <section className="card mb-6 p-5">
@@ -134,7 +265,7 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
     </section>
 
     <section className="card mb-6 p-5">
-      <h2 className="text-xl font-black">Contratos gerados e envio por WhatsApp</h2>
+      <h2 className="text-xl font-black">Documentos gerados, cobranças e WhatsApp</h2>
       <div className="mt-4 space-y-4">
         {generated.map((g:any)=>{
           const charges = installmentsByContract.get(g.financial_contract_id) || [];
@@ -144,18 +275,19 @@ export default async function PastaCliente({ params }: { params: Promise<{ id: s
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <b>{g.pdf_filename || g.document_type}</b>
-                <p className="text-sm text-slate-500">{dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
+                <b>{docLabel(g.document_type)}</b>
+                <p className="text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
               {wa ? <Link className="btn btn-primary" href={wa} target="_blank">Enviar links no WhatsApp</Link> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
-            <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-              <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" className="font-bold text-blue-700">abrir assinatura</Link> : g.zapsign_status || '-'}</p>
-              <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} link(s) de cobrança` : g.asaas_status || '-'}</p>
+            <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+              <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
+              <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} link(s) de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
+              <p><b>Data:</b> {dateBR(g.contract_date)}</p>
             </div>
           </div>
         })}
-        {!generated.length && <p className="text-sm text-slate-500">Nenhum contrato gerado para este cliente.</p>}
+        {!generated.length && <p className="text-sm text-slate-500">Nenhum documento gerado para este cliente.</p>}
       </div>
     </section>
 

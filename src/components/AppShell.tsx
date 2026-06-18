@@ -1,14 +1,13 @@
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { Briefcase, CalendarDays, CheckSquare, FileText, Home, LogOut, Plug, Scale, ScrollText, Settings, Users, Wallet } from 'lucide-react';
+import { Briefcase, CalendarDays, CheckSquare, FileText, Home, LogOut, Plug, Scale, Settings, Users, Wallet } from 'lucide-react';
 
 const items = [
   ['/app/dashboard', 'Início', Home],
   ['/app/clientes', 'Clientes', Users],
   ['/app/processos', 'Processos', Scale],
   ['/app/prazos', 'Prazos', CalendarDays],
-  ['/app/contratos', 'Contratos', ScrollText],
   ['/app/documentos', 'Documentos', FileText],
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/tarefas', 'Tarefas', CheckSquare],
