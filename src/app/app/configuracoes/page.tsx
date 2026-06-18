@@ -9,7 +9,7 @@ export default async function Configuracoes(){
   if(!profile){
     return <div>
       <PageHeader title="Configurações" subtitle="Finalize os dados iniciais do AdvOS dentro do painel." />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div>
         <form action="/api/setup" method="post" className="card p-8">
           <h1 className="text-3xl font-black">Definir escritório e usuário inicial</h1>
           <p className="mt-2 text-slate-600">Esta configuração fica apenas na aba Configurações. Depois de salvar, o painel principal será liberado.</p>
@@ -46,15 +46,6 @@ export default async function Configuracoes(){
 
           <button className="btn btn-primary mt-8">Salvar configurações</button>
         </form>
-        <aside className="card h-fit p-6">
-          <h2 className="text-xl font-black">Fluxo interno</h2>
-          <ol className="mt-4 space-y-3 text-sm text-slate-600">
-            <li><b>1.</b> O primeiro usuário é criado no Supabase Auth.</li>
-            <li><b>2.</b> O usuário entra normalmente no AdvOS.</li>
-            <li><b>3.</b> A configuração do escritório aparece só nesta aba.</li>
-            <li><b>4.</b> Depois, os demais usuários são criados em Usuários.</li>
-          </ol>
-        </aside>
       </div>
     </div>
   }
@@ -100,7 +91,7 @@ export default async function Configuracoes(){
       <form action="/api/settings" method="post" className="card p-6 lg:col-span-2">
         <input type="hidden" name="section" value="subscription" />
         <h2 className="text-xl font-black">Acesso interno</h2>
-        <p className="mt-1 text-sm text-slate-500">Na V1, isto serve para controlar o período de uso do escritório sem checkout obrigatório.</p>
+        <p className="mt-1 text-sm text-slate-500">Controle interno do período de acesso do escritório.</p>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <div><label className="label">Plano</label><input name="plan" defaultValue={sub?.plan||'interno'} className="input mt-1" /></div>
           <div><label className="label">Status</label><select name="status" defaultValue={sub?.status||'ativa'} className="input mt-1"><option value="ativa">Ativa</option><option value="vencida">Vencida</option><option value="suspensa">Suspensa</option></select></div>

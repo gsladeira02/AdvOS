@@ -1,5 +1,6 @@
--- AdvOS V1 - Supabase schema
--- Rode este SQL no Supabase SQL Editor.
+-- AdvOS V3 - Supabase schema completo
+-- Para instalação nova: rode este arquivo no Supabase SQL Editor.
+-- Para projeto que já rodou V1/V2: rode supabase/v3_migration.sql.
 
 create extension if not exists "uuid-ossp";
 
@@ -50,6 +51,7 @@ create table if not exists clients (
   email text,
   address text,
   notes text,
+  asaas_customer_id text,
   created_at timestamptz not null default now()
 );
 
@@ -119,6 +121,8 @@ create table if not exists documents (
   doc_type text,
   storage_path text,
   external_url text,
+  zapsign_doc_token text,
+  signature_status text default 'sem_assinatura',
   notes text,
   created_at timestamptz not null default now()
 );
@@ -128,13 +132,16 @@ create table if not exists document_signatures (
   law_firm_id uuid not null references law_firms(id) on delete cascade,
   document_id uuid references documents(id) on delete cascade,
   provider text default 'zapsign',
+  external_id text,
   status text default 'preparado',
   signature_url text,
   signed_document_url text,
   signer_name text,
   signer_email text,
+  signer_phone text,
   sent_at timestamptz,
   signed_at timestamptz,
+  raw_payload jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -156,7 +163,18 @@ create table if not exists financial_installments (
   due_date date,
   paid_at date,
   status text default 'pendente',
-  created_at timestamptz not null default now()
+  provider text,
+  external_id text,
+  payment_url text,
+  invoice_url text,
+  bank_slip_url text,
+  pix_qr_code text,
+  pix_payload text,
+  billing_type text,
+  integration_status text,
+  raw_payload jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz default now()
 );
 
 create table if not exists tasks (
@@ -183,7 +201,35 @@ create table if not exists activity_logs (
   created_at timestamptz not null default now()
 );
 
--- Helper: retorna o escritório do usuário logado
+create table if not exists integration_settings (
+  id uuid primary key default uuid_generate_v4(),
+  law_firm_id uuid not null references law_firms(id) on delete cascade,
+  provider text not null,
+  enabled boolean not null default false,
+  environment text not null default 'sandbox',
+  api_token text,
+  token_last4 text,
+  api_base_url text,
+  webhook_secret text,
+  default_billing_type text,
+  status text default 'pendente',
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(law_firm_id, provider)
+);
+
+create table if not exists webhook_events (
+  id uuid primary key default uuid_generate_v4(),
+  law_firm_id uuid references law_firms(id) on delete set null,
+  provider text not null,
+  event_id text,
+  event_type text,
+  payload jsonb,
+  processed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create or replace function public.current_law_firm_id()
 returns uuid language sql stable security definer as $$
   select law_firm_id from public.profiles where auth_user_id = auth.uid() limit 1;
@@ -203,12 +249,27 @@ alter table financial_contracts enable row level security;
 alter table financial_installments enable row level security;
 alter table tasks enable row level security;
 alter table activity_logs enable row level security;
+alter table integration_settings enable row level security;
+alter table webhook_events enable row level security;
 
--- Políticas: todos os usuários do mesmo escritório têm o mesmo nível de acesso na V1.
+drop policy if exists "law_firms_same_firm_select" on law_firms;
+drop policy if exists "profiles_same_firm_all" on profiles;
+drop policy if exists "subscriptions_same_firm_select" on subscriptions;
+drop policy if exists "clients_same_firm_all" on clients;
+drop policy if exists "cases_same_firm_all" on cases;
+drop policy if exists "case_parties_same_firm_all" on case_parties;
+drop policy if exists "deadlines_same_firm_all" on deadlines;
+drop policy if exists "calendar_events_same_firm_all" on calendar_events;
+drop policy if exists "documents_same_firm_all" on documents;
+drop policy if exists "document_signatures_same_firm_all" on document_signatures;
+drop policy if exists "financial_contracts_same_firm_all" on financial_contracts;
+drop policy if exists "financial_installments_same_firm_all" on financial_installments;
+drop policy if exists "tasks_same_firm_all" on tasks;
+drop policy if exists "activity_logs_same_firm_all" on activity_logs;
+
 create policy "law_firms_same_firm_select" on law_firms for select using (id = public.current_law_firm_id());
 create policy "profiles_same_firm_all" on profiles for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 create policy "subscriptions_same_firm_select" on subscriptions for select using (law_firm_id = public.current_law_firm_id());
-
 create policy "clients_same_firm_all" on clients for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 create policy "cases_same_firm_all" on cases for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 create policy "case_parties_same_firm_all" on case_parties for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
@@ -221,10 +282,14 @@ create policy "financial_installments_same_firm_all" on financial_installments f
 create policy "tasks_same_firm_all" on tasks for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 create policy "activity_logs_same_firm_all" on activity_logs for all using (law_firm_id = public.current_law_firm_id()) with check (law_firm_id = public.current_law_firm_id());
 
--- CONFIGURAÇÃO INICIAL DA V1
+create index if not exists idx_document_signatures_external_id on document_signatures(external_id);
+create index if not exists idx_financial_installments_external_id on financial_installments(external_id);
+create index if not exists idx_clients_asaas_customer_id on clients(asaas_customer_id);
+create index if not exists idx_webhook_events_provider_event on webhook_events(provider, event_id);
+
+-- Instalação inicial:
 -- 1) Crie apenas o primeiro usuário em Authentication > Users.
--- 2) Faça login no AdvOS com esse usuário.
--- 3) O sistema abrirá /configuracao-inicial.
--- 4) Preencha os dados do escritório, do usuário inicial e do acesso.
--- 5) O AdvOS criará automaticamente os registros em law_firms, subscriptions e profiles.
--- 6) Os demais usuários devem ser criados dentro do painel em /app/usuarios.
+-- 2) Entre no AdvOS com este usuário.
+-- 3) Vá em Configurações para definir escritório, usuário e acesso.
+-- 4) Os demais usuários são criados dentro do painel.
+-- 5) Em Integrações, conecte ZapSign e Asaas quando quiser usar assinatura/cobrança real.

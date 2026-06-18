@@ -1,6 +1,6 @@
 {
-  "name": "advos-v1",
-  "version": "1.0.1",
+  "name": "advos-v3",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
