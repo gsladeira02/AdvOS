@@ -61,5 +61,5 @@ export async function POST(req:Request){
   if(profile.error) return NextResponse.json({error:profile.error.message},{status:400});
 
   await admin.from('activity_logs').insert({law_firm_id:lawFirmId,auth_user_id:session.user.id,action:'configuracao_inicial',entity:'law_firms',entity_id:lawFirmId});
-  return NextResponse.json({ok:true});
+  return NextResponse.redirect(new URL('/app/dashboard', req.url), 303);
 }
