@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server';import { getCurrentProfile } from '@/lib/current';
+export async function POST(req:Request){const {supabase,profile}=await getCurrentProfile(); const f=await req.formData(); await supabase.from('documents').insert({law_firm_id:profile.law_firm_id,client_id:f.get('client_id')||null,case_id:f.get('case_id')||null,title:f.get('title'),doc_type:f.get('doc_type'),external_url:f.get('external_url'),notes:f.get('notes')}); return NextResponse.redirect(new URL('/app/documentos',req.url),303)}

@@ -1,0 +1,3 @@
+export const money = (v:number|null|undefined)=> new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
+export const dateBR = (v:string|null|undefined)=> v ? new Date(v+'T12:00:00').toLocaleDateString('pt-BR') : '-';
+export const deadlineClass=(date?:string,status?:string)=>{ if(status==='concluido') return 'badge-ok'; if(!date) return 'badge-info'; const today=new Date(); today.setHours(0,0,0,0); const d=new Date(date+'T00:00:00'); const diff=Math.ceil((d.getTime()-today.getTime())/86400000); if(diff<0) return 'badge-danger'; if(diff<=3) return 'badge-warn'; return 'badge-info'; };
