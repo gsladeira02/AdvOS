@@ -316,6 +316,33 @@ export default async function PastaCliente({ params, searchParams }: { params: P
               <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} link(s) de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
               <p><b>Data:</b> {dateBR(g.contract_date)}</p>
             </div>
+            {charges.length ? <div className="mt-4 overflow-x-auto rounded-2xl border border-[#eee4d4]">
+              <table className="table">
+                <thead><tr><th>Cobrança</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Link</th><th>Ação</th></tr></thead>
+                <tbody>{charges.map((i:any, idx:number)=>{
+                  const url = linkFromInstallment(i);
+                  return <tr key={i.id}>
+                    <td>{idx === 0 ? 'Entrada/parcela' : `Parcela ${idx + 1}`}</td>
+                    <td>{dateBR(i.due_date)}</td>
+                    <td>{money(i.amount || 0)}</td>
+                    <td><span className={`badge ${statusClass(i.integration_status || i.status)}`}>{i.integration_status || i.status || 'pendente'}</span></td>
+                    <td>{url ? <Link href={url} target="_blank" className="font-bold text-blue-700">abrir</Link> : '-'}</td>
+                    <td>
+                      <form action="/api/asaas/create-payment" method="post" className="flex min-w-[210px] gap-2">
+                        <input type="hidden" name="installment_id" value={i.id} />
+                        <input type="hidden" name="redirect_to" value={`/app/clientes/${client.id}`} />
+                        <select className="input" name="billingType" defaultValue={i.billing_type || 'BOLETO'}>
+                          <option value="BOLETO">Boleto</option>
+                          <option value="PIX">Pix</option>
+                          <option value="UNDEFINED">Cliente escolhe</option>
+                        </select>
+                        <button className="font-bold text-blue-700">{i.external_id ? 'Atualizar' : 'Gerar'}</button>
+                      </form>
+                    </td>
+                  </tr>
+                })}</tbody>
+              </table>
+            </div> : null}
           </div>
         })}
         {!generated.length && <p className="text-sm text-slate-500">Nenhum documento gerado para este cliente.</p>}

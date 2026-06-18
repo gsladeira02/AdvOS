@@ -18,15 +18,16 @@ function mapAsaasStatus(status?: string) {
   return 'pendente';
 }
 
-async function asaasFetch(baseUrl: string, token: string, path: string, body: any) {
+async function asaasRequest(baseUrl: string, token: string, method: 'POST' | 'PUT' | 'GET', path: string, body?: any) {
   const response = await fetch(`${baseUrl}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       'Content-Type': 'application/json',
+      accept: 'application/json',
       'User-Agent': 'AdvOS',
       access_token: token,
     },
-    body: JSON.stringify(body),
+    body: method === 'GET' ? undefined : JSON.stringify(body || {}),
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -36,11 +37,22 @@ async function asaasFetch(baseUrl: string, token: string, path: string, body: an
   return json;
 }
 
+function paymentLinks(payment: any) {
+  return {
+    payment_url: payment.paymentLink || payment.invoiceUrl || null,
+    invoice_url: payment.invoiceUrl || null,
+    bank_slip_url: payment.bankSlipUrl || null,
+    pix_qr_code: payment.pixQrCode || payment.encodedImage || null,
+    pix_payload: payment.pixCopyPaste || payment.payload || null,
+  };
+}
+
 export async function POST(req: Request) {
   const { session, profile } = await getCurrentProfile();
   const f = await req.formData();
   const installmentId = str(f.get('installment_id'));
-  const billingType = str(f.get('billingType')) || 'BOLETO';
+  const requestedBillingType = str(f.get('billingType'));
+  const redirectTo = str(f.get('redirect_to')) || '/app/financeiro';
   const admin = createAdminSupabase();
 
   const { data: installment } = await admin
@@ -58,14 +70,14 @@ export async function POST(req: Request) {
   const config = await getIntegrationConfig(profile.law_firm_id, 'asaas');
   if (!config.configured) {
     await admin.from('financial_installments').update({ provider: 'asaas', integration_status: 'configuracao_pendente' }).eq('id', installment.id);
-    return NextResponse.redirect(new URL('/app/financeiro?asaas=configuracao', req.url), 303);
+    return NextResponse.redirect(new URL(`${redirectTo}${redirectTo.includes('?') ? '&' : '?'}asaas=configuracao`, req.url), 303);
   }
 
   try {
     let customerId = client.asaas_customer_id;
 
     if (!customerId) {
-      const customer = await asaasFetch(config.baseUrl, config.token, '/customers', {
+      const customer = await asaasRequest(config.baseUrl, config.token, 'POST', '/customers', {
         name: client.name,
         cpfCnpj: onlyNumbers(client.doc) || undefined,
         email: client.email || undefined,
@@ -77,23 +89,26 @@ export async function POST(req: Request) {
     }
 
     const dueDate = installment.due_date || new Date().toISOString().slice(0, 10);
-    const payment = await asaasFetch(config.baseUrl, config.token, '/payments', {
+    const billingType = requestedBillingType || config.defaultBillingType || 'BOLETO';
+    const paymentPayload = {
       customer: customerId,
-      billingType: billingType || config.defaultBillingType,
+      billingType,
       dueDate,
       value: Number(installment.amount || 0),
       description: installment.financial_contracts?.description || 'Honorários advocatícios',
       externalReference: installment.id,
-    });
+    };
+
+    const payment = installment.external_id
+      ? await asaasRequest(config.baseUrl, config.token, 'PUT', `/payments/${installment.external_id}`, paymentPayload)
+      : await asaasRequest(config.baseUrl, config.token, 'POST', '/payments', paymentPayload);
 
     await admin.from('financial_installments').update({
       provider: 'asaas',
-      external_id: payment.id,
-      integration_status: 'criada',
+      external_id: payment.id || installment.external_id,
+      integration_status: installment.external_id ? 'atualizada' : 'criada',
       status: mapAsaasStatus(payment.status),
-      payment_url: payment.paymentLink || payment.invoiceUrl || null,
-      invoice_url: payment.invoiceUrl || null,
-      bank_slip_url: payment.bankSlipUrl || null,
+      ...paymentLinks(payment),
       billing_type: payment.billingType || billingType,
       raw_payload: payment,
       updated_at: new Date().toISOString(),
@@ -102,10 +117,12 @@ export async function POST(req: Request) {
     await admin.from('activity_logs').insert({
       law_firm_id: profile.law_firm_id,
       auth_user_id: session.user.id,
-      action: 'criou_cobranca_asaas',
+      action: installment.external_id ? 'atualizou_cobranca_asaas' : 'criou_cobranca_asaas',
       entity: 'financial_installments',
       entity_id: installment.id,
     });
+
+    return NextResponse.redirect(new URL(`${redirectTo}${redirectTo.includes('?') ? '&' : '?'}asaas=ok`, req.url), 303);
   } catch (error: any) {
     await admin.from('financial_installments').update({
       provider: 'asaas',
@@ -113,7 +130,6 @@ export async function POST(req: Request) {
       raw_payload: { message: error?.message || 'Erro desconhecido' },
       updated_at: new Date().toISOString(),
     }).eq('id', installment.id).eq('law_firm_id', profile.law_firm_id);
+    return NextResponse.redirect(new URL(`${redirectTo}${redirectTo.includes('?') ? '&' : '?'}asaas=erro`, req.url), 303);
   }
-
-  return NextResponse.redirect(new URL('/app/financeiro', req.url), 303);
 }

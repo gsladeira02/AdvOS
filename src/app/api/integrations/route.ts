@@ -19,12 +19,13 @@ export async function POST(req: Request) {
   const environment = str(f.get('environment')) || 'sandbox';
   const apiToken = str(f.get('api_token'));
   const apiBaseUrl = str(f.get('api_base_url')) || defaultBaseUrl(provider as any, environment);
+  const webhookSecret = str(f.get('webhook_secret'));
   const enabled = str(f.get('enabled')) === 'true';
   const admin = createAdminSupabase();
 
   const existing = await admin
     .from('integration_settings')
-    .select('id,api_token,token_last4')
+    .select('id,api_token,token_last4,webhook_secret')
     .eq('law_firm_id', profile.law_firm_id)
     .eq('provider', provider)
     .maybeSingle();
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     environment,
     api_base_url: apiBaseUrl,
     default_billing_type: provider === 'asaas' ? str(f.get('default_billing_type')) || 'BOLETO' : null,
+    webhook_secret: webhookSecret || existing.data?.webhook_secret || null,
     status: enabled ? 'configurado' : 'desativado',
     updated_at: new Date().toISOString(),
   };

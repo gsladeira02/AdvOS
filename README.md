@@ -58,3 +58,31 @@ NEXT_PUBLIC_APP_URL=
 - Cada cliente pode ter um serviço prestado vinculado.
 - O serviço vinculado é usado como base no objeto do contrato e no valor padrão da cobrança.
 - Para atualizar da V7, rode `supabase/v8_migration.sql`.
+
+## AdvOS V8.3 - Asaas
+
+Esta versão reforça a integração com o Asaas:
+
+- Configuração da API Key em `/app/integracoes`.
+- Teste de conexão com o Asaas.
+- Criação automática de webhook do Asaas.
+- Validação do header `asaas-access-token` no webhook.
+- Criação/atualização de cobranças sem duplicar parcelas já integradas.
+- Botão para gerar/atualizar cobranças Asaas diretamente na pasta do cliente.
+- Links de cobrança ficam disponíveis para envio por WhatsApp.
+
+Após atualizar os arquivos, rode no Supabase:
+
+```sql
+-- supabase/v8_3_asaas_integration.sql
+```
+
+Depois configure em `/app/integracoes`:
+
+1. Ambiente: Sandbox ou Produção.
+2. API Key do Asaas.
+3. Tipo padrão: Boleto, Pix ou Cliente escolhe.
+4. Token de segurança do webhook.
+5. Salvar Asaas.
+6. Testar conexão.
+7. Criar webhook no Asaas.

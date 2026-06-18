@@ -73,6 +73,7 @@ export default async function Financeiro() {
 
                 <form action="/api/asaas/create-payment" method="post" className="rounded-2xl border border-[#eee4d4] p-4">
                   <input type="hidden" name="installment_id" value={i.id} />
+                  <input type="hidden" name="redirect_to" value="/app/financeiro" />
                   <h3 className="font-black">Asaas</h3>
                   <p className="mt-1 text-xs text-slate-500">Crie ou atualize a cobrança vinculada a esta parcela.</p>
                   <div className="mt-3 grid gap-3">
