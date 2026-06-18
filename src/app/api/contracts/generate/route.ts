@@ -415,6 +415,7 @@ export async function POST(req: Request) {
   const data: Record<string, string> = {
     document_type: str(f.get('document_type')) || 'contrato_honorarios',
     client_id: str(f.get('client_id')),
+    service_id: str(f.get('service_id')),
     case_id: str(f.get('case_id')),
     client_name: str(f.get('client_name')),
     nationality: str(f.get('nationality')),
@@ -450,6 +451,16 @@ export async function POST(req: Request) {
     ? await admin.from('clients').select('*').eq('id', data.client_id).eq('law_firm_id', profile.law_firm_id).maybeSingle()
     : { data: null } as any;
 
+  const serviceId = data.service_id || clientRow?.service_id || null;
+  const { data: serviceRow } = serviceId
+    ? await admin.from('legal_services').select('*').eq('id', serviceId).eq('law_firm_id', profile.law_firm_id).maybeSingle()
+    : { data: null } as any;
+
+  if (serviceRow) {
+    data.object = data.object || serviceRow.description || serviceRow.name || '';
+    data.total_amount = data.total_amount || String(serviceRow.default_amount || '');
+  }
+
   // Se o usuário selecionar um cliente e deixar campos em branco, usamos o cadastro do cliente.
   if (clientRow) {
     data.client_name = data.client_name || clientRow.name || '';
@@ -473,6 +484,7 @@ export async function POST(req: Request) {
   const { data: doc } = await admin.from('documents').insert({
     law_firm_id: profile.law_firm_id,
     client_id: data.client_id || null,
+    service_id: serviceId,
     case_id: data.case_id || null,
     title: filename,
     doc_type: data.document_type,
@@ -484,6 +496,7 @@ export async function POST(req: Request) {
   const { data: generated } = await admin.from('generated_contracts').insert({
     law_firm_id: profile.law_firm_id,
     client_id: data.client_id || null,
+    service_id: serviceId,
     case_id: data.case_id || null,
     generated_by: session.user.id,
     document_type: data.document_type,
@@ -517,7 +530,8 @@ export async function POST(req: Request) {
   const { data: financialContract } = await admin.from('financial_contracts').insert({
     law_firm_id: profile.law_firm_id,
     client_id: data.client_id || null,
-    description: `${titleFor(data.document_type)} - ${data.client_name}`,
+    service_id: serviceId,
+    description: `${titleFor(data.document_type)}${serviceRow?.name ? ` - ${serviceRow.name}` : ''} - ${data.client_name}`,
     total_amount: num(data.total_amount),
     status: 'ativo',
   }).select('id').single();

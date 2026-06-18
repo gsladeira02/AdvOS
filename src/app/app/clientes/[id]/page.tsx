@@ -48,7 +48,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
   if (!client) notFound();
 
-  const [docsRes, generatedRes, casesRes, profilesRes] = await Promise.all([
+  const [docsRes, generatedRes, casesRes, profilesRes, servicesRes] = await Promise.all([
     supabase
       .from('documents')
       .select('*, cases(case_number,area,action_type), document_signatures(signature_url,status)')
@@ -72,6 +72,11 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       .select('full_name,email,phone,oab_number')
       .eq('law_firm_id', profile.law_firm_id)
       .order('full_name'),
+    supabase
+      .from('legal_services')
+      .select('*')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('name'),
   ]);
 
   const generated = generatedRes.data || [];
@@ -91,6 +96,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
     download_url: d.external_url || await signedUrl(d.storage_path),
   })));
 
+  const services = servicesRes.data || [];
+  const selectedService = services.find((s: any) => s.id === client.service_id);
   const lawyers = (profilesRes.data || []).filter((p: any) => p.full_name);
   const defaultOutorgados = lawyers
     .map((p: any) => `${p.full_name}${p.oab_number ? `, OAB ${p.oab_number}` : ''}`)
@@ -116,6 +123,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <p><b>Tipo:</b> {client.client_type || '-'}</p>
             <p><b>WhatsApp:</b> {clientPhone || '-'}</p>
             <p><b>E-mail:</b> {client.email || '-'}</p>
+            <p><b>Serviço:</b> {selectedService?.name || '-'}</p>
             <p className="md:col-span-2"><b>Endereço:</b> {client.address || '-'}</p>
           </div>
         </div>
@@ -123,6 +131,27 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           <b>Pasta em nuvem</b>
           <p className="mt-2">Esta tela concentra documentos gerados, arquivos enviados manualmente, links de assinatura, cobranças e processos do cliente.</p>
         </div>
+      </div>
+    </section>
+
+    <section className="card mb-6 p-5">
+      <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+        <div>
+          <h2 className="text-xl font-black">Serviço prestado</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Defina aqui qual serviço jurídico está sendo prestado para este cliente. O serviço escolhido será usado como base no objeto do contrato e na cobrança.
+          </p>
+          {selectedService?.description && <p className="mt-3 rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-sm text-slate-600"><b>Objeto padrão:</b> {selectedService.description}</p>}
+        </div>
+        <form action="/api/client-service" method="post" className="grid gap-3">
+          <input type="hidden" name="client_id" value={client.id} />
+          <select className="input" name="service_id" defaultValue={client.service_id || ''}>
+            <option value="">Sem serviço definido</option>
+            {services.map((s:any)=><option value={s.id} key={s.id}>{s.name}{!s.active ? ' (inativo)' : ''}</option>)}
+          </select>
+          <button className="btn btn-primary">Salvar serviço do cliente</button>
+          {!services.length && <Link href="/app/servicos" className="btn btn-secondary text-center">Cadastrar serviços</Link>}
+        </form>
       </div>
     </section>
 
@@ -136,6 +165,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
       <form action="/api/contracts/generate" method="post" className="space-y-6">
         <input type="hidden" name="client_id" value={client.id} />
+        <input type="hidden" name="service_id" value={client.service_id || ''} />
         <input type="hidden" name="redirect_to" value={`/app/clientes/${client.id}?gerado=1`} />
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -189,7 +219,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <input className="input" name="forum" placeholder="Foro" defaultValue="Vila Velha/ES" />
             <input className="input" name="contract_date" type="date" />
             <input className="input" name="due_day" type="number" min="1" max="31" placeholder="Dia vencimento" />
-            <input className="input md:col-span-4" name="object" defaultValue="propositura de ação judicial e/ou atuação administrativa relacionada a infrações de trânsito, CNH, suspensão ou cassação do direito de dirigir" placeholder="Objeto do serviço" />
+            <input className="input md:col-span-4" name="object" defaultValue={selectedService?.description || "propositura de ação judicial e/ou atuação administrativa relacionada a infrações de trânsito, CNH, suspensão ou cassação do direito de dirigir"} placeholder="Objeto do serviço" />
             <textarea className="input md:col-span-4" name="attorneys" rows={3} defaultValue={defaultOutorgados} placeholder="Outorgados/contratados: nome, OAB e qualificação" />
           </div>
         </div>
@@ -206,7 +236,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         <div>
           <h3 className="mb-3 text-lg font-black">Honorários e cobranças Asaas</h3>
           <div className="grid gap-4 md:grid-cols-6">
-            <input className="input" name="total_amount" type="number" step="0.01" placeholder="Valor total" />
+            <input className="input" name="total_amount" type="number" step="0.01" placeholder="Valor total" defaultValue={selectedService?.default_amount || ''} />
             <input className="input" name="entry_amount" type="number" step="0.01" placeholder="Entrada" />
             <input className="input" name="entry_date" type="date" placeholder="Data da entrada" />
             <input className="input" name="installment_count" type="number" placeholder="Nº parcelas" />

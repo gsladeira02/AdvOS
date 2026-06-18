@@ -49,3 +49,12 @@ NEXT_PUBLIC_APP_URL=
 - O bucket `documents` é privado.
 - Os arquivos da pasta do cliente são abertos por signed URL gerada no servidor.
 - Para ZapSign e Asaas funcionarem, configure as chaves em `/app/integracoes`.
+
+
+## AdvOS V8
+
+- Aba Documentos removida do menu lateral; documentos ficam dentro da pasta do cliente.
+- Nova aba Serviços para cadastrar serviços jurídicos do escritório.
+- Cada cliente pode ter um serviço prestado vinculado.
+- O serviço vinculado é usado como base no objeto do contrato e no valor padrão da cobrança.
+- Para atualizar da V7, rode `supabase/v8_migration.sql`.
