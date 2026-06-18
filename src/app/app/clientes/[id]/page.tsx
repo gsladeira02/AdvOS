@@ -7,6 +7,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
 import { dateBR, money } from '@/lib/utils';
+import { ClientFileUploader } from '@/components/ClientFileUploader';
 
 async function signedUrl(path?: string | null) {
   if (!path) return '';
@@ -255,40 +256,39 @@ export default async function PastaCliente({ params, searchParams }: { params: P
     </section>
 
     <section className="card mb-6 p-5">
-      <h2 className="text-xl font-black">Enviar arquivo para a pasta</h2>
-      <form action="/api/client-files/upload" method="post" encType="multipart/form-data" className="mt-4 grid gap-4 md:grid-cols-4">
-        <input type="hidden" name="client_id" value={client.id} />
-        <input className="input" name="title" placeholder="Nome do documento" />
-        <select className="input" name="doc_type" defaultValue="outros">
-          <option value="procuração">procuração</option>
-          <option value="contrato de honorários">contrato de honorários</option>
-          <option value="documento pessoal">documento pessoal</option>
-          <option value="comprovante">comprovante</option>
-          <option value="petição">petição</option>
-          <option value="decisão">decisão</option>
-          <option value="sentença">sentença</option>
-          <option value="acordo">acordo</option>
-          <option value="recibo">recibo</option>
-          <option value="outros">outros</option>
-        </select>
-        <input className="input" name="file" type="file" required />
-        <button className="btn btn-primary">Enviar arquivo</button>
-        <input className="input md:col-span-4" name="notes" placeholder="Observações" />
-      </form>
+      <h2 className="text-xl font-black">Enviar documentos para a pasta</h2>
+      <p className="mt-2 text-sm text-slate-600">
+        Arraste um ou mais arquivos para dentro da pasta do cliente. Você pode escolher o nome de cada documento antes do envio; se deixar em branco, o AdvOS usa o nome original do arquivo.
+      </p>
+      <ClientFileUploader clientId={client.id} />
     </section>
 
     <section className="card mb-6 p-5">
       <h2 className="text-xl font-black">Documentos da pasta</h2>
       <div className="mt-4 overflow-x-auto">
         <table className="table">
-          <thead><tr><th>Documento</th><th>Tipo</th><th>Processo</th><th>Assinatura</th><th>Arquivo</th><th>Criado em</th></tr></thead>
+          <thead><tr><th>Documento</th><th>Processo</th><th>Assinatura</th><th>Arquivo</th><th>Criado em</th><th>Ações</th></tr></thead>
           <tbody>{docs.map((d:any)=><tr key={d.id}>
-            <td><b>{d.title}</b><br/><span className="text-xs text-slate-500">{d.notes}</span></td>
-            <td>{d.doc_type || '-'}</td>
+            <td>
+              <form action="/api/client-files/rename" method="post" className="min-w-[260px] space-y-2">
+                <input type="hidden" name="client_id" value={client.id} />
+                <input type="hidden" name="document_id" value={d.id} />
+                <input className="input" name="title" defaultValue={d.title} placeholder="Nome do documento" />
+                {d.notes && <span className="block text-xs text-slate-500">{d.notes}</span>}
+                <button className="text-xs font-bold text-blue-700">Salvar nome</button>
+              </form>
+            </td>
             <td>{d.cases?.case_number || d.cases?.action_type || '-'}</td>
             <td>{d.document_signatures?.[0]?.signature_url ? <Link className="font-bold text-blue-700" href={d.document_signatures[0].signature_url} target="_blank">ZapSign</Link> : (d.signature_status || '-')}</td>
             <td>{d.download_url ? <Link className="font-bold text-blue-700" href={d.download_url} target="_blank">abrir arquivo</Link> : '-'}</td>
             <td>{dateBR(d.created_at)}</td>
+            <td>
+              <form action="/api/client-files/delete" method="post">
+                <input type="hidden" name="client_id" value={client.id} />
+                <input type="hidden" name="document_id" value={d.id} />
+                <button className="font-bold text-red-700">Apagar</button>
+              </form>
+            </td>
           </tr>)}</tbody>
         </table>
         {!docs.length && <p className="mt-3 text-sm text-slate-500">Nenhum documento salvo para este cliente.</p>}

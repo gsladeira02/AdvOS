@@ -1,0 +1,3 @@
+-- AdvOS V8.2
+-- Não há alteração obrigatória de banco.
+-- Esta versão altera o upload da pasta do cliente para múltiplos arquivos, renomeação e exclusão.
