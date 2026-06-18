@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { dateBR, money } from '@/lib/utils';
 import Link from 'next/link';
+import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
 
 function statusBadge(status: string) {
   if (status === 'pago') return 'badge-ok';
@@ -66,6 +67,7 @@ export default async function Financeiro() {
                     <p><b>Valor:</b> {money(i.amount)}</p>
                     <p><b>ID externo:</b> {i.external_id || '-'}</p>
                     <p><b>Link:</b> {i.invoice_url || i.payment_url ? <Link href={i.invoice_url || i.payment_url} target="_blank" className="font-bold text-blue-700">abrir cobrança</Link> : '-'}</p>
+                  <p><b>WhatsApp:</b> {(() => { const url = i.invoice_url || i.payment_url || i.bank_slip_url; const wa = whatsappUrl(client?.whatsapp || client?.phone, buildContractLinksMessage({ clientName: client?.name, asaasLinks: [{ label: 'Cobrança de honorários', amount: i.amount, dueDate: i.due_date, url }] })); return wa && url ? <Link href={wa} target="_blank" className="font-bold text-green-700">enviar cobrança</Link> : '-'; })()}</p>
                   </div>
                 </div>
 

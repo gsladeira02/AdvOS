@@ -444,9 +444,22 @@ export async function POST(req: Request) {
     billing_type: str(f.get('billing_type')) || 'BOLETO',
   };
 
+  const admin = createAdminSupabase();
+  const { data: clientRow } = data.client_id
+    ? await admin.from('clients').select('*').eq('id', data.client_id).eq('law_firm_id', profile.law_firm_id).maybeSingle()
+    : { data: null } as any;
+
+  // Se o usuário selecionar um cliente e deixar campos em branco, usamos o cadastro do cliente.
+  if (clientRow) {
+    data.client_name = data.client_name || clientRow.name || '';
+    data.email = data.email || clientRow.email || '';
+    data.phone = data.phone || clientRow.whatsapp || clientRow.phone || '';
+    data.cpf = data.cpf || clientRow.doc || '';
+    data.address = data.address || clientRow.address || '';
+  }
+
   if (!data.client_name) return NextResponse.json({ error: 'Informe o nome do contratante/outorgante.' }, { status: 400 });
 
-  const admin = createAdminSupabase();
   const filename = filenameFor(data.document_type, data.client_name);
   const pdfBuffer = await generatePdfBuffer(data);
   const storagePath = `${profile.law_firm_id}/contratos/${Date.now()}-${filename}`;
@@ -455,10 +468,6 @@ export async function POST(req: Request) {
     contentType: 'application/pdf',
     upsert: true,
   }).catch(() => null);
-
-  const { data: clientRow } = data.client_id
-    ? await admin.from('clients').select('*').eq('id', data.client_id).eq('law_firm_id', profile.law_firm_id).maybeSingle()
-    : { data: null } as any;
 
   const { data: doc } = await admin.from('documents').insert({
     law_firm_id: profile.law_firm_id,

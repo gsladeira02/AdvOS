@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import Link from 'next/link';
+import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
 
 function signatureBadge(status?: string) {
   if (!status) return 'badge-info';
@@ -80,6 +81,7 @@ export default async function Documentos() {
                     <p><b>Processo:</b> {d.cases?.case_number || '-'}</p>
                     <p><b>PDF:</b> {d.external_url ? <Link href={d.external_url} target="_blank" className="font-bold text-blue-700">abrir link</Link> : 'não informado'}</p>
                     <p><b>Assinatura:</b> {sig?.signature_url ? <Link href={sig.signature_url} target="_blank" className="font-bold text-blue-700">abrir link</Link> : '-'}</p>
+                    <p><b>WhatsApp:</b> {sig?.signature_url ? (() => { const wa = whatsappUrl(d.clients?.whatsapp || d.clients?.phone, buildContractLinksMessage({ clientName: d.clients?.name, zapsignUrl: sig.signature_url })); return wa ? <Link href={wa} target="_blank" className="font-bold text-green-700">enviar assinatura</Link> : '-'; })() : '-'}</p>
                   </div>
                   {d.notes && <p className="mt-3 text-sm text-slate-500">{d.notes}</p>}
                 </div>

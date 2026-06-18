@@ -1,62 +1,36 @@
-# AdvOS V4
+# AdvOS V6
 
-Sistema jurídico interno, desktop-first, para escritórios de advocacia.
+Sistema jurídico interno, desktop-first, com login direto, geração de PDF, ZapSign, Asaas, WhatsApp e pasta em nuvem por cliente.
 
-## O que mudou na V4
+## Principais mudanças da V6
 
-- Abre direto no login.
-- Sem página pública, planos ou módulos comerciais.
-- Card de “Fluxo interno” removido.
-- Dados do escritório e usuário ficam apenas em `/app/configuracoes`.
-- Aba `/app/integracoes` com ZapSign e Asaas.
-- Nova aba `/app/contratos` para gerar contrato de honorários e procurações.
-- Formulário de contratos baseado na aba `Dados Contrato` da planilha do escritório.
-- Modelos disponíveis:
-  - contrato de honorários;
-  - procuração sem hipossuficiência econômica;
-  - procuração com declaração de hipossuficiência econômica;
-  - kit contrato + procuração sem hipossuficiência;
-  - kit contrato + procuração com hipossuficiência.
-- Geração de arquivo Word editável `.doc` diretamente pelo navegador.
-- Histórico de documentos gerados em `generated_contracts`.
-- Sem `package-lock.json`.
+- O usuário consegue acessar as abas mesmo sem preencher os dados cadastrais do escritório.
+- No primeiro login, o AdvOS cria automaticamente um escritório provisório chamado **Escritório sem cadastro**.
+- Os dados do escritório podem ser completados depois em **Configurações**.
+- A lista de clientes agora abre uma **pasta do cliente**.
+- A pasta do cliente mostra documentos gerados, documentos enviados manualmente, processos vinculados e contratos gerados.
+- A pasta do cliente permite upload de arquivos para o Supabase Storage privado.
+- A aba Contratos gera PDF, salva na pasta do cliente, envia para ZapSign, cria cobranças no Asaas e prepara botão de WhatsApp.
+- O botão de WhatsApp usa o número cadastrado no cliente e envia mensagem com link da ZapSign e links das cobranças Asaas.
+
+## Instalação para quem já está na V5
+
+1. Substitua os arquivos do GitHub por esta versão.
+2. Rode no Supabase:
+
+```sql
+supabase/v6_migration.sql
+```
+
+3. Faça redeploy na Vercel.
+4. Entre no sistema normalmente.
 
 ## Instalação nova
 
-1. Crie o projeto no Supabase.
-2. Rode `supabase/schema.sql` no SQL Editor.
+1. Crie projeto no Supabase.
+2. Rode `supabase/schema.sql`.
 3. Crie o primeiro usuário em `Authentication > Users`.
-4. Configure as variáveis na Vercel.
-5. Faça deploy.
-6. Entre no AdvOS e vá em Configurações para criar o escritório/perfil inicial.
-
-## Atualização de V3 para V4
-
-Se você já rodou o schema da V3, rode apenas:
-
-```sql
--- arquivo: supabase/v4_migration.sql
-```
-
-Depois substitua os arquivos no GitHub e faça redeploy na Vercel.
-
-## Atualização de V1/V2 para V4
-
-Rode primeiro:
-
-```sql
--- arquivo: supabase/v3_migration.sql
-```
-
-Depois rode:
-
-```sql
--- arquivo: supabase/v4_migration.sql
-```
-
-Em seguida substitua os arquivos no GitHub e faça redeploy na Vercel.
-
-## Variáveis obrigatórias
+4. Configure as variáveis na Vercel:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
@@ -65,91 +39,13 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_APP_URL=
 ```
 
-## Variáveis opcionais
+5. Suba o projeto no GitHub e faça deploy na Vercel.
+6. Entre com o usuário criado no Supabase Auth.
+7. Complete os dados do escritório depois em `/app/configuracoes` quando quiser.
 
-Você pode salvar as chaves pela aba Integrações dentro do AdvOS. Se preferir usar env na Vercel:
+## Observações
 
-```env
-ZAPSIGN_API_TOKEN=
-ZAPSIGN_API_BASE_URL=https://api.zapsign.com.br/api/v1
-ASAAS_API_KEY=
-ASAAS_API_BASE_URL=https://api-sandbox.asaas.com/v3
-```
-
-## Webhooks
-
-Configure nos painéis externos:
-
-```text
-ZapSign: https://SEU-DOMINIO/api/webhooks/zapsign
-Asaas:   https://SEU-DOMINIO/api/webhooks/asaas
-```
-
-## Como usar contratos e procurações
-
-1. Vá em `Contratos`.
-2. Escolha o tipo de documento.
-3. Preencha os dados do autor/contratante.
-4. Preencha os honorários quando for contrato ou kit.
-5. Clique em `Gerar arquivo Word`.
-6. O navegador baixa um arquivo `.doc` editável.
-
-## Como usar ZapSign
-
-1. Vá em Integrações e salve o token da ZapSign.
-2. Vá em Documentos.
-3. Cadastre um documento com link público de PDF.
-4. Clique em Enviar para assinatura.
-
-## Como usar Asaas
-
-1. Vá em Integrações e salve a API Key do Asaas.
-2. Cadastre um cliente com CPF/CNPJ, e-mail e telefone.
-3. Vá em Financeiro.
-4. Cadastre uma cobrança.
-5. Clique em Gerar Asaas.
-
-## AdvOS V5 - PDF + ZapSign + Asaas
-
-Esta versão altera a aba **Contratos** para trabalhar com o fluxo completo:
-
-1. preencher os dados do contrato/procuração;
-2. gerar o documento em **PDF**;
-3. salvar o PDF no bucket privado `documents` do Supabase Storage;
-4. enviar o PDF para a ZapSign quando a integração estiver configurada;
-5. criar o contrato financeiro, entrada e parcelas no AdvOS;
-6. criar as cobranças correspondentes no Asaas quando a integração estiver configurada.
-
-### Migração necessária
-
-Se você já estava na V4, rode apenas:
-
-```sql
-supabase/v5_migration.sql
-```
-
-Se estiver instalando do zero, rode a sequência:
-
-```text
-supabase/schema.sql
-supabase/v3_migration.sql
-supabase/v4_migration.sql
-supabase/v5_migration.sql
-```
-
-### Configuração das integrações
-
-Dentro do sistema, acesse:
-
-```text
-/app/integracoes
-```
-
-Configure:
-
-- Token da ZapSign;
-- API Key do Asaas;
-- ambiente sandbox ou produção;
-- tipo de cobrança padrão.
-
-Se a integração não estiver configurada, o sistema ainda gera o PDF e cria os registros internos, mas marca ZapSign/Asaas como configuração pendente.
+- O ZIP não inclui `package-lock.json`.
+- O bucket `documents` é privado.
+- Os arquivos da pasta do cliente são abertos por signed URL gerada no servidor.
+- Para ZapSign e Asaas funcionarem, configure as chaves em `/app/integracoes`.
