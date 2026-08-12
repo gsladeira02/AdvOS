@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { firstTextFromInboundMessage, getOrCreateConversation } from '@/lib/whatsappApi';
+import { firstTextFromInboundMessage, getOrCreateConversation, getWhatsAppConfig } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,82 @@ export async function GET(req: Request) {
 function findFirmByPhoneNumberId(rows: any[] | null, phoneNumberId?: string | null) {
   if (!phoneNumberId) return null;
   return (rows || []).find((row) => row?.raw_settings?.phone_number_id === phoneNumberId) || null;
+}
+
+
+function safeFileName(name: string) {
+  return String(name || 'arquivo')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120) || 'arquivo';
+}
+
+function extensionFromMime(mime?: string | null) {
+  const clean = String(mime || '').toLowerCase();
+  if (clean.includes('jpeg')) return 'jpg';
+  if (clean.includes('png')) return 'png';
+  if (clean.includes('webp')) return 'webp';
+  if (clean.includes('pdf')) return 'pdf';
+  if (clean.includes('mpeg')) return 'mp3';
+  if (clean.includes('ogg')) return 'ogg';
+  if (clean.includes('mp4')) return 'mp4';
+  return 'bin';
+}
+
+async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, messageType: string) {
+  const mediaId = String(mediaNode?.id || '').trim();
+  if (!mediaId) return { mediaUrl: null, storagePath: null, mimeType: mediaNode?.mime_type || null, fileSize: null, fileName: mediaNode?.filename || null };
+
+  try {
+    const config = await getWhatsAppConfig(lawFirmId);
+    if (!config.configured) throw new Error('WhatsApp API não configurado.');
+
+    const metaResponse = await fetch(`${config.baseUrl}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${config.token}` },
+      cache: 'no-store',
+    });
+    const meta = await metaResponse.json().catch(() => ({}));
+    if (!metaResponse.ok || !meta?.url) throw new Error(meta?.error?.message || 'Meta não retornou URL da mídia.');
+
+    const fileResponse = await fetch(meta.url, {
+      headers: { Authorization: `Bearer ${config.token}` },
+      cache: 'no-store',
+    });
+    if (!fileResponse.ok) throw new Error('Falha ao baixar mídia recebida.');
+
+    const mimeType = meta.mime_type || mediaNode?.mime_type || fileResponse.headers.get('content-type') || 'application/octet-stream';
+    const bytes = Buffer.from(await fileResponse.arrayBuffer());
+    const baseName = safeFileName(mediaNode?.filename || `${messageType}-${mediaId}.${extensionFromMime(mimeType)}`);
+    const storagePath = `${lawFirmId}/whatsapp/inbound/${Date.now()}-${baseName}`;
+
+    const upload = await admin.storage.from('documents').upload(storagePath, bytes, {
+      contentType: mimeType,
+      upsert: false,
+    });
+    if (upload.error) throw new Error(upload.error.message);
+
+    const signed = await admin.storage.from('documents').createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+    return {
+      mediaUrl: signed.data?.signedUrl || null,
+      storagePath,
+      mimeType,
+      fileSize: Number(meta.file_size || bytes.length || 0) || null,
+      fileName: baseName,
+    };
+  } catch (error) {
+    console.error('Erro ao cachear mídia recebida do WhatsApp:', error);
+    return {
+      mediaUrl: mediaId,
+      storagePath: null,
+      mimeType: mediaNode?.mime_type || null,
+      fileSize: null,
+      fileName: mediaNode?.filename || null,
+    };
+  }
 }
 
 async function matchClient(lawFirmId: string, phone: string) {
@@ -105,6 +181,7 @@ export async function POST(req: Request) {
         }
 
         const inboundMedia = message?.image || message?.document || message?.video || message?.audio || message?.sticker || null;
+        const cachedMedia = inboundMedia ? await cacheInboundMedia(admin, lawFirmId, inboundMedia, message.type || 'media') : null;
 
         await admin.from('whatsapp_messages').upsert({
           law_firm_id: lawFirmId,
@@ -116,9 +193,11 @@ export async function POST(req: Request) {
           external_id: message.id,
           status: 'received',
           raw_payload: message,
-          file_name: inboundMedia?.filename || null,
-          mime_type: inboundMedia?.mime_type || null,
-          media_url: inboundMedia?.id || null,
+          file_name: cachedMedia?.fileName || inboundMedia?.filename || null,
+          file_size: cachedMedia?.fileSize || null,
+          mime_type: cachedMedia?.mimeType || inboundMedia?.mime_type || null,
+          media_url: cachedMedia?.mediaUrl || inboundMedia?.id || null,
+          storage_path: cachedMedia?.storagePath || null,
           created_at: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
         }, { onConflict: 'external_id' });
 

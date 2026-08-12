@@ -62,17 +62,20 @@ export function WhatsappCentralClient({
     });
   }, [conversations, query]);
 
-  const load = useCallback(async (targetId = selectedId, silent = true) => {
+  const load = useCallback(async (targetId = selectedId, silent = true, searchTerm = query) => {
     if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
       if (targetId) params.set('conversationId', targetId);
+      const cleanSearch = String(searchTerm || '').trim();
+      if (cleanSearch) params.set('q', cleanSearch);
       const response = await fetch(`/api/whatsapp/conversations${params.toString() ? `?${params.toString()}` : ''}`, { cache: 'no-store' });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Erro ao carregar mensagens.');
+      const nextSelectedId = result.selectedId || targetId || result.conversations?.[0]?.id || '';
       setConversations(result.conversations || []);
-      setMessages(result.messages || []);
-      setSelectedId(result.selectedId || targetId || result.conversations?.[0]?.id || '');
+      setMessages((result.messages || []).filter((message: any) => !nextSelectedId || !message?.conversation_id || message.conversation_id === nextSelectedId));
+      setSelectedId(nextSelectedId);
       setLastUpdate(result.fetchedAt || new Date().toISOString());
       setError(null);
     } catch (err: any) {
@@ -80,7 +83,7 @@ export function WhatsappCentralClient({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [selectedId]);
+  }, [selectedId, query]);
 
 
   useEffect(() => {
@@ -96,19 +99,25 @@ export function WhatsappCentralClient({
   }, [supabase, selectedId, load]);
 
   useEffect(() => {
-    const id = window.setInterval(() => load(selectedId, true), 1800);
-    const onFocus = () => load(selectedId, true);
+    const id = window.setInterval(() => load(selectedId, true, query), 1800);
+    const onFocus = () => load(selectedId, true, query);
     window.addEventListener('focus', onFocus);
     return () => {
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
     };
-  }, [load, selectedId]);
+  }, [load, selectedId, query]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => load(selectedId, true, query), 250);
+    return () => window.clearTimeout(id);
+  }, [query]);
 
   function selectConversation(id: string) {
     setSelectedId(id);
     window.history.replaceState(null, '', `/app/whatsapp?conversa=${id}`);
-    load(id, false);
+    setMessages([]);
+    load(id, false, query);
   }
 
   function handleThreadSent(nextConversationId?: string) {
@@ -117,7 +126,7 @@ export function WhatsappCentralClient({
       setSelectedId(target);
       window.history.replaceState(null, '', `/app/whatsapp?conversa=${target}`);
     }
-    load(target, true);
+    load(target, true, query);
   }
 
   return (
@@ -188,7 +197,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={!error} onSent={handleThreadSent} />
+        <WhatsappThread key={selected.id} conversation={selected} messages={messages || []} templates={templates} live={!error} onSent={handleThreadSent} />
       ) : (
         <section className="rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
           Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.

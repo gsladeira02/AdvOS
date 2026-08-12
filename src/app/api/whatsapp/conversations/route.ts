@@ -45,14 +45,15 @@ export async function GET(req: Request) {
       }
     }
 
-    const { data: clientContacts, error: clientsError } = await admin
+    const { data: rawClientContacts, error: clientsError } = await admin
       .from('clients')
       .select('id,law_firm_id,name,phone,whatsapp,created_at,updated_at')
       .eq('law_firm_id', profile.law_firm_id)
-      .or('phone.not.is.null,whatsapp.not.is.null')
       .order('name');
 
     if (clientsError) throw new Error(clientsError.message);
+
+    const clientContacts = (rawClientContacts || []).filter((client: any) => normalizeBrazilPhone(client?.whatsapp || client?.phone || ''));
 
     await syncClientContactsToConversations(admin, profile.law_firm_id, clientContacts || []);
 
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
       .select('*, clients(id,name,whatsapp,phone)')
       .eq('law_firm_id', profile.law_firm_id)
       .order('last_message_at', { ascending: false })
-      .limit(160);
+      .limit(500);
 
     if (conversationError) throw new Error(conversationError.message);
 

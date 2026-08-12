@@ -6,6 +6,7 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
+  Download,
   FileText,
   Image as ImageIcon,
   Laugh,
@@ -106,6 +107,19 @@ function mediaKind(message: any) {
   if (type === 'document' || message?.file_name || message?.storage_path) return 'document';
   return 'text';
 }
+function mediaDisplayUrl(message: any) {
+  const id = String(message?.id || '').trim();
+  if (message?.storage_path && id && !id.startsWith('local-')) return `/api/whatsapp/media/${encodeURIComponent(id)}`;
+  const direct = String(message?.media_url || message?.raw_payload?.advos_media_url || '').trim();
+  if (direct.startsWith('http')) return direct;
+  return id && !id.startsWith('local-') ? `/api/whatsapp/media/${encodeURIComponent(id)}` : '';
+}
+
+function mediaDownloadUrl(message: any) {
+  const display = mediaDisplayUrl(message);
+  if (!display) return '';
+  return display.startsWith('/api/') ? `${display}?download=1` : display;
+}
 
 function stableMessageKey(message: any) {
   return String(message?.external_id || message?.id || `${message?.direction}-${message?.created_at}-${message?.body}`);
@@ -164,8 +178,22 @@ export function WhatsappThread({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const visibleItems = useMemo(() => {
+    const conversationId = String(conversation?.id || '');
+    return (items || []).filter((message: any) => !message?.conversation_id || String(message.conversation_id) === conversationId);
+  }, [items, conversation?.id]);
+
   useEffect(() => {
-    setItems((current) => mergeMessageLists(messages || [], current));
+    const conversationId = String(conversation?.id || '');
+    const cleanServerMessages = (messages || []).filter((message: any) => {
+      if (!message?.conversation_id) return true;
+      return String(message.conversation_id) === conversationId;
+    });
+    setItems((current) => mergeMessageLists(cleanServerMessages, current.filter((message: any) => {
+      if (!message?.optimistic) return false;
+      if (!message?.conversation_id) return true;
+      return String(message.conversation_id) === conversationId;
+    })));
   }, [messages, conversation?.id]);
 
   function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
@@ -193,7 +221,7 @@ export function WhatsappThread({
     } else {
       setNewMessagesBelow(true);
     }
-  }, [items.length]);
+  }, [visibleItems.length]);
 
   const title = useMemo(() => {
     return conversation?.clients?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
@@ -422,13 +450,15 @@ export function WhatsappThread({
   function renderMessageBody(message: any) {
     const kind = mediaKind(message);
     const fileName = message.file_name || message.raw_payload?.document?.filename || message.body;
-    const mediaUrl = message.media_url && String(message.media_url).startsWith('http') ? String(message.media_url) : '';
+    const mediaUrl = mediaDisplayUrl(message);
+    const downloadUrl = mediaDownloadUrl(message);
 
     if (kind === 'sticker') {
       return (
         <div className="space-y-1.5">
           {mediaUrl ? <img src={mediaUrl} alt={fileName || 'Figurinha'} className="max-h-32 rounded-xl object-contain" /> : <div className="text-4xl leading-none">{message.body && !String(message.body).startsWith('[') ? message.body : '⭐'}</div>}
           {message.body && !String(message.body).startsWith('[') && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar</a>}
         </div>
       );
     }
@@ -438,6 +468,7 @@ export function WhatsappThread({
         <div className="space-y-1.5">
           {mediaUrl ? <img src={mediaUrl} alt={fileName || 'Imagem'} className="max-h-64 rounded-xl object-cover" /> : <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2"><ImageIcon size={16} /> Imagem</div>}
           {message.body && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar imagem</a>}
         </div>
       );
     }
@@ -453,7 +484,7 @@ export function WhatsappThread({
             </div>
           </div>
           {message.body && message.body !== fileName && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
-          {mediaUrl && <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-blue-700 hover:underline">Abrir arquivo</a>}
+          {mediaUrl && <div className="flex flex-wrap gap-2"><a href={mediaUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-blue-700 hover:underline">Abrir arquivo</a>{downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar</a>}</div>}
         </div>
       );
     }
@@ -491,9 +522,9 @@ export function WhatsappThread({
 
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleMessageScroll} className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2">
-          {!items.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
+          {!visibleItems.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
           <div className="space-y-1.5 pb-2">
-            {items.map((message: any) => {
+            {visibleItems.map((message: any) => {
               const outbound = message.direction === 'outbound';
               const bubbleReaction = outbound ? message.client_reaction_emoji || message.reaction_emoji : message.reaction_emoji || message.client_reaction_emoji;
               return (
