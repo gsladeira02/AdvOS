@@ -1,6 +1,6 @@
 {
   "name": "advos-v8-4",
-  "version": "9.16.0",
+  "version": "9.17.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -20,7 +20,7 @@
     "tailwindcss": "3.4.17",
     "pdf-lib": "1.17.1",
     "xlsx": "0.18.5",
-    "lamejs": "1.2.1"
+    "lamejsfixbug121": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

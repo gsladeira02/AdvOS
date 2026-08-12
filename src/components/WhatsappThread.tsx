@@ -158,6 +158,19 @@ function isValidMp3File(file?: File | null) {
   return (mime === 'audio/mpeg' || mime === 'audio/mp3') && name.endsWith('.mp3');
 }
 
+function hasMp3Header(bytes: Uint8Array) {
+  if (!bytes || bytes.length < 3) return false;
+  // ID3 tag no início ou sync word de frame MPEG. Isso valida conteúdo real, não só MIME/nome.
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
+  return bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0;
+}
+
+async function isRealMp3File(file?: File | null) {
+  if (!isValidMp3File(file)) return false;
+  const header = new Uint8Array(await file!.slice(0, 4).arrayBuffer());
+  return hasMp3Header(header);
+}
+
 function floatTo16BitPcm(input: Float32Array) {
   const output = new Int16Array(input.length);
   for (let i = 0; i < input.length; i += 1) {
@@ -193,8 +206,8 @@ async function convertRecordedBlobToMp3File(blob: Blob) {
     const decoded: AudioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
     const mono = mixToMono(decoded);
     const pcm = floatTo16BitPcm(mono);
-    const lameModule: any = await import('lamejs');
-    const Mp3Encoder = lameModule.Mp3Encoder || lameModule.default?.Mp3Encoder;
+    const lameModule: any = await import('lamejsfixbug121');
+    const Mp3Encoder = lameModule.Mp3Encoder || lameModule.default?.Mp3Encoder || lameModule.default?.default?.Mp3Encoder;
     if (!Mp3Encoder) throw new Error('Codificador MP3 não carregou.');
 
     const encoder = new Mp3Encoder(1, decoded.sampleRate, 64);
@@ -212,6 +225,11 @@ async function convertRecordedBlobToMp3File(blob: Blob) {
 
     const mp3Blob = new Blob(chunks, { type: 'audio/mpeg' });
     if (!mp3Blob.size) throw new Error('O áudio preparado ficou vazio. Grave novamente.');
+
+    const header = new Uint8Array(await mp3Blob.slice(0, 4).arrayBuffer());
+    if (!hasMp3Header(header)) {
+      throw new Error('O codificador não gerou um MP3 válido. Atualize com Ctrl+F5 e tente gravar de novo.');
+    }
 
     return new File([mp3Blob], `audio-whatsapp-${Date.now()}.mp3`, { type: 'audio/mpeg' });
   } finally {
@@ -677,8 +695,8 @@ export function WhatsappThread({
 
   async function sendRecordedAudio(audioFile: File) {
     if (sending) return;
-    if (!isValidMp3File(audioFile)) {
-      setFeedback('O áudio ainda não está em MP3. Apague, grave novamente e aguarde aparecer “Áudio pronto em MP3”.');
+    if (!(await isRealMp3File(audioFile))) {
+      setFeedback('O áudio ainda não é um MP3 real. Apague, grave novamente, aguarde aparecer “Áudio pronto em MP3” e escute a prévia antes de enviar.');
       return;
     }
     setSending(true);
