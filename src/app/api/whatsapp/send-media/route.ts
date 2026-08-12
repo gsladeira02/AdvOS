@@ -1,10 +1,4 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { readFile, unlink, writeFile } from 'fs/promises';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
@@ -13,8 +7,6 @@ import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
-
-const execFileAsync = promisify(execFile);
 
 function str(value: any) {
   return String(value || '').trim();
@@ -30,72 +22,57 @@ function safeName(name: string) {
     .slice(0, 120) || 'arquivo';
 }
 
+function baseMime(value?: string | null) {
+  return String(value || '').split(';')[0].trim().toLowerCase();
+}
+
+function acceptedWhatsAppAudioMime(mimeType?: string | null, fileName = '') {
+  const mime = baseMime(mimeType);
+  const name = String(fileName || '').toLowerCase();
+
+  if (mime === 'audio/ogg') return true;
+  if (mime === 'audio/mpeg' || mime === 'audio/mp3') return true;
+  if (mime === 'audio/amr') return true;
+  if (mime === 'audio/mp4' || mime === 'audio/aac') return true;
+
+  return /\.(ogg|opus|mp3|mpeg|amr|m4a|mp4|aac)$/i.test(name);
+}
+
 function looksLikeAudioFile(file: File, forceRecorded = false) {
-  const mime = String(file.type || '').toLowerCase();
+  const mime = baseMime(file.type);
   const name = String(file.name || '').toLowerCase();
   if (forceRecorded || name.startsWith('audio-whatsapp-')) return true;
   if (mime.startsWith('audio/')) return true;
-  if (mime.startsWith('video/') && !mime.includes('webm')) return false;
   return /\.(webm|ogg|opus|m4a|mp3|aac|amr|wav)$/i.test(name);
 }
 
-async function convertAudioToMp3(buffer: Buffer, originalName = 'audio') {
-  let ffmpegPath = '';
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ffmpeg = require('@ffmpeg-installer/ffmpeg');
-    ffmpegPath = ffmpeg?.path || '';
-  } catch {
-    ffmpegPath = '';
-  }
-
-  if (!ffmpegPath) {
-    throw new Error('Não foi possível preparar o áudio: ffmpeg não encontrado no build. Faça redeploy com Clear Build Cache.');
-  }
-
-  const id = randomUUID();
-  const safeOriginal = safeName(originalName || 'audio');
-  const extension = safeOriginal.includes('.') ? safeOriginal.split('.').pop() : 'input';
-  const inputPath = join(tmpdir(), `advos-audio-${id}.${extension || 'input'}`);
-  const outputPath = join(tmpdir(), `advos-audio-${id}.mp3`);
-
-  try {
-    await writeFile(inputPath, buffer);
-    await execFileAsync(ffmpegPath, [
-      '-y',
-      '-i', inputPath,
-      '-vn',
-      '-ac', '1',
-      '-ar', '44100',
-      '-codec:a', 'libmp3lame',
-      '-b:a', '64k',
-      outputPath,
-    ], { timeout: 45000 });
-    const output = await readFile(outputPath);
-    if (!output.length) throw new Error('Conversão de áudio gerou arquivo vazio.');
-    return output;
-  } finally {
-    await unlink(inputPath).catch(() => null);
-    await unlink(outputPath).catch(() => null);
-  }
-}
-
 async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) {
-  let buffer = Buffer.from(await file.arrayBuffer());
-  let fileName = file.name || 'arquivo';
+  const buffer = Buffer.from(await file.arrayBuffer());
+  let fileName = safeName(file.name || 'arquivo');
   let mimeType = file.type || 'application/octet-stream';
   let converted = false;
 
   const looksAudio = looksLikeAudioFile(file, forceRecordedAudio);
 
-  // A Meta costuma rejeitar gravações do navegador quando os bytes não batem
-  // perfeitamente com o mime declarado. Para eliminar o erro application/octet-stream,
-  // qualquer áudio enviado pelo WhatsApp do AdvOS é normalizado para MP3 real.
   if (looksAudio) {
-    buffer = await convertAudioToMp3(buffer, file.name || 'audio');
-    fileName = safeName(fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp') + '.mp3';
-    mimeType = 'audio/mpeg';
-    converted = true;
+    const cleanMime = baseMime(mimeType);
+    const isWebm = cleanMime === 'audio/webm' || cleanMime === 'video/webm' || fileName.toLowerCase().endsWith('.webm');
+    const isWav = cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav' || fileName.toLowerCase().endsWith('.wav');
+    const isOctet = cleanMime === 'application/octet-stream';
+
+    if (!acceptedWhatsAppAudioMime(mimeType, fileName) || isWebm || isWav || isOctet) {
+      throw new Error('Formato de áudio não aceito pela Meta. Grave novamente pelo microfone do AdvOS atualizado, que prepara o áudio em MP3 no navegador, ou envie um arquivo MP3, M4A, OGG/OPUS, AAC ou AMR.');
+    }
+
+    if (cleanMime === 'audio/mp3') mimeType = 'audio/mpeg';
+    if (!/\.(ogg|opus|mp3|mpeg|amr|m4a|mp4|aac)$/i.test(fileName)) {
+      const extension = baseMime(mimeType).includes('mpeg') ? 'mp3'
+        : baseMime(mimeType).includes('ogg') ? 'ogg'
+        : baseMime(mimeType).includes('amr') ? 'amr'
+        : baseMime(mimeType).includes('aac') ? 'aac'
+        : 'm4a';
+      fileName = `${fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp'}.${extension}`;
+    }
   }
 
   return {
@@ -174,7 +151,9 @@ export async function POST(req: Request) {
             storagePath,
           });
 
-      return NextResponse.json({ ok: true, converted: normalized.converted, uploaded_by_id: isAudioMessage, ...result });
+      return NextResponse.json({ ok: true, converted: normalized.converted, uploaded_by_id: isAudioMessage, ...result }, {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+      });
     } catch (error) {
       await admin.storage.from('documents').remove([storagePath]).catch(() => null);
       throw error;
