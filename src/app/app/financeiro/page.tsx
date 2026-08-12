@@ -61,16 +61,39 @@ function statusLabel(status: string) {
   return 'Pendente';
 }
 
-export default async function Financeiro() {
+function normalize(value: any) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function toTime(date?: string | null) {
+  if (!date) return 0;
+  const time = new Date(`${date}T00:00:00`).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+export default async function Financeiro({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
+  const query = (await searchParams) || {};
   const { supabase, profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
+
+  const selectedClient = query.cliente || '';
+  const selectedStatus = query.status || 'em_aberto';
+  const selectedOrder = query.ordem || 'vencimento_asc';
+  const dateFrom = query.data_inicio || '';
+  const dateTo = query.data_fim || '';
+  const searchText = query.busca || '';
+
   const [items, clients, firmRes, templateRes] = await Promise.all([
     supabase
       .from('financial_installments')
       .select('*, financial_contracts(description, clients(id,name,doc,email,phone,whatsapp,asaas_customer_id))')
       .eq('law_firm_id', profile.law_firm_id)
-      .order('due_date'),
-    supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
+      .order('due_date', { ascending: true }),
+    supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id).order('name'),
     admin.from('law_firms').select('name,phone').eq('id', profile.law_firm_id).maybeSingle(),
     admin.from('message_templates').select('body').eq('law_firm_id', profile.law_firm_id).eq('slug', 'cobranca_vencida').eq('active', true).maybeSingle(),
   ]);
@@ -78,6 +101,7 @@ export default async function Financeiro() {
   const installments = items.data || [];
   const firm = firmRes.data as any;
   const chargeTemplate = (templateRes.data as any)?.body || DEFAULT_MESSAGE_TEMPLATES.find((t) => t.slug === 'cobranca_vencida')?.body;
+
   const total = installments
     .filter((i: any) => i.status !== 'pago')
     .reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
@@ -86,14 +110,89 @@ export default async function Financeiro() {
     .filter((i: any) => i.status === 'atrasado')
     .reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
 
+  const filteredInstallments = installments
+    .filter((i: any) => {
+      const client = i.financial_contracts?.clients;
+      const label = installmentLabel(i);
+      const haystack = normalize(`${client?.name || ''} ${label} ${i.status || ''} ${i.external_id || ''}`);
+      const due = String(i.due_date || '');
+
+      if (selectedClient && client?.id !== selectedClient) return false;
+      if (selectedStatus === 'em_aberto' && i.status === 'pago') return false;
+      if (selectedStatus !== 'todos' && selectedStatus !== 'em_aberto' && i.status !== selectedStatus) return false;
+      if (dateFrom && due < dateFrom) return false;
+      if (dateTo && due > dateTo) return false;
+      if (searchText && !haystack.includes(normalize(searchText))) return false;
+
+      return true;
+    })
+    .sort((a: any, b: any) => {
+      if (selectedOrder === 'vencimento_desc') return toTime(b.due_date) - toTime(a.due_date);
+      if (selectedOrder === 'valor_desc') return Number(b.amount || 0) - Number(a.amount || 0);
+      if (selectedOrder === 'valor_asc') return Number(a.amount || 0) - Number(b.amount || 0);
+      return toTime(a.due_date) - toTime(b.due_date);
+    });
+
+  const filteredTotal = filteredInstallments.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+  const hasFilters = Boolean(selectedClient || selectedStatus !== 'em_aberto' || selectedOrder !== 'vencimento_asc' || dateFrom || dateTo || searchText);
+
   return (
     <div>
       <PageHeader
         title="Financeiro"
-        subtitle={`Pendente: ${money(total)}. Atrasado: ${money(overdueTotal)}. Use o botão de WhatsApp para cobrar parcelas em aberto.`}
+        subtitle={`Pendente: ${money(total)}. Atrasado: ${money(overdueTotal)}. Filtre e ordene as cobranças para fazer a cobrança pelo WhatsApp.`}
       />
 
       <section className="card mb-6 p-5">
+        <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Filtros</h2>
+            <p className="text-sm text-slate-500">Encontre parcelas por cliente, status, período e ordene pela data de vencimento.</p>
+          </div>
+          <div className="text-sm font-bold text-slate-600">
+            {filteredInstallments.length} cobrança(s) • {money(filteredTotal)}
+          </div>
+        </div>
+
+        <form method="get" action="/app/financeiro" className="grid gap-4 md:grid-cols-6">
+          <select className="input md:col-span-2" name="cliente" defaultValue={selectedClient}>
+            <option value="">Todos os clientes</option>
+            {(clients.data || []).map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}
+          </select>
+
+          <select className="input" name="status" defaultValue={selectedStatus}>
+            <option value="em_aberto">Em aberto</option>
+            <option value="atrasado">Atrasadas</option>
+            <option value="pendente">Pendentes</option>
+            <option value="pago">Pagas</option>
+            <option value="todos">Todas</option>
+          </select>
+
+          <select className="input" name="ordem" defaultValue={selectedOrder}>
+            <option value="vencimento_asc">Vencimento: mais antigas</option>
+            <option value="vencimento_desc">Vencimento: mais recentes</option>
+            <option value="valor_desc">Valor: maior primeiro</option>
+            <option value="valor_asc">Valor: menor primeiro</option>
+          </select>
+
+          <input className="input" name="data_inicio" type="date" defaultValue={dateFrom} title="Data inicial" />
+          <input className="input" name="data_fim" type="date" defaultValue={dateTo} title="Data final" />
+          <input className="input md:col-span-4" name="busca" placeholder="Buscar por cliente, parcela ou ID Asaas" defaultValue={searchText} />
+
+          <button className="btn btn-primary md:col-span-1">Aplicar filtros</button>
+          {hasFilters ? (
+            <Link href="/app/financeiro" className="btn btn-secondary justify-center md:col-span-1">Limpar</Link>
+          ) : (
+            <span className="hidden md:block" />
+          )}
+        </form>
+      </section>
+
+      <section className="card mb-6 p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-black text-slate-950">Cadastrar cobrança manual</h2>
+          <p className="text-sm text-slate-500">Use quando precisar lançar uma cobrança que ainda não veio do Asaas.</p>
+        </div>
         <form action="/api/finance" method="post" className="grid gap-4 md:grid-cols-5">
           <select className="input" name="client_id">
             <option value="">Cliente</option>
@@ -112,13 +211,13 @@ export default async function Financeiro() {
       </section>
 
       <div className="space-y-3">
-        {installments.map((i: any) => {
+        {filteredInstallments.map((i: any) => {
           const client = i.financial_contracts?.clients;
           const url = chargeUrl(i);
           const message = buildChargeWhatsappMessage({ clientName: client?.name, installment: i, url, template: chargeTemplate, firmName: firm?.name, firmPhone: firm?.phone });
           const phone = client?.whatsapp || client?.phone;
           const wa = phone ? whatsappUrl(phone, message) : whatsappShareUrl(message);
-          const canCharge = Boolean(wa);
+          const canCharge = Boolean(wa) && i.status !== 'pago';
           const label = installmentLabel(i);
 
           return (
@@ -166,14 +265,14 @@ export default async function Financeiro() {
                   </Link>
                 ) : (
                   <button className="btn w-full cursor-not-allowed justify-center opacity-50" disabled>
-                    Cobrar no WhatsApp
+                    {i.status === 'pago' ? 'Cobrança paga' : 'Cobrar no WhatsApp'}
                   </button>
                 )}
               </div>
             </section>
           );
         })}
-        {!installments.length && <section className="card p-6 text-slate-500">Nenhuma cobrança cadastrada.</section>}
+        {!filteredInstallments.length && <section className="card p-6 text-slate-500">Nenhuma cobrança encontrada com esses filtros.</section>}
       </div>
     </div>
   );
