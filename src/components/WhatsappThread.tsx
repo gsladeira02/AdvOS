@@ -177,6 +177,7 @@ export function WhatsappThread({
   const [stickerOpen, setStickerOpen] = useState(false);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [recordedAudio, setRecordedAudio] = useState<{ file: File; url: string; seconds: number } | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -189,6 +190,7 @@ export function WhatsappThread({
   const recorderStreamRef = useRef<MediaStream | null>(null);
   const recorderChunksRef = useRef<BlobPart[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef(0);
   const threadLoadingRef = useRef(false);
   const appliedDraftRef = useRef('');
 
@@ -197,6 +199,12 @@ export function WhatsappThread({
     return (items || []).filter((message: any) => !message?.conversation_id || String(message.conversation_id) === conversationId);
   }, [items, conversation?.id]);
 
+  function clearRecordedAudio() {
+    setRecordedAudio((current) => {
+      if (current?.url) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  }
 
   function stopRecorderTracks() {
     recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -211,14 +219,14 @@ export function WhatsappThread({
   }
 
   function bestAudioMimeType() {
-    const candidates = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/mp4'];
+    const candidates = ['audio/ogg; codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
     if (typeof MediaRecorder === 'undefined') return '';
     return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
   }
 
   async function refreshThreadMessages(silent = true) {
     const conversationId = String(conversation?.id || '');
-    if (!conversationId || conversation?.virtual || threadLoadingRef.current) return;
+    if (!conversationId || threadLoadingRef.current) return;
     threadLoadingRef.current = true;
     try {
       const params = new URLSearchParams({ conversationId, _: String(Date.now()) });
@@ -228,7 +236,11 @@ export function WhatsappThread({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível atualizar a conversa.');
-      const serverMessages = (result.messages || []).filter((message: any) => String(message?.conversation_id || '') === conversationId);
+      const nextConversationId = String(result.selectedId || conversationId);
+      if (nextConversationId && nextConversationId !== conversationId) {
+        onSent?.(nextConversationId);
+      }
+      const serverMessages = (result.messages || []).filter((message: any) => String(message?.conversation_id || '') === nextConversationId);
       setItems((current) => mergeMessageLists(serverMessages, current.filter((message: any) => message?.optimistic)));
       if (!silent) setFeedback('Conversa atualizada.');
     } catch (error: any) {
@@ -277,6 +289,10 @@ export function WhatsappThread({
         recorderRef.current?.state === 'recording' && recorderRef.current.stop();
       } catch {}
       stopRecorderTracks();
+      setRecordedAudio((current) => {
+        if (current?.url) URL.revokeObjectURL(current.url);
+        return null;
+      });
     };
   }, []);
 
@@ -515,19 +531,23 @@ export function WhatsappThread({
     setFeedback('Enviando áudio...');
     try {
       const result = await sendFileMessage('', audioFile);
-      setItems((current) => mergeMessageLists([optimisticFileMessage(result, audioFile, '[Áudio enviado]')], current));
-      setFeedback('Áudio enviado.');
+      const serverMessage = result.message || {};
+      const normalizedAudioFile = new File([audioFile], serverMessage.file_name || audioFile.name, { type: serverMessage.mime_type || audioFile.type });
+      setItems((current) => mergeMessageLists([optimisticFileMessage(result, normalizedAudioFile, '[Áudio enviado]')], current));
+      clearRecordedAudio();
+      setFeedback(result.converted ? 'Áudio convertido para OGG/OPUS e enviado.' : 'Áudio enviado.');
       onSent?.(result?.conversationId || conversation?.id);
-      window.setTimeout(() => refreshThreadMessages(true), 350);
+      window.setTimeout(() => refreshThreadMessages(true), 250);
+      window.setTimeout(() => refreshThreadMessages(true), 1200);
     } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao enviar áudio. Se a Meta recusar o formato, grave/enveie em OGG/OPUS pelo clipe.');
+      setFeedback(error?.message || 'Erro ao enviar áudio. O AdvOS tenta converter áudio webm para OGG/OPUS antes de enviar.');
     } finally {
       setSending(false);
     }
   }
 
   async function startRecording() {
-    if (recording || sending) return;
+    if (recording || sending || recordedAudio) return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setFeedback('Seu navegador não liberou gravação de áudio. Use Chrome/Edge atualizado ou envie o áudio pelo clipe.');
       return;
@@ -545,10 +565,11 @@ export function WhatsappThread({
         if (event.data?.size) recorderChunksRef.current.push(event.data);
       };
 
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
+        const seconds = recordingStartedAtRef.current ? Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000)) : recordingSeconds;
         clearRecordingTimer();
         setRecording(false);
-        const finalMimeType = recorder.mimeType || mimeType || 'audio/ogg';
+        const finalMimeType = recorder.mimeType || mimeType || 'audio/webm';
         const blob = new Blob(recorderChunksRef.current, { type: finalMimeType });
         recorderChunksRef.current = [];
         stopRecorderTracks();
@@ -558,13 +579,17 @@ export function WhatsappThread({
         }
         const extension = finalMimeType.includes('ogg') ? 'ogg' : finalMimeType.includes('mp4') ? 'm4a' : 'webm';
         const audioFile = new File([blob], `audio-whatsapp-${Date.now()}.${extension}`, { type: finalMimeType });
-        await sendRecordedAudio(audioFile);
+        const url = URL.createObjectURL(blob);
+        clearRecordedAudio();
+        setRecordedAudio({ file: audioFile, url, seconds });
+        setFeedback('Áudio gravado. Escute antes de enviar ou apague e grave de novo.');
       };
 
       recorder.start();
+      recordingStartedAtRef.current = Date.now();
       setRecording(true);
       setRecordingSeconds(0);
-      setFeedback('Gravando áudio. Clique no botão vermelho para enviar.');
+      setFeedback('Gravando áudio. Clique no botão vermelho para parar e ouvir antes de enviar.');
       recordingTimerRef.current = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000);
     } catch (error: any) {
       stopRecorderTracks();
@@ -582,7 +607,11 @@ export function WhatsappThread({
 
   async function send() {
     const message = templateMessageFromText(text);
-    if ((!message && !file) || sending) return;
+    if ((!message && !file && !recordedAudio) || sending) return;
+    if (recordedAudio) {
+      await sendRecordedAudio(recordedAudio.file);
+      return;
+    }
     setSending(true);
     setFeedback(null);
     try {
@@ -614,7 +643,8 @@ export function WhatsappThread({
       setStickerOpen(false);
       setFeedback(file ? 'Arquivo enviado.' : 'Mensagem enviada.');
       onSent?.(result?.conversationId || conversation?.id);
-      window.setTimeout(() => refreshThreadMessages(true), 350);
+      window.setTimeout(() => refreshThreadMessages(true), 250);
+      window.setTimeout(() => refreshThreadMessages(true), 1200);
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao enviar pela API oficial.');
     } finally {
@@ -799,8 +829,31 @@ export function WhatsappThread({
           </div>
         )}
 
+        {recordedAudio && (
+          <div className="mb-2 rounded-2xl border border-[#d7ded4] bg-white px-3 py-2 text-xs shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 font-black text-slate-800">
+                <Mic size={15} className="text-[#075e54]" />
+                Áudio gravado {recordedAudio.seconds ? `• ${recordedAudio.seconds}s` : ''}
+              </div>
+              <button type="button" className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-slate-100" onClick={clearRecordedAudio} title="Descartar áudio">
+                <X size={14} />
+              </button>
+            </div>
+            <audio controls preload="metadata" className="w-full" src={recordedAudio.url}>
+              Seu navegador não suporta reprodução de áudio.
+            </audio>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-500">Escute antes de enviar. Se o navegador gravar em WebM, o AdvOS converte para OGG/OPUS na hora do envio.</span>
+              <button type="button" onClick={() => sendRecordedAudio(recordedAudio.file)} disabled={sending} className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-50">
+                <Send size={12} /> Enviar áudio
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="relative flex items-end gap-2">
-          <input ref={fileInputRef} type="file" className="hidden" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <input ref={fileInputRef} type="file" className="hidden" onChange={(event) => { setFile(event.target.files?.[0] || null); clearRecordedAudio(); }} />
           <button type="button" className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm hover:bg-[#fffaf2]" onClick={() => fileInputRef.current?.click()} title="Enviar documento, imagem, arquivo ou .webp como figurinha">
             <Paperclip size={18} />
           </button>
@@ -812,7 +865,7 @@ export function WhatsappThread({
           </button>
 
           <div className="relative flex-1">
-            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); } }} placeholder={file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
+            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); } }} placeholder={recordedAudio ? 'Escute o áudio e clique em enviar.' : file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
 
             {shortcutOpen && slashTerm !== null && (
               <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-80 w-full overflow-auto rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
@@ -854,13 +907,13 @@ export function WhatsappThread({
             type="button"
             className={`mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${recording ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-slate-600 hover:bg-[#fffaf2]'}`}
             onClick={recording ? stopRecording : startRecording}
-            disabled={sending || Boolean(file)}
-            title={recording ? 'Parar gravação e enviar' : 'Gravar áudio'}
+            disabled={sending || Boolean(file) || Boolean(recordedAudio)}
+            title={recording ? 'Parar gravação e escutar' : recordedAudio ? 'Apague o áudio gravado para gravar outro' : 'Gravar áudio'}
           >
             {recording ? <Square size={15} /> : <Mic size={18} />}
           </button>
 
-          <button className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-50" onClick={send} disabled={sending || recording || (!text.trim() && !file)} title="Enviar">
+          <button className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-50" onClick={send} disabled={sending || recording || (!text.trim() && !file && !recordedAudio)} title="Enviar">
             <Send size={17} />
           </button>
         </div>
@@ -882,7 +935,7 @@ export function WhatsappThread({
         )}
 
         <div className="mt-2 min-h-[16px]">
-          {recording ? <p className="truncate text-[10px] font-black text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para enviar.</p> : feedback ? <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p> : <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
+          {recording ? <p className="truncate text-[10px] font-black text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p> : <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>
     </div>

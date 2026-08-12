@@ -85,7 +85,7 @@ export function WhatsappCentralClient({
       params.set('_', String(Date.now()));
       const response = await fetch(`/api/whatsapp/conversations?${params.toString()}`, {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' },
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Erro ao carregar mensagens.');
@@ -125,7 +125,7 @@ export function WhatsappCentralClient({
 
   useEffect(() => {
     load(selectedIdRef.current, true, queryRef.current);
-    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 950);
+    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 1100);
     const onFocus = () => load(selectedIdRef.current, true, queryRef.current);
     const onVisibility = () => {
       if (!document.hidden) load(selectedIdRef.current, true, queryRef.current);

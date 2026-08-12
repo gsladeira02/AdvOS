@@ -6,6 +6,7 @@ import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClient
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function getClientForVirtual(admin: any, lawFirmId: string, virtualId: string) {
   const clientId = clientIdFromVirtualConversationId(virtualId);
@@ -109,7 +110,7 @@ export async function GET(req: Request) {
       selectedId: selected?.id || '',
       messages,
       fetchedAt: new Date().toISOString(),
-    });
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar conversas.' }, { status: 400 });
   }
