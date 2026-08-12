@@ -14,9 +14,9 @@ const items = [
   ['/app/tarefas', 'Tarefas', CheckSquare],
   ['/app/usuarios', 'Usuários', Briefcase],
   ['/app/integracoes', 'Integrações', Plug],
-  ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
+  ['/app/integracoes/asaas/importar', 'Importar', UploadCloud],
   ['/app/modelos-mensagens', 'Modelos', MessageSquare],
-  ['/app/configuracoes', 'Configurações', Settings],
+  ['/app/configuracoes', 'Config.', Settings],
 ] as const;
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
@@ -52,28 +52,28 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mobile-readonly">
         AdvOS mobile: visualização rápida de painéis. Cadastros completos são melhores no computador.
       </div>
-      <div className="desktop-grid grid min-h-screen grid-cols-[58px_1fr]">
-        <aside className="sidebar sticky top-0 flex h-screen flex-col items-center border-r border-[#e8dfcf] bg-white px-1.5 py-3">
+      <div className="desktop-grid grid min-h-screen grid-cols-[126px_1fr]">
+        <aside className="sidebar sticky top-0 flex h-screen flex-col border-r border-[#e8dfcf] bg-white px-2 py-3">
           <Link
             href="/app/dashboard"
             title={`AdvOS — ${firmName}`}
-            className="mb-3 grid h-9 w-9 place-items-center rounded-xl bg-ink text-lg font-black text-white shadow-sm"
+            className="mb-3 flex h-9 items-center gap-2 rounded-xl bg-ink px-2 text-xs font-black text-white shadow-sm"
           >
-            A
-            <span className="sr-only">AdvOS</span>
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/15 text-sm">A</span>
+            <span className="truncate">AdvOS</span>
           </Link>
 
-          <nav className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto pb-3">
+          <nav className="flex w-full flex-1 flex-col gap-1 overflow-y-auto pb-3">
             {items.map(([href, label, Icon]) => (
               <Link
                 key={href}
                 href={href}
                 title={label}
                 aria-label={label}
-                className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-soft hover:text-slate-950"
+                className="flex h-8 items-center gap-2 rounded-lg px-2 text-[11px] font-black text-slate-600 transition hover:bg-soft hover:text-slate-950"
               >
-                <Icon size={17} />
-                <span className="sr-only">{label}</span>
+                <Icon size={14} className="shrink-0" />
+                <span className="truncate leading-none">{label}</span>
               </Link>
             ))}
           </nav>
@@ -82,10 +82,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <button
               title="Sair"
               aria-label="Sair"
-              className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-soft hover:text-slate-950"
+              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[11px] font-black text-slate-600 transition hover:bg-soft hover:text-slate-950"
             >
-              <LogOut size={17} />
-              <span className="sr-only">Sair</span>
+              <LogOut size={14} className="shrink-0" />
+              <span>Sair</span>
             </button>
           </form>
         </aside>

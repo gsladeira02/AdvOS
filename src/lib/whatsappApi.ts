@@ -23,6 +23,7 @@ function normalizeBaseUrl(url: string) {
   const clean = unmarkdownUrl(url)
     .trim()
     .replace(/^<|>$/g, '')
+    .replace(/^['"]|['"]$/g, '')
     .replace(/\s+/g, '')
     .replace(/\/+$/, '');
 
@@ -32,6 +33,21 @@ function normalizeBaseUrl(url: string) {
   if (match?.[1]) return match[1];
 
   return clean;
+}
+
+function normalizeAccessToken(value: string) {
+  return String(value || '')
+    .trim()
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\s+/g, '');
+}
+
+function graphErrorMessage(payload: any) {
+  const error = payload?.error || payload;
+  const message = error?.error_data?.details || error?.message || payload?.message || 'Erro ao enviar mensagem pela API oficial do WhatsApp.';
+  const code = error?.code ? ` Código ${error.code}${error?.error_subcode ? `/${error.error_subcode}` : ''}.` : '';
+  return `${message}${code}`;
 }
 
 export function defaultWhatsAppBaseUrl(version = 'v22.0') {
@@ -49,9 +65,9 @@ export async function getWhatsAppConfig(lawFirmId: string): Promise<WhatsAppConf
     .maybeSingle();
 
   const raw = (data?.raw_settings || {}) as Record<string, any>;
-  const token = data?.api_token || process.env.WHATSAPP_ACCESS_TOKEN || '';
-  const phoneNumberId = raw.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-  const wabaId = raw.waba_id || process.env.WHATSAPP_WABA_ID || '';
+  const token = normalizeAccessToken(data?.api_token || process.env.WHATSAPP_ACCESS_TOKEN || '');
+  const phoneNumberId = String(raw.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim().replace(/\D/g, '');
+  const wabaId = String(raw.waba_id || process.env.WHATSAPP_WABA_ID || '').trim().replace(/\D/g, '');
   const businessPhone = raw.business_phone || process.env.WHATSAPP_BUSINESS_PHONE || '';
   const version = raw.graph_version || process.env.WHATSAPP_GRAPH_VERSION || 'v22.0';
   const baseUrl = normalizeBaseUrl(data?.api_base_url || process.env.WHATSAPP_API_BASE_URL || defaultWhatsAppBaseUrl(version));
@@ -109,8 +125,7 @@ export async function sendWhatsAppText(input: {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const msg = payload?.error?.message || payload?.message || 'Erro ao enviar mensagem pela API oficial do WhatsApp.';
-    throw new Error(msg);
+    throw new Error(graphErrorMessage(payload));
   }
 
   const externalId = payload?.messages?.[0]?.id || null;

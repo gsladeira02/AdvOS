@@ -13,6 +13,8 @@ export type WhatsappTemplateOption = {
   body: string;
 };
 
+type NormalizedTemplate = WhatsappTemplateOption & { normalizedShortcut: string };
+
 function messageTime(value?: string) {
   if (!value) return '';
   try {
@@ -31,6 +33,14 @@ function normalizeShortcut(value: string) {
     .replace(/^\/+/, '')
     .replace(/[^a-z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '');
+}
+
+function normalizeSearch(value: string) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
 function firstName(name?: string | null) {
@@ -54,6 +64,7 @@ export function WhatsappThread({
   const [items, setItems] = useState(messages || []);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [shortcutOpen, setShortcutOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -74,8 +85,18 @@ export function WhatsappThread({
         const shortcut = normalizeShortcut(template.shortcut || template.slug || template.name);
         return shortcut ? { ...template, normalizedShortcut: shortcut } : null;
       })
-      .filter(Boolean) as Array<WhatsappTemplateOption & { normalizedShortcut: string }>;
+      .filter(Boolean) as NormalizedTemplate[];
   }, [templates]);
+
+  function renderTemplate(template: WhatsappTemplateOption) {
+    const clientName = conversation?.clients?.name || conversation?.lead_name || '';
+    return renderMessageTemplate(template.body, {
+      cliente: clientName,
+      primeiro_nome: firstName(clientName),
+      telefone_escritorio: '',
+      escritorio: 'escritório',
+    });
+  }
 
   function templateMessageFromText(raw: string) {
     const typed = raw.trim();
@@ -85,13 +106,37 @@ export function WhatsappThread({
     const template = shortcuts.find((item) => item.normalizedShortcut === key);
     if (!template) return raw.trim();
 
-    const clientName = conversation?.clients?.name || conversation?.lead_name || '';
-    return renderMessageTemplate(template.body, {
-      cliente: clientName,
-      primeiro_nome: firstName(clientName),
-      telefone_escritorio: '',
-      escritorio: 'escritório',
+    return renderTemplate(template);
+  }
+
+  const slashTerm = useMemo(() => {
+    const trimmed = text.trimStart();
+    if (!trimmed.startsWith('/')) return null;
+    return normalizeSearch(trimmed.slice(1).split(/\s+/)[0] || '');
+  }, [text]);
+
+  const shortcutSuggestions = useMemo(() => {
+    if (slashTerm === null) return [];
+    const term = slashTerm;
+    const result = shortcuts.filter((template) => {
+      if (!term) return true;
+      const haystack = normalizeSearch(`${template.normalizedShortcut} ${template.name} ${template.category || ''}`);
+      return haystack.includes(term);
     });
+    return result.slice(0, 12);
+  }, [shortcuts, slashTerm]);
+
+  const previewTemplate = useMemo(() => {
+    const typed = text.trim();
+    if (!typed.startsWith('/')) return null;
+    const key = normalizeShortcut(typed.slice(1).split(/\s+/)[0]);
+    return shortcuts.find((item) => item.normalizedShortcut === key) || null;
+  }, [text, shortcuts]);
+
+  function insertTemplate(template: NormalizedTemplate) {
+    setText(renderTemplate(template));
+    setShortcutOpen(false);
+    setFeedback(`Modelo inserido: ${template.name}.`);
   }
 
   async function send() {
@@ -122,6 +167,7 @@ export function WhatsappThread({
         },
       ]);
       setText('');
+      setShortcutOpen(false);
       setFeedback('Mensagem enviada.');
       onSent?.();
     } catch (error: any) {
@@ -130,13 +176,6 @@ export function WhatsappThread({
       setSending(false);
     }
   }
-
-  const previewTemplate = useMemo(() => {
-    const typed = text.trim();
-    if (!typed.startsWith('/')) return null;
-    const key = normalizeShortcut(typed.slice(1).split(/\s+/)[0]);
-    return shortcuts.find((item) => item.normalizedShortcut === key) || null;
-  }, [text, shortcuts]);
 
   return (
     <div className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-[16px] border border-[#e8dfcf] bg-white shadow-sm">
@@ -163,6 +202,11 @@ export function WhatsappThread({
                   <div className="mt-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">
                     {message.status || (outbound ? 'enviada' : 'recebida')} • {messageTime(message.created_at)}
                   </div>
+                  {message.status === 'failed' && (
+                    <div className="mt-1 rounded-lg bg-red-50 px-2 py-1 text-[9px] font-bold normal-case text-red-700">
+                      Falhou: {message.error_message || 'em primeira mensagem ou fora da janela de 24h, a Meta exige template oficial aprovado.'}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -172,22 +216,55 @@ export function WhatsappThread({
       </div>
 
       <div className="border-t border-[#eee4d4] bg-[#fbf7ef] p-2.5">
-        <textarea
-          className="input min-h-[68px] resize-y rounded-xl text-xs"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-              event.preventDefault();
-              send();
-            }
-          }}
-          placeholder="Digite a mensagem ou um atalho, ex: /cobranca. Ctrl + Enter envia."
-        />
+        <div className="relative">
+          <textarea
+            className="input min-h-[68px] resize-y rounded-xl text-xs"
+            value={text}
+            onChange={(event) => {
+              const value = event.target.value;
+              setText(value);
+              setShortcutOpen(value.trimStart().startsWith('/'));
+            }}
+            onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                send();
+              }
+              if (event.key === 'Escape') setShortcutOpen(false);
+            }}
+            placeholder="Digite a mensagem ou / para escolher um modelo. Ctrl + Enter envia."
+          />
 
-        {previewTemplate && (
+          {shortcutOpen && slashTerm !== null && shortcuts.length > 0 && (
+            <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-72 w-full overflow-auto rounded-2xl border border-[#e8dfcf] bg-white p-2 shadow-xl">
+              <div className="mb-1 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                Modelos rápidos
+              </div>
+              {shortcutSuggestions.length ? shortcutSuggestions.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-[#fbf7ef]"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => insertTemplate(template)}
+                >
+                  <span className="min-w-0">
+                    <b className="block truncate text-xs text-slate-950">{template.name}</b>
+                    <span className="mt-0.5 block truncate text-[10px] text-slate-500">/{template.normalizedShortcut} • {template.category || 'geral'}</span>
+                  </span>
+                  <span className="rounded-full bg-[#fbf7ef] px-2 py-1 text-[10px] font-black text-slate-600">Selecionar</span>
+                </button>
+              )) : (
+                <p className="px-2 py-3 text-xs font-bold text-slate-500">Nenhum modelo encontrado para esse atalho.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {previewTemplate && text.trim().startsWith('/') && (
           <div className="mt-2 rounded-xl border border-[#eee4d4] bg-white px-3 py-2 text-[11px] text-slate-600">
-            <b>Atalho encontrado:</b> {previewTemplate.name}. Ao enviar, o AdvOS substituirá <code>/{previewTemplate.normalizedShortcut}</code> pelo modelo salvo.
+            <b>Atalho encontrado:</b> {previewTemplate.name}. Se enviar <code>/{previewTemplate.normalizedShortcut}</code>, o AdvOS substituirá pelo modelo salvo.
           </div>
         )}
 
@@ -198,7 +275,7 @@ export function WhatsappThread({
                 key={template.id}
                 type="button"
                 className="rounded-full border border-[#eee4d4] bg-white px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-[#fffaf2]"
-                onClick={() => setText(`/${template.normalizedShortcut}`)}
+                onClick={() => insertTemplate(template)}
                 title={template.name}
               >
                 /{template.normalizedShortcut}
@@ -212,7 +289,7 @@ export function WhatsappThread({
             {feedback ? (
               <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p>
             ) : (
-              <p className="truncate text-[10px] text-slate-500">Enter quebra linha. Ctrl + Enter envia.</p>
+              <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Enter quebra linha. Ctrl + Enter envia.</p>
             )}
           </div>
           <button className="btn btn-primary shrink-0 !rounded-lg !px-3 !py-2 text-xs" onClick={send} disabled={sending || !text.trim()}>

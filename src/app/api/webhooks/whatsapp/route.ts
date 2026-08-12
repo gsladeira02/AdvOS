@@ -117,7 +117,10 @@ export async function POST(req: Request) {
         const updates: any = { status: status.status || 'status', raw_payload: status };
         if (status.status === 'delivered') updates.delivered_at = new Date(Number(status.timestamp || Date.now() / 1000) * 1000).toISOString();
         if (status.status === 'read') updates.read_at = new Date(Number(status.timestamp || Date.now() / 1000) * 1000).toISOString();
-        if (status.errors?.[0]?.message) updates.error_message = status.errors[0].message;
+        const statusError = status.errors?.[0];
+        if (statusError) {
+          updates.error_message = statusError.error_data?.details || statusError.message || statusError.title || `Erro ${statusError.code || ''}`.trim();
+        }
 
         await admin
           .from('whatsapp_messages')

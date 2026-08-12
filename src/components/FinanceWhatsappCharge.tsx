@@ -75,9 +75,9 @@ export function FinanceWhatsappCharge(props: {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar pela API.');
-      setFeedback('Mensagem enviada pela API oficial do WhatsApp.');
+      setFeedback('Mensagem enviada à Meta. Confira a entrega na aba WhatsApp.');
     } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao enviar pela API oficial. Se a janela de 24h estiver fechada, use template aprovado na Meta ou abra pelo WhatsApp Web.');
+      setFeedback(error?.message || 'Erro ao enviar pela API oficial. Se for primeira mensagem ou janela de 24h fechada, a Meta exige template oficial aprovado.');
     } finally {
       setSending(false);
     }
@@ -131,6 +131,8 @@ export function FinanceWhatsappCharge(props: {
           )}
 
           {feedback && <p className="mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
+
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">O envio direto pela API funciona para conversas dentro da janela de atendimento de 24h. Para primeira cobrança ativa fora da janela, será necessário template oficial aprovado na Meta.</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={sendByApi} disabled={sending || !props.phone}>
