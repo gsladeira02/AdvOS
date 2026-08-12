@@ -59,6 +59,8 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     ? await materializeClientConversation(admin, profile.law_firm_id, query.cliente)
     : await materializeSelectedConversation(admin, profile.law_firm_id, query?.conversa || '');
 
+  const initialDraft = String(query?.draft || query?.mensagem || '').trim();
+
   const [{ data: integration }, { data: clients }, { data: templates }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
     admin
@@ -117,6 +119,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialConversations={conversations || []}
         initialMessages={messages || []}
         initialSelectedId={selected?.id || ''}
+        initialDraft={initialDraft}
         templates={((templates && templates.length ? templates : DEFAULT_MESSAGE_TEMPLATES) || []).map((template: any) => ({
           id: String(template.id || template.slug || template.name),
           name: String(template.name || ''),

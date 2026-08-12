@@ -10,9 +10,11 @@ import {
   FileText,
   Image as ImageIcon,
   Laugh,
+  Mic,
   Paperclip,
   Phone,
   Send,
+  Square,
   Smile,
   Sparkles,
   Trash2,
@@ -154,12 +156,16 @@ export function WhatsappThread({
   messages,
   templates = [],
   live = true,
+  initialDraft = '',
+  onDraftApplied,
   onSent,
 }: {
   conversation: any;
   messages: any[];
   templates?: WhatsappTemplateOption[];
   live?: boolean;
+  initialDraft?: string;
+  onDraftApplied?: () => void;
   onSent?: (conversationId?: string) => void;
 }) {
   const [text, setText] = useState('');
@@ -171,17 +177,108 @@ export function WhatsappThread({
   const [stickerOpen, setStickerOpen] = useState(false);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessagesBelow, setNewMessagesBelow] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderStreamRef = useRef<MediaStream | null>(null);
+  const recorderChunksRef = useRef<BlobPart[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+  const threadLoadingRef = useRef(false);
+  const appliedDraftRef = useRef('');
 
   const visibleItems = useMemo(() => {
     const conversationId = String(conversation?.id || '');
     return (items || []).filter((message: any) => !message?.conversation_id || String(message.conversation_id) === conversationId);
   }, [items, conversation?.id]);
+
+
+  function stopRecorderTracks() {
+    recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderStreamRef.current = null;
+  }
+
+  function clearRecordingTimer() {
+    if (recordingTimerRef.current) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }
+
+  function bestAudioMimeType() {
+    const candidates = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/mp4'];
+    if (typeof MediaRecorder === 'undefined') return '';
+    return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  async function refreshThreadMessages(silent = true) {
+    const conversationId = String(conversation?.id || '');
+    if (!conversationId || conversation?.virtual || threadLoadingRef.current) return;
+    threadLoadingRef.current = true;
+    try {
+      const params = new URLSearchParams({ conversationId, _: String(Date.now()) });
+      const response = await fetch(`/api/whatsapp/conversations?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível atualizar a conversa.');
+      const serverMessages = (result.messages || []).filter((message: any) => String(message?.conversation_id || '') === conversationId);
+      setItems((current) => mergeMessageLists(serverMessages, current.filter((message: any) => message?.optimistic)));
+      if (!silent) setFeedback('Conversa atualizada.');
+    } catch (error: any) {
+      if (!silent) setFeedback(error?.message || 'Erro ao atualizar conversa.');
+    } finally {
+      threadLoadingRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    const draft = String(initialDraft || '').trim();
+    const conversationId = String(conversation?.id || '');
+    const key = `${conversationId}:${draft}`;
+    if (!draft || !conversationId || appliedDraftRef.current === key) return;
+    appliedDraftRef.current = key;
+    setText(draft);
+    setShortcutOpen(false);
+    setEmojiOpen(false);
+    setStickerOpen(false);
+    setFeedback('Mensagem carregada do Financeiro. Revise e envie pela conversa.');
+    onDraftApplied?.();
+    window.setTimeout(() => textareaRef.current?.focus(), 100);
+  }, [initialDraft, conversation?.id, onDraftApplied]);
+
+  useEffect(() => {
+    if (!live || conversation?.virtual) return;
+    refreshThreadMessages(true);
+    const interval = window.setInterval(() => refreshThreadMessages(true), 900);
+    const onFocus = () => refreshThreadMessages(true);
+    const onVisibility = () => {
+      if (!document.hidden) refreshThreadMessages(true);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [conversation?.id, conversation?.virtual, live]);
+
+  useEffect(() => {
+    return () => {
+      clearRecordingTimer();
+      try {
+        recorderRef.current?.state === 'recording' && recorderRef.current.stop();
+      } catch {}
+      stopRecorderTracks();
+    };
+  }, []);
 
   useEffect(() => {
     const conversationId = String(conversation?.id || '');
@@ -378,10 +475,10 @@ export function WhatsappThread({
     return result;
   }
 
-  async function sendFileMessage(caption: string) {
-    if (!file) throw new Error('Nenhum arquivo selecionado.');
+  async function sendFileMessage(caption: string, selectedFile: File | null = file) {
+    if (!selectedFile) throw new Error('Nenhum arquivo selecionado.');
     const form = new FormData();
-    form.set('file', file);
+    form.set('file', selectedFile);
     form.set('phone', conversation.phone || '');
     form.set('client_id', conversation.client_id || '');
     form.set('caption', caption || '');
@@ -390,6 +487,97 @@ export function WhatsappThread({
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar arquivo.');
     return result;
+  }
+
+  function optimisticFileMessage(result: any, selectedFile: File, message = ''): MessageListItem {
+    const type = result.type || mediaKind({ mime_type: selectedFile.type, file_name: selectedFile.name });
+    return {
+      id: result.message?.id || result.externalId || `local-${Date.now()}`,
+      external_id: result.externalId || null,
+      conversation_id: result.conversationId || conversation.id,
+      direction: 'outbound',
+      message_type: type,
+      body: message || (type === 'audio' ? '[Áudio enviado]' : type === 'sticker' ? '[Figurinha]' : selectedFile.name),
+      status: 'sent',
+      created_at: new Date().toISOString(),
+      file_name: result.message?.file_name || selectedFile.name,
+      file_size: result.message?.file_size || selectedFile.size,
+      mime_type: result.message?.mime_type || selectedFile.type,
+      media_url: result.message?.media_url || null,
+      storage_path: result.message?.storage_path || null,
+      optimistic: true,
+    };
+  }
+
+  async function sendRecordedAudio(audioFile: File) {
+    if (sending) return;
+    setSending(true);
+    setFeedback('Enviando áudio...');
+    try {
+      const result = await sendFileMessage('', audioFile);
+      setItems((current) => mergeMessageLists([optimisticFileMessage(result, audioFile, '[Áudio enviado]')], current));
+      setFeedback('Áudio enviado.');
+      onSent?.(result?.conversationId || conversation?.id);
+      window.setTimeout(() => refreshThreadMessages(true), 350);
+    } catch (error: any) {
+      setFeedback(error?.message || 'Erro ao enviar áudio. Se a Meta recusar o formato, grave/enveie em OGG/OPUS pelo clipe.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function startRecording() {
+    if (recording || sending) return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setFeedback('Seu navegador não liberou gravação de áudio. Use Chrome/Edge atualizado ou envie o áudio pelo clipe.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = bestAudioMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderRef.current = recorder;
+      recorderStreamRef.current = stream;
+      recorderChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) recorderChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        clearRecordingTimer();
+        setRecording(false);
+        const finalMimeType = recorder.mimeType || mimeType || 'audio/ogg';
+        const blob = new Blob(recorderChunksRef.current, { type: finalMimeType });
+        recorderChunksRef.current = [];
+        stopRecorderTracks();
+        if (!blob.size) {
+          setFeedback('Áudio vazio. Tente gravar novamente.');
+          return;
+        }
+        const extension = finalMimeType.includes('ogg') ? 'ogg' : finalMimeType.includes('mp4') ? 'm4a' : 'webm';
+        const audioFile = new File([blob], `audio-whatsapp-${Date.now()}.${extension}`, { type: finalMimeType });
+        await sendRecordedAudio(audioFile);
+      };
+
+      recorder.start();
+      setRecording(true);
+      setRecordingSeconds(0);
+      setFeedback('Gravando áudio. Clique no botão vermelho para enviar.');
+      recordingTimerRef.current = window.setInterval(() => setRecordingSeconds((seconds) => seconds + 1), 1000);
+    } catch (error: any) {
+      stopRecorderTracks();
+      setRecording(false);
+      clearRecordingTimer();
+      setFeedback(error?.message || 'Não foi possível acessar o microfone.');
+    }
+  }
+
+  function stopRecording() {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state !== 'recording') return;
+    recorder.stop();
   }
 
   async function send() {
@@ -401,24 +589,8 @@ export function WhatsappThread({
       let result: any;
       let optimistic: MessageListItem;
       if (file) {
-        result = await sendFileMessage(message);
-        const type = result.type || mediaKind({ mime_type: file.type, file_name: file.name });
-        optimistic = {
-          id: result.message?.id || result.externalId || `local-${Date.now()}`,
-          external_id: result.externalId || null,
-          conversation_id: result.conversationId || conversation.id,
-          direction: 'outbound',
-          message_type: type,
-          body: message || (type === 'sticker' ? '[Figurinha]' : file.name),
-          status: 'sent',
-          created_at: new Date().toISOString(),
-          file_name: result.message?.file_name || file.name,
-          file_size: result.message?.file_size || file.size,
-          mime_type: result.message?.mime_type || file.type,
-          media_url: result.message?.media_url || null,
-          storage_path: result.message?.storage_path || null,
-          optimistic: true,
-        };
+        result = await sendFileMessage(message, file);
+        optimistic = optimisticFileMessage(result, file, message);
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
       } else {
@@ -442,6 +614,7 @@ export function WhatsappThread({
       setStickerOpen(false);
       setFeedback(file ? 'Arquivo enviado.' : 'Mensagem enviada.');
       onSent?.(result?.conversationId || conversation?.id);
+      window.setTimeout(() => refreshThreadMessages(true), 350);
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao enviar pela API oficial.');
     } finally {
@@ -677,7 +850,17 @@ export function WhatsappThread({
             )}
           </div>
 
-          <button className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-50" onClick={send} disabled={sending || (!text.trim() && !file)} title="Enviar">
+          <button
+            type="button"
+            className={`mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${recording ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white text-slate-600 hover:bg-[#fffaf2]'}`}
+            onClick={recording ? stopRecording : startRecording}
+            disabled={sending || Boolean(file)}
+            title={recording ? 'Parar gravação e enviar' : 'Gravar áudio'}
+          >
+            {recording ? <Square size={15} /> : <Mic size={18} />}
+          </button>
+
+          <button className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-50" onClick={send} disabled={sending || recording || (!text.trim() && !file)} title="Enviar">
             <Send size={17} />
           </button>
         </div>
@@ -699,7 +882,7 @@ export function WhatsappThread({
         )}
 
         <div className="mt-2 min-h-[16px]">
-          {feedback ? <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p> : <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas rápidas e o clipe para documentos ou .webp.</p>}
+          {recording ? <p className="truncate text-[10px] font-black text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para enviar.</p> : feedback ? <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p> : <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>
     </div>

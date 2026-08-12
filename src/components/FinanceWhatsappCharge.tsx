@@ -88,31 +88,17 @@ export function FinanceWhatsappCharge(props: {
 
   const whatsappHref = props.phone ? whatsappUrl(props.phone, message) : whatsappShareUrl(message);
 
-  async function sendByApi() {
-    setSending(true);
-    setFeedback(null);
-    try {
-      const response = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: props.phone,
-          client_id: props.clientId,
-          message,
-          template_name: metaTemplateName,
-          template_language: metaTemplateLanguage,
-          template_parameters: templateParameters,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar pela API.');
-      setFeedback('Mensagem enviada à Meta. Confira a entrega na aba WhatsApp.');
-    } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao enviar pela API oficial. Se for primeira mensagem ou janela de 24h fechada, a Meta exige template oficial aprovado.');
-    } finally {
-      setSending(false);
-    }
+  const conversationHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (props.clientId) params.set('cliente', props.clientId);
+    if (message) params.set('draft', message);
+    return `/app/whatsapp?${params.toString()}`;
+  }, [props.clientId, message]);
+
+  function explainConversationDraft() {
+    setFeedback('A conversa será aberta com a mensagem pronta. O envio acontece pela central do WhatsApp.');
   }
+
 
   async function sendOfficialTemplate() {
     if (!metaTemplateName) {
@@ -195,24 +181,26 @@ export function FinanceWhatsappCharge(props: {
           {feedback && <p className="mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
 
           <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
-            <b>Regra da Meta:</b> texto livre só envia dentro da janela de 24h. Fora dela, use um template oficial aprovado.
+            <b>Regra da Meta:</b> o botão principal agora abre a conversa com o texto pronto. Se a janela de 24h estiver fechada, envie um template oficial aprovado.
             {metaTemplateName ? <span> Este modelo está ligado ao template Meta <b>{metaTemplateName}</b>.</span> : <span> Cadastre o campo <b>Template Meta</b> em Modelos de mensagem para cobranças fora da janela.</span>}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={sendByApi} disabled={sending || !props.phone}>
-              {sending ? 'Enviando...' : 'Enviar pela API'}
-            </button>
+            {props.clientId && props.phone ? (
+              <Link href={conversationHref} className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={explainConversationDraft}>
+                Abrir conversa com texto
+              </Link>
+            ) : (
+              <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" disabled>
+                Cliente sem conversa
+              </button>
+            )}
             {metaTemplateName && (
               <button type="button" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs" onClick={sendOfficialTemplate} disabled={sending || !props.phone}>
                 Template oficial
               </button>
             )}
-            {props.clientId && props.phone && (
-              <Link href={`/app/whatsapp?cliente=${props.clientId}`} className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
-                Abrir conversa
-              </Link>
-            )}
+
             <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
               Abrir Web
             </a>

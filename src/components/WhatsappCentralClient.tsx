@@ -32,17 +32,20 @@ export function WhatsappCentralClient({
   initialConversations,
   initialMessages,
   initialSelectedId,
+  initialDraft = '',
   templates = [],
 }: {
   initialConversations: any[];
   initialMessages: any[];
   initialSelectedId: string;
+  initialDraft?: string;
   templates?: WhatsappTemplateOption[];
 }) {
   const [conversations, setConversations] = useState(initialConversations || []);
   const [messages, setMessages] = useState(initialMessages || []);
   const [selectedId, setSelectedId] = useState(initialSelectedId || initialConversations?.[0]?.id || '');
   const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState(initialDraft || '');
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +125,7 @@ export function WhatsappCentralClient({
 
   useEffect(() => {
     load(selectedIdRef.current, true, queryRef.current);
-    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 1200);
+    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 950);
     const onFocus = () => load(selectedIdRef.current, true, queryRef.current);
     const onVisibility = () => {
       if (!document.hidden) load(selectedIdRef.current, true, queryRef.current);
@@ -145,6 +148,7 @@ export function WhatsappCentralClient({
     selectedIdRef.current = id;
     setSelectedId(id);
     window.history.replaceState(null, '', `/app/whatsapp?conversa=${id}`);
+    setDraft('');
     setMessages([]);
     load(id, false, queryRef.current);
   }
@@ -227,7 +231,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <WhatsappThread key={selected.id} conversation={selected} messages={messages || []} templates={templates} live={!error} onSent={handleThreadSent} />
+        <WhatsappThread key={selected.id} conversation={selected} messages={messages || []} templates={templates} live={!error} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} />
       ) : (
         <section className="rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
           Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.
