@@ -86,3 +86,16 @@ Depois configure em `/app/integracoes`:
 5. Salvar Asaas.
 6. Testar conexão.
 7. Criar webhook no Asaas.
+
+
+## V8.4 - Importação inicial do Asaas
+
+Esta versão adiciona uma tela para importar clientes e cobranças exportados do Asaas em CSV/XLSX.
+
+1. Rode no Supabase: `supabase/v8_4_asaas_initial_import.sql`.
+2. Faça redeploy na Vercel.
+3. Acesse `Integrações > Asaas > Importação inicial`.
+4. Envie o arquivo exportado do Asaas.
+5. O AdvOS cruza cliente por ID Asaas, CPF/CNPJ, e-mail, telefone e nome.
+
+A importação cria clientes faltantes, vincula `asaas_customer_id`, cria cobranças no financeiro e evita duplicidade quando encontrar ID externo de cobrança.

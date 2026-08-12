@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
@@ -167,6 +168,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             <form action="/api/asaas/create-webhook" method="post">
               <button className="btn btn-secondary">Criar webhook no Asaas</button>
             </form>
+            <Link href="/app/integracoes/asaas/importar" className="btn btn-primary">Importação inicial</Link>
           </div>
 
           <div className="mt-5 rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-xs text-slate-600">

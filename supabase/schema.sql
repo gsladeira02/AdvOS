@@ -172,6 +172,9 @@ create table if not exists financial_installments (
   pix_payload text,
   billing_type text,
   integration_status text,
+  import_source text,
+  import_key text,
+  import_batch_id uuid,
   raw_payload jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz default now()
@@ -230,6 +233,20 @@ create table if not exists webhook_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists asaas_import_batches (
+  id uuid primary key default uuid_generate_v4(),
+  law_firm_id uuid not null references law_firms(id) on delete cascade,
+  file_name text,
+  import_type text default 'auto',
+  inserted_clients integer default 0,
+  updated_clients integer default 0,
+  inserted_payments integer default 0,
+  updated_payments integer default 0,
+  skipped_rows integer default 0,
+  errors jsonb default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create or replace function public.current_law_firm_id()
 returns uuid language sql stable security definer as $$
   select law_firm_id from public.profiles where auth_user_id = auth.uid() limit 1;
@@ -251,6 +268,7 @@ alter table tasks enable row level security;
 alter table activity_logs enable row level security;
 alter table integration_settings enable row level security;
 alter table webhook_events enable row level security;
+alter table asaas_import_batches enable row level security;
 
 drop policy if exists "law_firms_same_firm_select" on law_firms;
 drop policy if exists "profiles_same_firm_all" on profiles;
@@ -362,3 +380,7 @@ create index if not exists idx_clients_service_id on clients(service_id);
 create index if not exists idx_documents_service_id on documents(service_id);
 create index if not exists idx_generated_contracts_service_id on generated_contracts(service_id);
 create index if not exists idx_financial_contracts_service_id on financial_contracts(service_id);
+
+create index if not exists idx_asaas_import_batches_firm_created on asaas_import_batches(law_firm_id, created_at desc);
+create index if not exists idx_financial_installments_import_batch on financial_installments(import_batch_id);
+create index if not exists idx_financial_installments_import_key on financial_installments(law_firm_id, import_key);
