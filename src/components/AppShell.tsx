@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { Briefcase, CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, Wallet, ListChecks } from 'lucide-react';
+import { Briefcase, CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, Wallet, ListChecks, UploadCloud } from 'lucide-react';
 
 const items = [
   ['/app/dashboard', 'Início', Home],
@@ -13,6 +13,7 @@ const items = [
   ['/app/tarefas', 'Tarefas', CheckSquare],
   ['/app/usuarios', 'Usuários', Briefcase],
   ['/app/integracoes', 'Integrações', Plug],
+  ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
   ['/app/configuracoes', 'Configurações', Settings],
 ] as const;
 
