@@ -8,7 +8,7 @@ import { readFile, unlink, writeFile } from 'fs/promises';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
-import { sendWhatsAppMedia } from '@/lib/whatsappApi';
+import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,10 +29,14 @@ function safeName(name: string) {
     .slice(0, 120) || 'arquivo';
 }
 
-function isBrowserRecordedAudio(file: File) {
+function isBrowserRecordedAudio(file: File, forceRecorded = false) {
   const mime = String(file.type || '').toLowerCase();
   const name = String(file.name || '').toLowerCase();
-  return mime.includes('audio/webm') || mime.includes('video/webm') || name.endsWith('.webm');
+  return forceRecorded
+    || mime.includes('audio/webm')
+    || mime.includes('video/webm')
+    || name.endsWith('.webm')
+    || name.startsWith('audio-whatsapp-');
 }
 
 function supportedWhatsAppAudioMime(file: File) {
@@ -85,20 +89,31 @@ async function convertWebmToOggOpus(buffer: Buffer) {
   }
 }
 
-async function normalizeFileForWhatsApp(file: File) {
+async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) {
   let buffer = Buffer.from(await file.arrayBuffer());
   let fileName = file.name || 'arquivo';
   let mimeType = file.type || 'application/octet-stream';
   let converted = false;
 
-  const supportedAudio = supportedWhatsAppAudioMime(file);
-  if (supportedAudio) {
-    mimeType = supportedAudio;
-  } else if (isBrowserRecordedAudio(file)) {
+  const originalMime = String(file.type || '').toLowerCase();
+  const originalName = String(file.name || '').toLowerCase();
+  const looksLikeAudio = forceRecordedAudio || originalMime.startsWith('audio/') || originalName.match(/\.(webm|ogg|opus|m4a|mp4|mp3|aac|amr)$/);
+
+  // Áudio gravado pelo navegador pode vir como webm ou mp4, mas a Meta pode
+  // detectar os bytes como application/octet-stream quando o arquivo passa por
+  // URL assinada. Para gravações, sempre transcodificamos para OGG/OPUS real.
+  if (isBrowserRecordedAudio(file, forceRecordedAudio)) {
     buffer = await convertWebmToOggOpus(buffer);
     fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
     mimeType = 'audio/ogg; codecs=opus';
     converted = true;
+  } else {
+    const supportedAudio = supportedWhatsAppAudioMime(file);
+    if (supportedAudio) {
+      mimeType = supportedAudio;
+    } else if (looksLikeAudio) {
+      throw new Error('Formato de áudio não suportado. Use OGG/OPUS, MP3, M4A/MP4, AAC ou AMR.');
+    }
   }
 
   return {
@@ -118,12 +133,13 @@ export async function POST(req: Request) {
     const phone = normalizeBrazilPhone(str(form.get('phone') || form.get('to')));
     const clientId = str(form.get('client_id') || form.get('clientId')) || null;
     const caption = str(form.get('caption'));
+    const recordedAudio = ['1', 'true', 'yes', 'sim'].includes(str(form.get('recorded_audio') || form.get('recordedAudio')).toLowerCase());
 
     if (!phone) throw new Error('Telefone/WhatsApp do cliente não informado.');
     if (!(file instanceof File)) throw new Error('Selecione um arquivo para enviar.');
     if (!file.size) throw new Error('Arquivo vazio.');
 
-    const normalized = await normalizeFileForWhatsApp(file);
+    const normalized = await normalizeFileForWhatsApp(file, recordedAudio);
     const isSticker = String(normalized.mimeType || '').toLowerCase() === 'image/webp' || String(normalized.fileName || '').toLowerCase().endsWith('.webp');
     const isAudio = String(normalized.mimeType || '').toLowerCase().startsWith('audio/');
     const maxSize = isSticker ? 500 * 1024 : isAudio ? 16 * 1024 * 1024 : 15 * 1024 * 1024;
@@ -148,20 +164,35 @@ export async function POST(req: Request) {
     }
 
     try {
-      const result = await sendWhatsAppMedia({
-        lawFirmId: profile.law_firm_id,
-        to: phone,
-        mediaUrl: signed.data.signedUrl,
-        mimeType: normalized.mimeType || 'application/octet-stream',
-        fileName: normalized.fileName || originalName,
-        fileSize: normalized.size,
-        caption,
-        clientId,
-        sentBy: session.user.id,
-        storagePath,
-      });
+      const isAudioMessage = String(normalized.mimeType || '').toLowerCase().startsWith('audio/');
+      const result = isAudioMessage
+        ? await sendWhatsAppMediaBuffer({
+            lawFirmId: profile.law_firm_id,
+            to: phone,
+            buffer: normalized.buffer,
+            mimeType: normalized.mimeType || 'application/octet-stream',
+            fileName: normalized.fileName || originalName,
+            fileSize: normalized.size,
+            caption,
+            clientId,
+            sentBy: session.user.id,
+            storagePath,
+            mediaUrl: signed.data.signedUrl,
+          })
+        : await sendWhatsAppMedia({
+            lawFirmId: profile.law_firm_id,
+            to: phone,
+            mediaUrl: signed.data.signedUrl,
+            mimeType: normalized.mimeType || 'application/octet-stream',
+            fileName: normalized.fileName || originalName,
+            fileSize: normalized.size,
+            caption,
+            clientId,
+            sentBy: session.user.id,
+            storagePath,
+          });
 
-      return NextResponse.json({ ok: true, converted: normalized.converted, ...result });
+      return NextResponse.json({ ok: true, converted: normalized.converted, uploaded_by_id: isAudioMessage, ...result });
     } catch (error) {
       await admin.storage.from('documents').remove([storagePath]).catch(() => null);
       throw error;

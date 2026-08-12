@@ -491,13 +491,14 @@ export function WhatsappThread({
     return result;
   }
 
-  async function sendFileMessage(caption: string, selectedFile: File | null = file) {
+  async function sendFileMessage(caption: string, selectedFile: File | null = file, options: { recordedAudio?: boolean } = {}) {
     if (!selectedFile) throw new Error('Nenhum arquivo selecionado.');
     const form = new FormData();
     form.set('file', selectedFile);
     form.set('phone', conversation.phone || '');
     form.set('client_id', conversation.client_id || '');
     form.set('caption', caption || '');
+    if (options.recordedAudio) form.set('recorded_audio', '1');
 
     const response = await fetch('/api/whatsapp/send-media', { method: 'POST', body: form });
     const result = await response.json().catch(() => ({}));
@@ -530,7 +531,7 @@ export function WhatsappThread({
     setSending(true);
     setFeedback('Enviando áudio...');
     try {
-      const result = await sendFileMessage('', audioFile);
+      const result = await sendFileMessage('', audioFile, { recordedAudio: true });
       const serverMessage = result.message || {};
       const normalizedAudioFile = new File([audioFile], serverMessage.file_name || audioFile.name, { type: serverMessage.mime_type || audioFile.type });
       setItems((current) => mergeMessageLists([optimisticFileMessage(result, normalizedAudioFile, '[Áudio enviado]')], current));
