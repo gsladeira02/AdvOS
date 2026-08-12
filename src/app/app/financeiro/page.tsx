@@ -4,9 +4,9 @@ import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { dateBR, money } from '@/lib/utils';
 import Link from 'next/link';
-import { whatsappShareUrl, whatsappUrl } from '@/lib/whatsapp';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { DEFAULT_MESSAGE_TEMPLATES, renderMessageTemplate } from '@/lib/messageTemplates';
+import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
+import { FinanceWhatsappCharge } from '@/components/FinanceWhatsappCharge';
 
 function statusBadge(status: string) {
   if (status === 'pago') return 'badge-ok';
@@ -31,28 +31,6 @@ function installmentLabel(installment: any) {
   if (match?.[1]) return `Parcela ${match[1].replace(/\s+/g, '')}`;
 
   return text || 'Cobrança de honorários';
-}
-
-function buildChargeWhatsappMessage(input: {
-  clientName?: string | null;
-  installment: any;
-  url: string;
-  template?: string;
-  firmName?: string | null;
-  firmPhone?: string | null;
-}) {
-  const label = installmentLabel(input.installment);
-  const defaultTemplate = DEFAULT_MESSAGE_TEMPLATES.find((t) => t.slug === 'cobranca_vencida')?.body || '';
-
-  return renderMessageTemplate(input.template || defaultTemplate, {
-    cliente: input.clientName || '',
-    parcela: label,
-    valor: Number(input.installment.amount || 0),
-    vencimento_iso: input.installment.due_date,
-    link_asaas: input.url || '',
-    escritorio: input.firmName || 'escritório',
-    telefone_escritorio: input.firmPhone || '',
-  });
 }
 
 function statusLabel(status: string) {
@@ -87,7 +65,7 @@ export default async function Financeiro({ searchParams }: { searchParams?: Prom
   const dateTo = query.data_fim || '';
   const searchText = query.busca || '';
 
-  const [items, clients, firmRes, templateRes] = await Promise.all([
+  const [items, clients, firmRes, templatesRes] = await Promise.all([
     supabase
       .from('financial_installments')
       .select('*, financial_contracts(description, clients(id,name,doc,email,phone,whatsapp,asaas_customer_id))')
@@ -95,12 +73,22 @@ export default async function Financeiro({ searchParams }: { searchParams?: Prom
       .order('due_date', { ascending: true }),
     supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id).order('name'),
     admin.from('law_firms').select('name,phone').eq('id', profile.law_firm_id).maybeSingle(),
-    admin.from('message_templates').select('body').eq('law_firm_id', profile.law_firm_id).eq('slug', 'cobranca_vencida').eq('active', true).maybeSingle(),
+    admin
+      .from('message_templates')
+      .select('id,name,body,category,active')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('category', 'cobranca')
+      .eq('active', true)
+      .order('name'),
   ]);
 
   const installments = items.data || [];
   const firm = firmRes.data as any;
-  const chargeTemplate = (templateRes.data as any)?.body || DEFAULT_MESSAGE_TEMPLATES.find((t) => t.slug === 'cobranca_vencida')?.body;
+  const chargeTemplates = (templatesRes.data?.length ? templatesRes.data : DEFAULT_MESSAGE_TEMPLATES.filter((t) => t.category === 'cobranca')).map((template: any) => ({
+    id: String(template.id || template.slug || template.name),
+    name: String(template.name || 'Modelo de cobrança'),
+    body: String(template.body || ''),
+  }));
 
   const total = installments
     .filter((i: any) => i.status !== 'pago')
@@ -214,10 +202,7 @@ export default async function Financeiro({ searchParams }: { searchParams?: Prom
         {filteredInstallments.map((i: any) => {
           const client = i.financial_contracts?.clients;
           const url = chargeUrl(i);
-          const message = buildChargeWhatsappMessage({ clientName: client?.name, installment: i, url, template: chargeTemplate, firmName: firm?.name, firmPhone: firm?.phone });
           const phone = client?.whatsapp || client?.phone;
-          const wa = phone ? whatsappUrl(phone, message) : whatsappShareUrl(message);
-          const canCharge = Boolean(wa) && i.status !== 'pago';
           const label = installmentLabel(i);
 
           return (
@@ -259,15 +244,18 @@ export default async function Financeiro({ searchParams }: { searchParams?: Prom
                   </div>
                 </div>
 
-                {canCharge ? (
-                  <Link href={wa} target="_blank" className="btn btn-primary w-full justify-center">
-                    Cobrar no WhatsApp
-                  </Link>
-                ) : (
-                  <button className="btn w-full cursor-not-allowed justify-center opacity-50" disabled>
-                    {i.status === 'pago' ? 'Cobrança paga' : 'Cobrar no WhatsApp'}
-                  </button>
-                )}
+                <FinanceWhatsappCharge
+                  paid={i.status === 'pago'}
+                  clientName={client?.name}
+                  phone={phone}
+                  installmentLabel={label}
+                  amount={Number(i.amount || 0)}
+                  dueDate={i.due_date}
+                  asaasUrl={url}
+                  firmName={firm?.name}
+                  firmPhone={firm?.phone}
+                  templates={chargeTemplates}
+                />
               </div>
             </section>
           );

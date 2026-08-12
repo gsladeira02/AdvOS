@@ -1,0 +1,3 @@
+-- AdvOS V8.8
+-- Nenhuma alteração obrigatória no banco.
+-- Esta versão altera apenas a interface do Financeiro para permitir escolher o modelo de cobrança antes de abrir o WhatsApp.
