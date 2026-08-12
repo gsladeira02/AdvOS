@@ -12,6 +12,7 @@ import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 const execFileAsync = promisify(execFile);
 
@@ -29,28 +30,16 @@ function safeName(name: string) {
     .slice(0, 120) || 'arquivo';
 }
 
-function isBrowserRecordedAudio(file: File, forceRecorded = false) {
+function looksLikeAudioFile(file: File, forceRecorded = false) {
   const mime = String(file.type || '').toLowerCase();
   const name = String(file.name || '').toLowerCase();
-  return forceRecorded
-    || mime.includes('audio/webm')
-    || mime.includes('video/webm')
-    || name.endsWith('.webm')
-    || name.startsWith('audio-whatsapp-');
+  if (forceRecorded || name.startsWith('audio-whatsapp-')) return true;
+  if (mime.startsWith('audio/')) return true;
+  if (mime.startsWith('video/') && !mime.includes('webm')) return false;
+  return /\.(webm|ogg|opus|m4a|mp3|aac|amr|wav)$/i.test(name);
 }
 
-function supportedWhatsAppAudioMime(file: File) {
-  const mime = String(file.type || '').toLowerCase();
-  const name = String(file.name || '').toLowerCase();
-  if (mime.includes('audio/ogg') || name.endsWith('.ogg') || name.endsWith('.opus')) return 'audio/ogg; codecs=opus';
-  if (mime.includes('audio/mpeg') || name.endsWith('.mp3')) return 'audio/mpeg';
-  if (mime.includes('audio/mp4') || name.endsWith('.m4a') || name.endsWith('.mp4')) return 'audio/mp4';
-  if (mime.includes('audio/aac') || name.endsWith('.aac')) return 'audio/aac';
-  if (mime.includes('audio/amr') || name.endsWith('.amr')) return 'audio/amr';
-  return '';
-}
-
-async function convertWebmToOggOpus(buffer: Buffer) {
+async function convertAudioToMp3(buffer: Buffer, originalName = 'audio') {
   let ffmpegPath = '';
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -61,12 +50,14 @@ async function convertWebmToOggOpus(buffer: Buffer) {
   }
 
   if (!ffmpegPath) {
-    throw new Error('Não foi possível converter o áudio: ffmpeg não encontrado no build. Faça redeploy depois de atualizar o package.json.');
+    throw new Error('Não foi possível preparar o áudio: ffmpeg não encontrado no build. Faça redeploy com Clear Build Cache.');
   }
 
   const id = randomUUID();
-  const inputPath = join(tmpdir(), `advos-audio-${id}.webm`);
-  const outputPath = join(tmpdir(), `advos-audio-${id}.ogg`);
+  const safeOriginal = safeName(originalName || 'audio');
+  const extension = safeOriginal.includes('.') ? safeOriginal.split('.').pop() : 'input';
+  const inputPath = join(tmpdir(), `advos-audio-${id}.${extension || 'input'}`);
+  const outputPath = join(tmpdir(), `advos-audio-${id}.mp3`);
 
   try {
     await writeFile(inputPath, buffer);
@@ -75,11 +66,11 @@ async function convertWebmToOggOpus(buffer: Buffer) {
       '-i', inputPath,
       '-vn',
       '-ac', '1',
-      '-c:a', 'libopus',
-      '-b:a', '32k',
-      '-application', 'voip',
+      '-ar', '44100',
+      '-codec:a', 'libmp3lame',
+      '-b:a', '64k',
       outputPath,
-    ], { timeout: 30000 });
+    ], { timeout: 45000 });
     const output = await readFile(outputPath);
     if (!output.length) throw new Error('Conversão de áudio gerou arquivo vazio.');
     return output;
@@ -95,25 +86,16 @@ async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) 
   let mimeType = file.type || 'application/octet-stream';
   let converted = false;
 
-  const originalMime = String(file.type || '').toLowerCase();
-  const originalName = String(file.name || '').toLowerCase();
-  const looksLikeAudio = forceRecordedAudio || originalMime.startsWith('audio/') || originalName.match(/\.(webm|ogg|opus|m4a|mp4|mp3|aac|amr)$/);
+  const looksAudio = looksLikeAudioFile(file, forceRecordedAudio);
 
-  // Áudio gravado pelo navegador pode vir como webm ou mp4, mas a Meta pode
-  // detectar os bytes como application/octet-stream quando o arquivo passa por
-  // URL assinada. Para gravações, sempre transcodificamos para OGG/OPUS real.
-  if (isBrowserRecordedAudio(file, forceRecordedAudio)) {
-    buffer = await convertWebmToOggOpus(buffer);
-    fileName = fileName.replace(/\.[^.]+$/, '') + '.ogg';
-    mimeType = 'audio/ogg; codecs=opus';
+  // A Meta costuma rejeitar gravações do navegador quando os bytes não batem
+  // perfeitamente com o mime declarado. Para eliminar o erro application/octet-stream,
+  // qualquer áudio enviado pelo WhatsApp do AdvOS é normalizado para MP3 real.
+  if (looksAudio) {
+    buffer = await convertAudioToMp3(buffer, file.name || 'audio');
+    fileName = safeName(fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp') + '.mp3';
+    mimeType = 'audio/mpeg';
     converted = true;
-  } else {
-    const supportedAudio = supportedWhatsAppAudioMime(file);
-    if (supportedAudio) {
-      mimeType = supportedAudio;
-    } else if (looksLikeAudio) {
-      throw new Error('Formato de áudio não suportado. Use OGG/OPUS, MP3, M4A/MP4, AAC ou AMR.');
-    }
   }
 
   return {

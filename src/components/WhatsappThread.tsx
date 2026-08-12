@@ -127,6 +127,34 @@ function stableMessageKey(message: any) {
   return String(message?.external_id || message?.id || `${message?.direction}-${message?.created_at}-${message?.body}`);
 }
 
+
+function appendMessagePreservingHistory(currentMessages: MessageListItem[], newMessage: MessageListItem) {
+  const key = stableMessageKey(newMessage);
+  const next: MessageListItem[] = [];
+  let inserted = false;
+
+  for (const item of currentMessages || []) {
+    const sameId = newMessage.id && item.id && String(item.id) === String(newMessage.id);
+    const sameExternal = newMessage.external_id && item.external_id && String(item.external_id) === String(newMessage.external_id);
+    const sameLocalEquivalent = item.optimistic
+      && item.direction === newMessage.direction
+      && item.body === newMessage.body
+      && Math.abs(new Date(item.created_at || 0).getTime() - new Date(newMessage.created_at || 0).getTime()) < 120000;
+
+    if (sameId || sameExternal || sameLocalEquivalent || stableMessageKey(item) === key) {
+      if (!inserted) {
+        next.push({ ...item, ...newMessage, optimistic: newMessage.optimistic ?? item.optimistic });
+        inserted = true;
+      }
+      continue;
+    }
+    next.push(item);
+  }
+
+  if (!inserted) next.push(newMessage);
+  return next.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+}
+
 function mergeMessageLists(serverMessages: MessageListItem[], currentMessages: MessageListItem[]) {
   const merged: MessageListItem[] = [];
   const seen = new Set<string>();
@@ -241,7 +269,11 @@ export function WhatsappThread({
         onSent?.(nextConversationId);
       }
       const serverMessages = (result.messages || []).filter((message: any) => String(message?.conversation_id || '') === nextConversationId);
-      setItems((current) => mergeMessageLists(serverMessages, current.filter((message: any) => message?.optimistic)));
+      setItems((current) => {
+        const hasCurrentPersisted = current.some((message: any) => !message?.optimistic && String(message?.conversation_id || '') === nextConversationId);
+        if (!serverMessages.length && hasCurrentPersisted) return current;
+        return mergeMessageLists(serverMessages, current.filter((message: any) => message?.optimistic));
+      });
       if (!silent) setFeedback('Conversa atualizada.');
     } catch (error: any) {
       if (!silent) setFeedback(error?.message || 'Erro ao atualizar conversa.');
@@ -302,11 +334,15 @@ export function WhatsappThread({
       if (!message?.conversation_id) return true;
       return String(message.conversation_id) === conversationId;
     });
-    setItems((current) => mergeMessageLists(cleanServerMessages, current.filter((message: any) => {
-      if (!message?.optimistic) return false;
-      if (!message?.conversation_id) return true;
-      return String(message.conversation_id) === conversationId;
-    })));
+    setItems((current) => {
+      const hasCurrentPersisted = current.some((message: any) => !message?.optimistic && String(message?.conversation_id || '') === conversationId);
+      if (!cleanServerMessages.length && hasCurrentPersisted) return current;
+      return mergeMessageLists(cleanServerMessages, current.filter((message: any) => {
+        if (!message?.optimistic) return false;
+        if (!message?.conversation_id) return true;
+        return String(message.conversation_id) === conversationId;
+      }));
+    });
   }, [messages, conversation?.id]);
 
   function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
@@ -534,14 +570,15 @@ export function WhatsappThread({
       const result = await sendFileMessage('', audioFile, { recordedAudio: true });
       const serverMessage = result.message || {};
       const normalizedAudioFile = new File([audioFile], serverMessage.file_name || audioFile.name, { type: serverMessage.mime_type || audioFile.type });
-      setItems((current) => mergeMessageLists([optimisticFileMessage(result, normalizedAudioFile, '[Áudio enviado]')], current));
+      setItems((current) => appendMessagePreservingHistory(current, optimisticFileMessage(result, normalizedAudioFile, '[Áudio enviado]')));
       clearRecordedAudio();
-      setFeedback(result.converted ? 'Áudio convertido para OGG/OPUS e enviado.' : 'Áudio enviado.');
+      setFeedback(result.converted ? 'Áudio preparado em MP3 e enviado.' : 'Áudio enviado.');
       onSent?.(result?.conversationId || conversation?.id);
+      window.dispatchEvent(new Event('advos:whatsapp-refresh'));
       window.setTimeout(() => refreshThreadMessages(true), 250);
       window.setTimeout(() => refreshThreadMessages(true), 1200);
     } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao enviar áudio. O AdvOS tenta converter áudio webm para OGG/OPUS antes de enviar.');
+      setFeedback(error?.message || 'Erro ao enviar áudio. O AdvOS tenta preparar qualquer áudio em MP3 antes de enviar pela Meta.');
     } finally {
       setSending(false);
     }
@@ -637,13 +674,14 @@ export function WhatsappThread({
           optimistic: true,
         };
       }
-      setItems((current) => mergeMessageLists([optimistic], current));
+      setItems((current) => appendMessagePreservingHistory(current, optimistic));
       setText('');
       setShortcutOpen(false);
       setEmojiOpen(false);
       setStickerOpen(false);
       setFeedback(file ? 'Arquivo enviado.' : 'Mensagem enviada.');
       onSent?.(result?.conversationId || conversation?.id);
+      window.dispatchEvent(new Event('advos:whatsapp-refresh'));
       window.setTimeout(() => refreshThreadMessages(true), 250);
       window.setTimeout(() => refreshThreadMessages(true), 1200);
     } catch (error: any) {
@@ -845,7 +883,7 @@ export function WhatsappThread({
               Seu navegador não suporta reprodução de áudio.
             </audio>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[10px] font-bold text-slate-500">Escute antes de enviar. Se o navegador gravar em WebM, o AdvOS converte para OGG/OPUS na hora do envio.</span>
+              <span className="text-[10px] font-bold text-slate-500">Escute antes de enviar. O AdvOS prepara o áudio em MP3 antes de enviar pela Meta.</span>
               <button type="button" onClick={() => sendRecordedAudio(recordedAudio.file)} disabled={sending} className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-50">
                 <Send size={12} /> Enviar áudio
               </button>
@@ -866,7 +904,7 @@ export function WhatsappThread({
           </button>
 
           <div className="relative flex-1">
-            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); } }} placeholder={recordedAudio ? 'Escute o áudio e clique em enviar.' : file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
+            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => { setShortcutOpen(text.trimStart().startsWith('/')); refreshThreadMessages(true); }} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); } }} placeholder={recordedAudio ? 'Escute o áudio e clique em enviar.' : file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
 
             {shortcutOpen && slashTerm !== null && (
               <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-80 w-full overflow-auto rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">

@@ -4,6 +4,7 @@ import { firstTextFromInboundMessage, getOrCreateConversation, getWhatsAppConfig
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

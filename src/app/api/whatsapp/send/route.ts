@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { sendWhatsAppTemplate, sendWhatsAppText } from '@/lib/whatsappApi';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 function str(value: any) {
   return String(value || '').trim();
 }

@@ -6,6 +6,7 @@ import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClient
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 async function getClientForVirtual(admin: any, lawFirmId: string, virtualId: string) {

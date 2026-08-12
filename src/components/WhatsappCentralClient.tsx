@@ -130,11 +130,14 @@ export function WhatsappCentralClient({
     const onVisibility = () => {
       if (!document.hidden) load(selectedIdRef.current, true, queryRef.current);
     };
+    const onForcedRefresh = () => load(selectedIdRef.current, true, queryRef.current);
     window.addEventListener('focus', onFocus);
+    window.addEventListener('advos:whatsapp-refresh', onForcedRefresh);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('advos:whatsapp-refresh', onForcedRefresh);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [load]);
