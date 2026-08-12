@@ -376,9 +376,12 @@ async function uploadWhatsAppMediaFromBuffer(input: {
   const endpoint = `${input.config.baseUrl}/${input.config.phoneNumberId}/media`;
   const form = new FormData();
   const mime = multipartMimeType(input.mimeType);
-  const file = new File([input.buffer], input.fileName || 'arquivo', { type: mime });
+  const safeFileName = input.fileName || (mime === 'audio/mpeg' ? 'audio-whatsapp.mp3' : 'arquivo');
+  // Usar Blob + filename força o multipart a sair com Content-Type correto.
+  // Isso evita a Meta receber áudio gravado como application/octet-stream.
+  const blob = new Blob([new Uint8Array(input.buffer)], { type: mime });
   form.set('messaging_product', 'whatsapp');
-  form.set('file', file);
+  form.set('file', blob, safeFileName);
 
   const response = await fetch(endpoint, {
     method: 'POST',

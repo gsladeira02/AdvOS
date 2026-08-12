@@ -26,6 +26,18 @@ function baseMime(value?: string | null) {
   return String(value || '').split(';')[0].trim().toLowerCase();
 }
 
+function hasMp3Signature(buffer: Buffer) {
+  if (!buffer || buffer.length < 3) return false;
+  // ID3 tag no início do arquivo ou sync word de frame MPEG.
+  if (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) return true;
+  return buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0;
+}
+
+function normalizeMp3FileName(fileName: string) {
+  const base = safeName(fileName || `audio-whatsapp-${Date.now()}.mp3`).replace(/\.[^.]+$/, '') || 'audio-whatsapp';
+  return `${base}.mp3`;
+}
+
 function acceptedWhatsAppAudioMime(mimeType?: string | null, fileName = '') {
   const mime = baseMime(mimeType);
   const name = String(fileName || '').toLowerCase();
@@ -56,22 +68,34 @@ async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) 
 
   if (looksAudio) {
     const cleanMime = baseMime(mimeType);
-    const isWebm = cleanMime === 'audio/webm' || cleanMime === 'video/webm' || fileName.toLowerCase().endsWith('.webm');
-    const isWav = cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav' || fileName.toLowerCase().endsWith('.wav');
-    const isOctet = cleanMime === 'application/octet-stream';
 
-    if (!acceptedWhatsAppAudioMime(mimeType, fileName) || isWebm || isWav || isOctet) {
-      throw new Error('Formato de áudio não aceito pela Meta. Grave novamente pelo microfone do AdvOS atualizado, que prepara o áudio em MP3 no navegador, ou envie um arquivo MP3, M4A, OGG/OPUS, AAC ou AMR.');
-    }
+    if (forceRecordedAudio) {
+      // Áudio gravado pelo navegador sempre deve chegar aqui como MP3 REAL.
+      // Nunca encaminhar audio/webm/audio/mp4 gravado para a Meta, pois ela costuma detectar
+      // esses blobs como application/octet-stream e rejeitar o envio.
+      if (!hasMp3Signature(buffer)) {
+        throw new Error('O áudio gravado ainda não chegou como MP3 real. Atualize a página com Ctrl+F5, grave novamente e aguarde aparecer “Áudio pronto em MP3” antes de enviar.');
+      }
+      mimeType = 'audio/mpeg';
+      fileName = normalizeMp3FileName(fileName);
+    } else {
+      const isWebm = cleanMime === 'audio/webm' || cleanMime === 'video/webm' || fileName.toLowerCase().endsWith('.webm');
+      const isWav = cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav' || fileName.toLowerCase().endsWith('.wav');
+      const isOctet = cleanMime === 'application/octet-stream';
 
-    if (cleanMime === 'audio/mp3') mimeType = 'audio/mpeg';
-    if (!/\.(ogg|opus|mp3|mpeg|amr|m4a|mp4|aac)$/i.test(fileName)) {
-      const extension = baseMime(mimeType).includes('mpeg') ? 'mp3'
-        : baseMime(mimeType).includes('ogg') ? 'ogg'
-        : baseMime(mimeType).includes('amr') ? 'amr'
-        : baseMime(mimeType).includes('aac') ? 'aac'
-        : 'm4a';
-      fileName = `${fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp'}.${extension}`;
+      if (!acceptedWhatsAppAudioMime(mimeType, fileName) || isWebm || isWav || isOctet) {
+        throw new Error('Formato de áudio não aceito pela Meta. Envie MP3, M4A/MP4, OGG/OPUS, AAC ou AMR. Para gravação pelo microfone, grave novamente no AdvOS atualizado e aguarde o MP3 ficar pronto.');
+      }
+
+      if (cleanMime === 'audio/mp3') mimeType = 'audio/mpeg';
+      if (!/\.(ogg|opus|mp3|mpeg|amr|m4a|mp4|aac)$/i.test(fileName)) {
+        const extension = baseMime(mimeType).includes('mpeg') ? 'mp3'
+          : baseMime(mimeType).includes('ogg') ? 'ogg'
+          : baseMime(mimeType).includes('amr') ? 'amr'
+          : baseMime(mimeType).includes('aac') ? 'aac'
+          : 'm4a';
+        fileName = `${fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp'}.${extension}`;
+      }
     }
   }
 
