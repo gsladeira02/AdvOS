@@ -44,7 +44,7 @@ function extensionFromMime(mime?: string | null) {
   return 'bin';
 }
 
-export async function GET(req: Request, context: { params: Promise<{ messageId: string }> | { messageId: string } }) {
+export async function GET(req: Request, context: { params: Promise<{ messageId: string }> }) {
   try {
     const { profile } = await getCurrentProfile();
     const admin = createAdminSupabase();
