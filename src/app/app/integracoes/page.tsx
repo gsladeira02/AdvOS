@@ -51,20 +51,20 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
       {asaasMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${asaasMsg.cls}`}>{asaasMsg.text}</section>}
       {whatsappMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${whatsappMsg.cls}`}>{whatsappMsg.text}</section>}
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="card p-6">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="label">Assinatura digital</p>
-              <h2 className="mt-2 text-2xl font-black">ZapSign</h2>
+              <h2 className="mt-2 text-xl font-black">ZapSign</h2>
               <p className="mt-2 text-sm text-slate-600">Use para enviar procurações, contratos de honorários, acordos e documentos para assinatura.</p>
             </div>
             <span className={`badge ${zapStatus.cls}`}>{zapStatus.label}</span>
           </div>
 
-          <form action="/api/integrations" method="post" className="mt-6 space-y-4">
+          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
             <input type="hidden" name="provider" value="zapsign" />
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Ambiente</label>
                 <select name="environment" defaultValue={zapsign?.environment || 'sandbox'} className="input mt-1">
@@ -101,19 +101,19 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
           </form>
         </section>
 
-        <section className="card p-6">
+        <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="label">Cobranças</p>
-              <h2 className="mt-2 text-2xl font-black">Asaas</h2>
+              <h2 className="mt-2 text-xl font-black">Asaas</h2>
               <p className="mt-2 text-sm text-slate-600">Gere cobranças de honorários, parcelas, Pix e boleto a partir da pasta do cliente ou do financeiro.</p>
             </div>
             <span className={`badge ${asaasStatus.cls}`}>{asaasStatus.label}</span>
           </div>
 
-          <form action="/api/integrations" method="post" className="mt-6 space-y-4">
+          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
             <input type="hidden" name="provider" value="asaas" />
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Ambiente</label>
                 <select name="environment" defaultValue={asaas?.environment || 'sandbox'} className="input mt-1">
@@ -136,7 +136,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <p className="mt-2 text-xs text-slate-500">Deixe vazio para manter a chave atual.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Tipo padrão</label>
                 <select name="default_billing_type" defaultValue={asaas?.default_billing_type || 'BOLETO'} className="input mt-1">
@@ -166,26 +166,26 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             <button className="btn btn-primary">Salvar Asaas</button>
           </form>
 
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <form action="/api/asaas/test" method="post"><button className="btn btn-secondary">Testar conexão</button></form>
             <form action="/api/asaas/create-webhook" method="post"><button className="btn btn-secondary">Criar webhook</button></form>
             <Link href="/app/integracoes/asaas/importar" className="btn btn-primary">Importação inicial</Link>
           </div>
         </section>
 
-        <section className="card p-6">
+        <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="label">Atendimento</p>
-              <h2 className="mt-2 text-2xl font-black">WhatsApp API</h2>
+              <h2 className="mt-2 text-xl font-black">WhatsApp API</h2>
               <p className="mt-2 text-sm text-slate-600">Conecte a Cloud API oficial para enviar mensagens pelo AdvOS e receber respostas no sistema.</p>
             </div>
             <span className={`badge ${whatsappStatus.cls}`}>{whatsappStatus.label}</span>
           </div>
 
-          <form action="/api/integrations" method="post" className="mt-6 space-y-4">
+          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
             <input type="hidden" name="provider" value="whatsapp" />
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Ambiente</label>
                 <select name="environment" defaultValue={whatsapp?.environment || 'producao'} className="input mt-1">
@@ -208,7 +208,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <p className="mt-2 text-xs text-slate-500">Deixe vazio para manter o token atual. Use token com permissão whatsapp_business_messaging.</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Phone Number ID</label>
                 <input name="phone_number_id" className="input mt-1" defaultValue={whatsappRaw.phone_number_id || ''} placeholder="ID do número na Meta" />
@@ -219,7 +219,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">Número oficial</label>
                 <input name="business_phone" className="input mt-1" defaultValue={whatsappRaw.business_phone || ''} placeholder="5527999999999" />
@@ -227,6 +227,17 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <div>
                 <label className="label">Versão Graph API</label>
                 <input name="graph_version" className="input mt-1" defaultValue={whatsappRaw.graph_version || 'v22.0'} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3">
+              <p className="text-xs font-black text-slate-950">Nome e foto do número</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                O nome de exibição e a foto do número são alterados no WhatsApp Manager da Meta, em Números de telefone → Perfil. O AdvOS salva estes campos apenas como referência interna para não confundir o atendimento.
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <input name="profile_display_name" className="input" defaultValue={whatsappRaw.profile_display_name || ''} placeholder="Nome desejado, ex: Ladeira Advogados" />
+                <input name="profile_picture_note" className="input" defaultValue={whatsappRaw.profile_picture_note || ''} placeholder="Foto: use no WhatsApp Manager → Perfil" />
               </div>
             </div>
 
@@ -251,12 +262,12 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             <button className="btn btn-primary">Salvar WhatsApp</button>
           </form>
 
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <form action="/api/whatsapp/test" method="post"><button className="btn btn-secondary">Testar conexão</button></form>
             <Link href="/app/whatsapp" className="btn btn-primary">Abrir central</Link>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-xs text-slate-600">
+          <div className="mt-4 rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-xs text-slate-600">
             <b>Atenção:</b> mensagens livres pela API funcionam dentro da janela de atendimento de 24h. Fora dela, a Meta pode exigir template oficial aprovado.
           </div>
         </section>

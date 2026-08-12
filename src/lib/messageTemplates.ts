@@ -4,6 +4,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
   {
     name: 'Cobrança vencida',
     slug: 'cobranca_vencida',
+    shortcut: '/cobranca',
     category: 'cobranca',
     active: true,
     body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nIdentificamos uma parcela em aberto referente ao seu atendimento com o escritório.\n\nParcela: {{parcela}}\nValor: {{valor}}\nVencimento: {{vencimento}}\n\n{{linha_link_asaas}}\n\nQualquer dúvida, estamos à disposição.`,
@@ -11,6 +12,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
   {
     name: 'Cobrança vencendo hoje',
     slug: 'cobranca_vencendo_hoje',
+    shortcut: '/vencendo',
     category: 'cobranca',
     active: true,
     body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nPassando para lembrar que a parcela referente ao seu atendimento vence hoje.\n\nParcela: {{parcela}}\nValor: {{valor}}\n\n{{linha_link_asaas}}\n\nQualquer dúvida, estamos à disposição.`,
@@ -18,6 +20,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
   {
     name: 'Contrato e cobrança',
     slug: 'contrato_e_cobranca',
+    shortcut: '/contrato',
     category: 'contrato',
     active: true,
     body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nSeguem os links referentes ao seu atendimento com o escritório:\n\nAssinatura do documento:\n{{link_zapsign}}\n\nPagamento:\n{{link_asaas}}\n\nApós a assinatura e confirmação do pagamento, daremos andamento ao serviço.`,
@@ -25,6 +28,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
   {
     name: 'Lembrete de assinatura',
     slug: 'lembrete_assinatura',
+    shortcut: '/assinatura',
     category: 'assinatura',
     active: true,
     body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nEstamos passando para lembrar que o documento enviado para assinatura ainda está pendente.\n\nVocê pode assinar pelo link abaixo:\n{{link_zapsign}}\n\nQualquer dúvida, estamos à disposição.`,
@@ -32,6 +36,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
   {
     name: 'Pedido de documentos',
     slug: 'pedido_documentos',
+    shortcut: '/documentos',
     category: 'documentos',
     active: true,
     body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nPara darmos andamento ao seu atendimento, precisamos que envie os documentos solicitados.\n\nPode encaminhar por aqui mesmo no WhatsApp. Assim que recebermos, conferimos e damos sequência.`,

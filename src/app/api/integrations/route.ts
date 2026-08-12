@@ -7,6 +7,14 @@ function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
 }
 
+function sanitizeGraphBaseUrl(value: string) {
+  const raw = String(value || '').trim();
+  const markdown = raw.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  const clean = (markdown?.[2] || raw).replace(/^<|>$/g, '').replace(/\s+/g, '').replace(/\/+$/, '');
+  const match = clean.match(/^(https:\/\/graph\.facebook\.com\/v[0-9.]+)/i);
+  return match?.[1] || clean;
+}
+
 export async function POST(req: Request) {
   const { session, profile } = await getCurrentProfile();
   const f = await req.formData();
@@ -18,7 +26,8 @@ export async function POST(req: Request) {
 
   const environment = str(f.get('environment')) || 'sandbox';
   const apiToken = str(f.get('api_token'));
-  const apiBaseUrl = str(f.get('api_base_url')) || defaultBaseUrl(provider as any, environment);
+  const apiBaseUrlRaw = str(f.get('api_base_url')) || defaultBaseUrl(provider as any, environment);
+  const apiBaseUrl = provider === 'whatsapp' ? sanitizeGraphBaseUrl(apiBaseUrlRaw) : apiBaseUrlRaw;
   const webhookSecret = str(f.get('webhook_secret'));
   const enabled = str(f.get('enabled')) === 'true';
   const admin = createAdminSupabase();
@@ -35,6 +44,8 @@ export async function POST(req: Request) {
     waba_id: str(f.get('waba_id')),
     business_phone: str(f.get('business_phone')),
     graph_version: str(f.get('graph_version')) || 'v22.0',
+    profile_display_name: str(f.get('profile_display_name')),
+    profile_picture_note: str(f.get('profile_picture_note')),
   } : existing.data?.raw_settings || null;
 
   const payload: any = {

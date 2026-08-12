@@ -28,6 +28,8 @@ export async function POST(req: Request) {
   const category = String(form.get('category') || 'geral').trim() || 'geral';
   const active = String(form.get('active') || 'false') === 'true';
   const slug = String(form.get('slug') || '').trim() || slugify(name);
+  const shortcutRaw = String(form.get('shortcut') || '').trim() || `/${slugify(name)}`;
+  const shortcut = shortcutRaw.startsWith('/') ? shortcutRaw : `/${shortcutRaw}`;
 
   if (!name || !body) {
     return NextResponse.redirect(new URL('/app/modelos-mensagens?erro=campos', req.url), 303);
@@ -37,6 +39,7 @@ export async function POST(req: Request) {
     law_firm_id: profile.law_firm_id,
     name,
     slug,
+    shortcut,
     category,
     body,
     active,

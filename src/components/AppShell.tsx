@@ -52,33 +52,44 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mobile-readonly">
         AdvOS mobile: visualização rápida de painéis. Cadastros completos são melhores no computador.
       </div>
-      <div className="desktop-grid grid min-h-screen grid-cols-[280px_1fr]">
-        <aside className="sidebar border-r border-[#e8dfcf] bg-white p-5">
-          <div className="mb-8 flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-ink text-xl font-black text-white">A</div>
-            <div>
-              <b className="text-xl">AdvOS</b>
-              <p className="text-xs font-bold text-slate-500">{firmName}</p>
-            </div>
-          </div>
+      <div className="desktop-grid grid min-h-screen grid-cols-[58px_1fr]">
+        <aside className="sidebar sticky top-0 flex h-screen flex-col items-center border-r border-[#e8dfcf] bg-white px-1.5 py-3">
+          <Link
+            href="/app/dashboard"
+            title={`AdvOS — ${firmName}`}
+            className="mb-3 grid h-9 w-9 place-items-center rounded-xl bg-ink text-lg font-black text-white shadow-sm"
+          >
+            A
+            <span className="sr-only">AdvOS</span>
+          </Link>
 
-          <nav className="space-y-2">
+          <nav className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto pb-3">
             {items.map(([href, label, Icon]) => (
-              <Link key={href} href={href} className="flex items-center gap-3 rounded-2xl px-4 py-3 font-bold text-slate-700 hover:bg-soft">
-                <Icon size={18} />
-                {label}
+              <Link
+                key={href}
+                href={href}
+                title={label}
+                aria-label={label}
+                className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-soft hover:text-slate-950"
+              >
+                <Icon size={17} />
+                <span className="sr-only">{label}</span>
               </Link>
             ))}
           </nav>
 
-          <form action="/auth/signout" method="post" className="mt-8">
-            <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 font-bold text-slate-700 hover:bg-soft">
-              <LogOut size={18} />
-              Sair
+          <form action="/auth/signout" method="post" className="mt-2">
+            <button
+              title="Sair"
+              aria-label="Sair"
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 transition hover:bg-soft hover:text-slate-950"
+            >
+              <LogOut size={17} />
+              <span className="sr-only">Sair</span>
             </button>
           </form>
         </aside>
-        <main className="app-main p-8">{children}</main>
+        <main className="app-main min-w-0 p-4">{children}</main>
       </div>
     </div>
   );

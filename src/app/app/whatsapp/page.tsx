@@ -2,12 +2,27 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
-import { WhatsappThread } from '@/components/WhatsappThread';
+import { WhatsappCentralClient } from '@/components/WhatsappCentralClient';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { getOrCreateConversation } from '@/lib/whatsappApi';
+import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, syncClientContactsToConversations } from '@/lib/whatsappConversations';
+import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
-function titleFor(conversation: any) {
-  return conversation.clients?.name || conversation.lead_name || conversation.phone || 'Conversa';
+async function materializeSelectedConversation(admin: any, lawFirmId: string, selectedId: string) {
+  if (!isVirtualConversationId(selectedId)) return selectedId;
+  const clientId = clientIdFromVirtualConversationId(selectedId);
+  if (!clientId) return selectedId;
+  const { data: client } = await admin
+    .from('clients')
+    .select('id,name,phone,whatsapp')
+    .eq('law_firm_id', lawFirmId)
+    .eq('id', clientId)
+    .maybeSingle();
+  const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
+  if (!client?.id || !phone) return selectedId;
+  const conversation = await getOrCreateConversation({ lawFirmId, clientId: client.id, phone, leadName: client.name });
+  return conversation.id;
 }
 
 export default async function WhatsAppCentral({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
@@ -15,19 +30,37 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
 
-  const [{ data: integration }, { data: conversations }] = await Promise.all([
+  const requestedId = await materializeSelectedConversation(admin, profile.law_firm_id, query?.conversa || '');
+
+  const [{ data: integration }, { data: clients }, { data: templates }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
     admin
-      .from('whatsapp_conversations')
-      .select('*, clients(id,name,whatsapp,phone)')
+      .from('clients')
+      .select('id,law_firm_id,name,phone,whatsapp,created_at,updated_at')
       .eq('law_firm_id', profile.law_firm_id)
-      .order('last_message_at', { ascending: false })
-      .limit(50),
+      .or('phone.not.is.null,whatsapp.not.is.null')
+      .order('name'),
+    admin
+      .from('message_templates')
+      .select('id,name,slug,shortcut,body,category,active')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('active', true)
+      .order('name'),
   ]);
 
-  const selectedId = query?.conversa || conversations?.[0]?.id || '';
+  await syncClientContactsToConversations(admin, profile.law_firm_id, clients || []);
+
+  const { data: conversationsRaw } = await admin
+    .from('whatsapp_conversations')
+    .select('*, clients(id,name,whatsapp,phone)')
+    .eq('law_firm_id', profile.law_firm_id)
+    .order('last_message_at', { ascending: false })
+    .limit(160);
+
+  const conversations = mergeClientContactsIntoConversations(conversationsRaw || [], clients || []);
+  const selectedId = requestedId || conversations?.[0]?.id || '';
   const selected = (conversations || []).find((item: any) => item.id === selectedId) || conversations?.[0] || null;
-  const { data: messages } = selected
+  const { data: messages } = selected && !selected.virtual
     ? await admin
         .from('whatsapp_messages')
         .select('*')
@@ -42,7 +75,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     <div>
       <PageHeader
         title="WhatsApp"
-        subtitle="Central inicial para mensagens enviadas e recebidas pela API oficial da Meta."
+        subtitle="Central compacta com contatos dos clientes, busca, atualização automática e atalhos de modelos como /cobranca. Ctrl + Enter envia."
         action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar API</Link>}
       />
 
@@ -52,38 +85,19 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        <section className="card overflow-hidden">
-          <div className="border-b border-[#eee4d4] p-4">
-            <h2 className="text-base font-black text-slate-950">Conversas</h2>
-            <p className="text-xs text-slate-500">Mensagens são vinculadas ao cliente pelo telefone/WhatsApp.</p>
-          </div>
-
-          <div className="max-h-[620px] overflow-auto">
-            {!(conversations || []).length && <p className="p-4 text-sm font-bold text-slate-500">Nenhuma conversa recebida ainda.</p>}
-            {(conversations || []).map((conversation: any) => (
-              <Link
-                key={conversation.id}
-                href={`/app/whatsapp?conversa=${conversation.id}`}
-                className={`block border-b border-[#f0e7d8] p-4 hover:bg-[#fffaf2] ${selected?.id === conversation.id ? 'bg-[#fbf7ef]' : ''}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <b className="max-w-[220px] truncate text-sm text-slate-950">{titleFor(conversation)}</b>
-                  {conversation.unread_count > 0 && <span className="badge badge-info">{conversation.unread_count}</span>}
-                </div>
-                <p className="mt-1 text-xs font-bold text-slate-500">{conversation.phone}</p>
-                <p className="mt-1 text-[11px] text-slate-400">{conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleString('pt-BR') : ''}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {selected ? (
-          <WhatsappThread conversation={selected} messages={messages || []} />
-        ) : (
-          <section className="card p-8 text-sm font-bold text-slate-500">Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.</section>
-        )}
-      </div>
+      <WhatsappCentralClient
+        initialConversations={conversations || []}
+        initialMessages={messages || []}
+        initialSelectedId={selected?.id || ''}
+        templates={(templates || []).map((template: any) => ({
+          id: String(template.id),
+          name: String(template.name || ''),
+          slug: String(template.slug || ''),
+          shortcut: String(template.shortcut || ''),
+          category: String(template.category || ''),
+          body: String(template.body || ''),
+        }))}
+      />
     </div>
   );
 }

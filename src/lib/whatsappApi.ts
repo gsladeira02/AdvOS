@@ -13,8 +13,25 @@ export type WhatsAppConfig = {
   verifyToken: string;
 };
 
+function unmarkdownUrl(value: string) {
+  const input = String(value || '').trim();
+  const markdown = input.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  return markdown?.[2] || input;
+}
+
 function normalizeBaseUrl(url: string) {
-  return String(url || '').replace(/\/+$/, '');
+  const clean = unmarkdownUrl(url)
+    .trim()
+    .replace(/^<|>$/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\/+$/, '');
+
+  // O AdvOS precisa apenas da base da Graph API. Caso o usuário cole o endpoint
+  // completo /{phone-number-id}/messages, removemos esse trecho para evitar URL inválida.
+  const match = clean.match(/^(https:\/\/graph\.facebook\.com\/v[0-9.]+)/i);
+  if (match?.[1]) return match[1];
+
+  return clean;
 }
 
 export function defaultWhatsAppBaseUrl(version = 'v22.0') {
@@ -133,18 +150,49 @@ export async function getOrCreateConversation(input: {
 }) {
   const admin = createAdminSupabase();
   const phone = normalizeBrazilPhone(input.phone);
+  if (!phone) throw new Error('Telefone/WhatsApp inválido.');
 
-  let query = admin
-    .from('whatsapp_conversations')
-    .select('*')
-    .eq('law_firm_id', input.lawFirmId)
-    .eq('phone', phone)
-    .limit(1);
+  let existing: any = null;
 
-  if (input.clientId) query = query.eq('client_id', input.clientId);
+  if (input.clientId) {
+    const byClient = await admin
+      .from('whatsapp_conversations')
+      .select('*')
+      .eq('law_firm_id', input.lawFirmId)
+      .eq('client_id', input.clientId)
+      .limit(1)
+      .maybeSingle();
+    existing = byClient.data;
+  }
 
-  const existing = await query.maybeSingle();
-  if (existing.data) return existing.data;
+  if (!existing) {
+    const byPhone = await admin
+      .from('whatsapp_conversations')
+      .select('*')
+      .eq('law_firm_id', input.lawFirmId)
+      .eq('phone', phone)
+      .limit(1)
+      .maybeSingle();
+    existing = byPhone.data;
+  }
+
+  if (existing) {
+    const patch: any = {};
+    if (input.clientId && !existing.client_id) patch.client_id = input.clientId;
+    if (input.leadName && !existing.lead_name) patch.lead_name = input.leadName;
+    if (Object.keys(patch).length) {
+      patch.updated_at = new Date().toISOString();
+      const { data } = await admin
+        .from('whatsapp_conversations')
+        .update(patch)
+        .eq('id', existing.id)
+        .eq('law_firm_id', input.lawFirmId)
+        .select('*')
+        .single();
+      return data || { ...existing, ...patch };
+    }
+    return existing;
+  }
 
   const { data, error } = await admin
     .from('whatsapp_conversations')
