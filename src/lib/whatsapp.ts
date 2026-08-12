@@ -41,3 +41,8 @@ function formatDate(value: string) {
   if (!y || !m || !d) return value;
   return `${d}/${m}/${y}`;
 }
+
+
+export function whatsappShareUrl(message?: string) {
+  return `https://web.whatsapp.com/send?text=${encodeURIComponent(message || '')}`;
+}

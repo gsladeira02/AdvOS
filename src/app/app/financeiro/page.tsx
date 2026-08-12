@@ -4,7 +4,9 @@ import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { dateBR, money } from '@/lib/utils';
 import Link from 'next/link';
-import { whatsappUrl } from '@/lib/whatsapp';
+import { whatsappShareUrl, whatsappUrl } from '@/lib/whatsapp';
+import { createAdminSupabase } from '@/lib/supabase/admin';
+import { DEFAULT_MESSAGE_TEMPLATES, renderMessageTemplate } from '@/lib/messageTemplates';
 
 function statusBadge(status: string) {
   if (status === 'pago') return 'badge-ok';
@@ -35,24 +37,22 @@ function buildChargeWhatsappMessage(input: {
   clientName?: string | null;
   installment: any;
   url: string;
+  template?: string;
+  firmName?: string | null;
+  firmPhone?: string | null;
 }) {
   const label = installmentLabel(input.installment);
-  const dueDate = dateBR(input.installment.due_date);
-  const value = money(input.installment.amount);
+  const defaultTemplate = DEFAULT_MESSAGE_TEMPLATES.find((t) => t.slug === 'cobranca_vencida')?.body || '';
 
-  return [
-    `Olá${input.clientName ? `, ${input.clientName}` : ''}.`,
-    '',
-    'Estamos entrando em contato sobre uma cobrança em aberto do escritório.',
-    '',
-    `Parcela: ${label}`,
-    `Vencimento: ${dueDate}`,
-    `Valor: ${value}`,
-    '',
-    `Link para pagamento: ${input.url}`,
-    '',
-    'Qualquer dúvida, estamos à disposição.',
-  ].join('\n');
+  return renderMessageTemplate(input.template || defaultTemplate, {
+    cliente: input.clientName || '',
+    parcela: label,
+    valor: Number(input.installment.amount || 0),
+    vencimento_iso: input.installment.due_date,
+    link_asaas: input.url || '',
+    escritorio: input.firmName || 'escritório',
+    telefone_escritorio: input.firmPhone || '',
+  });
 }
 
 function statusLabel(status: string) {
@@ -63,16 +63,21 @@ function statusLabel(status: string) {
 
 export default async function Financeiro() {
   const { supabase, profile } = await getCurrentProfile();
-  const [items, clients] = await Promise.all([
+  const admin = createAdminSupabase();
+  const [items, clients, firmRes, templateRes] = await Promise.all([
     supabase
       .from('financial_installments')
       .select('*, financial_contracts(description, clients(id,name,doc,email,phone,whatsapp,asaas_customer_id))')
       .eq('law_firm_id', profile.law_firm_id)
       .order('due_date'),
     supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
+    admin.from('law_firms').select('name,phone').eq('id', profile.law_firm_id).maybeSingle(),
+    admin.from('message_templates').select('body').eq('law_firm_id', profile.law_firm_id).eq('slug', 'cobranca_vencida').eq('active', true).maybeSingle(),
   ]);
 
   const installments = items.data || [];
+  const firm = firmRes.data as any;
+  const chargeTemplate = (templateRes.data as any)?.body || DEFAULT_MESSAGE_TEMPLATES.find((t) => t.slug === 'cobranca_vencida')?.body;
   const total = installments
     .filter((i: any) => i.status !== 'pago')
     .reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
@@ -110,11 +115,10 @@ export default async function Financeiro() {
         {installments.map((i: any) => {
           const client = i.financial_contracts?.clients;
           const url = chargeUrl(i);
-          const wa = whatsappUrl(
-            client?.whatsapp || client?.phone,
-            buildChargeWhatsappMessage({ clientName: client?.name, installment: i, url })
-          );
-          const canCharge = Boolean(url && wa);
+          const message = buildChargeWhatsappMessage({ clientName: client?.name, installment: i, url, template: chargeTemplate, firmName: firm?.name, firmPhone: firm?.phone });
+          const phone = client?.whatsapp || client?.phone;
+          const wa = phone ? whatsappUrl(phone, message) : whatsappShareUrl(message);
+          const canCharge = Boolean(wa);
           const label = installmentLabel(i);
 
           return (
@@ -149,10 +153,10 @@ export default async function Financeiro() {
                     {url ? (
                       <Link href={url} target="_blank" className="font-bold text-blue-700">abrir cobrança Asaas</Link>
                     ) : (
-                      <span>Sem link Asaas importado</span>
+                      <span>Sem link Asaas importado — a mensagem será enviada sem link de pagamento</span>
                     )}
                     {i.external_id && <span>ID Asaas: {i.external_id}</span>}
-                    {!client?.whatsapp && !client?.phone && <span className="font-bold text-amber-700">Cliente sem WhatsApp/telefone</span>}
+                    {!client?.whatsapp && !client?.phone && <span className="font-bold text-amber-700">Cliente sem WhatsApp/telefone — o WhatsApp abrirá sem destinatário para você escolher manualmente</span>}
                   </div>
                 </div>
 
