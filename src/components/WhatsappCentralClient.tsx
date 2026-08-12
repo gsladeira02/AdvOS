@@ -111,8 +111,17 @@ export function WhatsappCentralClient({
     load(id, false);
   }
 
+  function handleThreadSent(nextConversationId?: string) {
+    const target = nextConversationId || selected?.id || selectedId;
+    if (target && target !== selectedId) {
+      setSelectedId(target);
+      window.history.replaceState(null, '', `/app/whatsapp?conversa=${target}`);
+    }
+    load(target, true);
+  }
+
   return (
-    <div className="grid h-[calc(100vh-132px)] min-h-[520px] gap-3 xl:grid-cols-[310px_1fr]">
+    <div className="grid h-[calc(100vh-116px)] min-h-[540px] gap-3 xl:grid-cols-[300px_1fr]">
       <section className="overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm">
         <div className="border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -142,7 +151,7 @@ export function WhatsappCentralClient({
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-246px)] overflow-y-auto">
+        <div className="max-h-[calc(100vh-230px)] overflow-y-auto">
           {!filtered.length && <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa encontrada.</p>}
           {filtered.map((conversation: any) => {
             const active = selected?.id === conversation.id;
@@ -179,7 +188,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={!error} onSent={() => load(selected.id, true)} />
+        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={!error} onSent={handleThreadSent} />
       ) : (
         <section className="rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
           Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.

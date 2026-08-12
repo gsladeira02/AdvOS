@@ -2,26 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+:root{--ink:#0f172a;--paper:#f6f2ea;--line:#e6dccb;--soft:#fbf7ef;--muted:#64748b;--whatsapp:#25D366;--whatsapp-dark:#075e54}
 *{box-sizing:border-box}
-body{margin:0;background:#f6f2ea;color:#0f172a;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+html{scroll-behavior:smooth}
+body{margin:0;background:linear-gradient(180deg,#f8f5ef 0%,#f3eee4 100%);color:#0f172a;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;text-rendering:optimizeLegibility}
 a{text-decoration:none;color:inherit}
-input,select,textarea{font:inherit}
+input,select,textarea,button{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed}
 .page-shell{min-height:100vh}
-.card{background:#fff;border:1px solid #e8dfcf;border-radius:18px;box-shadow:0 14px 36px rgba(15,23,42,.055)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border-radius:12px;padding:.65rem .8rem;font-weight:800;transition:.2s;font-size:.82rem;line-height:1.15}
+.app-main{max-width:100%;overflow-x:hidden}
+.card,.panel{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 28px rgba(15,23,42,.045)}
+.panel{box-shadow:0 8px 22px rgba(15,23,42,.035)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border-radius:11px;padding:.58rem .72rem;font-weight:900;transition:.18s;font-size:.78rem;line-height:1.15;white-space:nowrap}
 .btn-primary{background:#0f172a;color:white}.btn-primary:hover{background:#1e293b}
-.btn-secondary,.btn-ghost{background:#fff;border:1px solid #e8dfcf;color:#0f172a}.btn-secondary:hover,.btn-ghost:hover{background:#fbf7ef}
-.input{width:100%;border:1px solid #ded4c2;background:#fff;border-radius:12px;padding:.62rem .75rem;outline:none;font-size:.82rem;line-height:1.2}
-.input:focus{border-color:#c7a252;box-shadow:0 0 0 3px rgba(199,162,82,.16)}
-.label{font-size:.68rem;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.055em}
-.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8dfcf;border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(15,23,42,.045);font-size:.78rem}
-.table th{background:#fbf7ef;text-align:left;color:#64748b;font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;padding:9px 10px;border-bottom:1px solid #eee4d4;white-space:nowrap}
-.table td{background:#fff;border-bottom:1px solid #f0e7d8;padding:9px 10px;vertical-align:top}
+.btn-secondary,.btn-ghost{background:#fff;border:1px solid var(--line);color:#0f172a}.btn-secondary:hover,.btn-ghost:hover{background:var(--soft)}
+.input{width:100%;border:1px solid #ded4c2;background:#fff;border-radius:12px;padding:.58rem .7rem;outline:none;font-size:.79rem;line-height:1.2;transition:.15s}
+.input:focus{border-color:#c7a252;box-shadow:0 0 0 3px rgba(199,162,82,.13)}
+.compact-input{border-radius:10px!important;padding:.48rem .62rem!important;font-size:.74rem!important}
+.label{font-size:.64rem;font-weight:950;color:#475569;text-transform:uppercase;letter-spacing:.06em}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.04);font-size:.75rem}
+.table th{background:var(--soft);text-align:left;color:#64748b;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;padding:8px 9px;border-bottom:1px solid #eee4d4;white-space:nowrap}
+.table td{background:#fff;border-bottom:1px solid #f0e7d8;padding:8px 9px;vertical-align:top}
 .table tr:hover td{background:#fffaf2}
-.table p{margin:.15rem 0 0}
-.badge{display:inline-flex;border-radius:999px;padding:.26rem .5rem;font-size:.65rem;font-weight:900;white-space:nowrap}.badge-ok{background:#dcfce7;color:#166534}.badge-warn{background:#fef3c7;color:#92400e}.badge-danger{background:#fee2e2;color:#991b1b}.badge-info{background:#dbeafe;color:#1e40af}
+.table p{margin:.12rem 0 0}
+.spreadsheet{width:100%;border-collapse:collapse;background:#fff;font-size:.74rem}
+.spreadsheet th{background:#fbf7ef;color:#64748b;font-size:.62rem;font-weight:950;text-align:left;text-transform:uppercase;letter-spacing:.06em;padding:8px 9px;border-bottom:1px solid #eee4d4;white-space:nowrap}
+.spreadsheet td{border-bottom:1px solid #f0e7d8;padding:6px 8px;vertical-align:top}
+.spreadsheet tr:hover td{background:#fffaf2}
+.sheet-input{width:100%;min-width:0;border:1px solid transparent;background:transparent;border-radius:8px;padding:.42rem .46rem;outline:none;font-size:.72rem;color:#0f172a}
+.sheet-input:focus{border-color:#c7a252;background:#fff;box-shadow:0 0 0 2px rgba(199,162,82,.12)}
+.badge{display:inline-flex;border-radius:999px;padding:.22rem .46rem;font-size:.62rem;font-weight:950;white-space:nowrap}.badge-ok{background:#dcfce7;color:#166534}.badge-warn{background:#fef3c7;color:#92400e}.badge-danger{background:#fee2e2;color:#991b1b}.badge-info{background:#dbeafe;color:#1e40af}
 .mobile-readonly{display:none}
-@media(max-width:760px){.desktop-grid{display:block}.sidebar{display:none}.app-main{padding:14px!important}.hide-mobile{display:none!important}.mobile-readonly{display:block;background:#0f172a;color:white;padding:10px 14px;text-align:center;font-weight:700;font-size:.78rem}.table{font-size:.76rem;display:block;overflow-x:auto;white-space:nowrap}.table th,.table td{padding:8px 9px}}
+.sidebar nav{scrollbar-width:thin;scrollbar-color:#d8cfbe transparent}
+.sidebar nav::-webkit-scrollbar{width:6px}.sidebar nav::-webkit-scrollbar-thumb{background:#d8cfbe;border-radius:999px}
+@media(max-width:760px){.desktop-grid{display:block}.sidebar{display:none}.app-main{padding:12px!important}.hide-mobile{display:none!important}.mobile-readonly{display:block;background:#0f172a;color:white;padding:10px 14px;text-align:center;font-weight:800;font-size:.76rem}.table{font-size:.74rem;display:block;overflow-x:auto;white-space:nowrap}.table th,.table td{padding:7px 8px}.spreadsheet{font-size:.72rem}}
 
 .whatsapp-message-scroll{scrollbar-width:thin;scrollbar-color:rgba(7,94,84,.48) rgba(229,221,213,.8)}
 .whatsapp-message-scroll::-webkit-scrollbar{width:10px}

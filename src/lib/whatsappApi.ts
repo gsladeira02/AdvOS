@@ -132,7 +132,7 @@ export async function sendWhatsAppText(input: {
   const admin = createAdminSupabase();
   const conversation = await getOrCreateConversation({ lawFirmId: input.lawFirmId, clientId: input.clientId, phone: to });
 
-  await admin.from('whatsapp_messages').insert({
+  const { data: savedMessage, error: savedMessageError } = await admin.from('whatsapp_messages').insert({
     law_firm_id: input.lawFirmId,
     conversation_id: conversation.id,
     client_id: input.clientId || conversation.client_id || null,
@@ -143,7 +143,9 @@ export async function sendWhatsAppText(input: {
     status: 'sent',
     sent_by: input.sentBy || null,
     raw_payload: payload,
-  });
+  }).select('*').single();
+
+  if (savedMessageError) throw new Error(savedMessageError.message);
 
   await admin
     .from('whatsapp_conversations')
@@ -154,12 +156,14 @@ export async function sendWhatsAppText(input: {
     .eq('id', conversation.id)
     .eq('law_firm_id', input.lawFirmId);
 
-  return { payload, externalId, conversationId: conversation.id };
+  return { payload, externalId, conversationId: conversation.id, message: savedMessage };
 }
 
 
-function mediaTypeFromMime(mimeType: string) {
+function mediaTypeFromMime(mimeType: string, fileName = '') {
   const mime = String(mimeType || '').toLowerCase();
+  const name = String(fileName || '').toLowerCase();
+  if (mime === 'image/webp' || name.endsWith('.webp')) return 'sticker';
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime.startsWith('audio/')) return 'audio';
@@ -178,6 +182,9 @@ function mediaPayload(type: string, url: string, caption?: string | null, filena
   }
   if (type === 'audio') {
     return { type: 'audio', audio: { link: url } };
+  }
+  if (type === 'sticker') {
+    return { type: 'sticker', sticker: { link: url } };
   }
   return {
     type: 'document',
@@ -212,7 +219,7 @@ export async function sendWhatsAppMedia(input: {
   const mediaUrl = String(input.mediaUrl || '').trim();
   if (!mediaUrl) throw new Error('Arquivo sem URL pública temporária para envio.');
 
-  const type = mediaTypeFromMime(String(input.mimeType || ''));
+  const type = mediaTypeFromMime(String(input.mimeType || ''), String(input.fileName || ''));
   const endpoint = `${config.baseUrl}/${config.phoneNumberId}/messages`;
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -236,9 +243,9 @@ export async function sendWhatsAppMedia(input: {
   const externalId = payload?.messages?.[0]?.id || null;
   const admin = createAdminSupabase();
   const conversation = await getOrCreateConversation({ lawFirmId: input.lawFirmId, clientId: input.clientId, phone: to });
-  const body = String(input.caption || input.fileName || (type === 'image' ? 'Imagem' : 'Documento')).trim();
+  const body = String(input.caption || input.fileName || (type === 'image' ? 'Imagem' : type === 'sticker' ? '[Figurinha]' : 'Documento')).trim();
 
-  await admin.from('whatsapp_messages').insert({
+  const { data: savedMessage, error: savedMessageError } = await admin.from('whatsapp_messages').insert({
     law_firm_id: input.lawFirmId,
     conversation_id: conversation.id,
     client_id: input.clientId || conversation.client_id || null,
@@ -254,7 +261,9 @@ export async function sendWhatsAppMedia(input: {
     mime_type: input.mimeType || null,
     media_url: mediaUrl,
     storage_path: input.storagePath || null,
-  });
+  }).select('*').single();
+
+  if (savedMessageError) throw new Error(savedMessageError.message);
 
   await admin
     .from('whatsapp_conversations')
@@ -265,7 +274,7 @@ export async function sendWhatsAppMedia(input: {
     .eq('id', conversation.id)
     .eq('law_firm_id', input.lawFirmId);
 
-  return { payload, externalId, conversationId: conversation.id, type };
+  return { payload, externalId, conversationId: conversation.id, type, message: savedMessage };
 }
 
 export async function getOrCreateConversation(input: {
@@ -346,5 +355,80 @@ export function firstTextFromInboundMessage(message: any) {
   if (message.type === 'document') return message.document?.caption || message.document?.filename || '[Documento recebido]';
   if (message.type === 'audio') return '[Áudio recebido]';
   if (message.type === 'video') return message.video?.caption || '[Vídeo recebido]';
+  if (message.type === 'sticker') return '[Figurinha recebida]';
+  if (message.type === 'reaction') return message.reaction?.emoji || '[Reação recebida]';
   return `[${message.type || 'Mensagem'} recebida]`;
+}
+
+
+export async function sendWhatsAppReaction(input: {
+  lawFirmId: string;
+  messageId: string;
+  emoji: string;
+  reactedBy?: string | null;
+}) {
+  const admin = createAdminSupabase();
+  const { data: messageRow, error: messageError } = await admin
+    .from('whatsapp_messages')
+    .select('id,law_firm_id,conversation_id,external_id,client_id')
+    .eq('law_firm_id', input.lawFirmId)
+    .eq('id', input.messageId)
+    .maybeSingle();
+
+  if (messageError) throw new Error(messageError.message);
+  if (!messageRow?.id) throw new Error('Mensagem não encontrada.');
+  if (!messageRow.external_id) throw new Error('Essa mensagem ainda não tem ID externo da Meta para receber reação.');
+
+  const { data: conversation, error: conversationError } = await admin
+    .from('whatsapp_conversations')
+    .select('id,phone')
+    .eq('law_firm_id', input.lawFirmId)
+    .eq('id', messageRow.conversation_id)
+    .maybeSingle();
+
+  if (conversationError) throw new Error(conversationError.message);
+
+  const config = await getWhatsAppConfig(input.lawFirmId);
+  if (!config.configured) throw new Error('WhatsApp API não configurado.');
+
+  const to = normalizeBrazilPhone(conversation?.phone || '');
+  if (!to) throw new Error('Telefone da conversa não encontrado.');
+
+  const endpoint = `${config.baseUrl}/${config.phoneNumberId}/messages`;
+  const emoji = String(input.emoji || '').trim();
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'reaction',
+      reaction: {
+        message_id: messageRow.external_id,
+        emoji,
+      },
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(graphErrorMessage(payload));
+
+  const { data, error } = await admin
+    .from('whatsapp_messages')
+    .update({
+      reaction_emoji: emoji || null,
+      reacted_at: emoji ? new Date().toISOString() : null,
+      reaction_by: input.reactedBy || null,
+    })
+    .eq('law_firm_id', input.lawFirmId)
+    .eq('id', messageRow.id)
+    .select('*')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { payload, message: data };
 }

@@ -31,8 +31,11 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) throw new Error('Selecione um arquivo para enviar.');
     if (!file.size) throw new Error('Arquivo vazio.');
 
-    const maxSize = 15 * 1024 * 1024;
-    if (file.size > maxSize) throw new Error('Arquivo muito grande. Envie arquivos de até 15 MB nesta versão.');
+    const isSticker = String(file.type || '').toLowerCase() === 'image/webp' || String(file.name || '').toLowerCase().endsWith('.webp');
+    const maxSize = isSticker ? 500 * 1024 : 15 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error(isSticker ? 'Figurinha muito grande. Envie .webp de até 500 KB.' : 'Arquivo muito grande. Envie arquivos de até 15 MB nesta versão.');
+    }
 
     const admin = createAdminSupabase();
     const originalName = safeName(file.name || 'arquivo');

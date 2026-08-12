@@ -8,6 +8,25 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getOrCreateConversation } from '@/lib/whatsappApi';
 import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, syncClientContactsToConversations } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
+import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
+
+
+async function ensureMessageTemplates(admin: any, lawFirmId: string) {
+  const { count } = await admin
+    .from('message_templates')
+    .select('id', { count: 'exact', head: true })
+    .eq('law_firm_id', lawFirmId);
+
+  if (!count) {
+    await admin.from('message_templates').insert(
+      DEFAULT_MESSAGE_TEMPLATES.map((template) => ({
+        ...template,
+        law_firm_id: lawFirmId,
+        shortcut: `/${String(template.slug || template.name || 'modelo').replace(/^\/+/, '')}`,
+      }))
+    );
+  }
+}
 
 async function materializeClientConversation(admin: any, lawFirmId: string, clientId: string) {
   if (!clientId) return '';
@@ -33,6 +52,8 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const query = await searchParams;
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
+
+  await ensureMessageTemplates(admin, profile.law_firm_id);
 
   const requestedId = query?.cliente
     ? await materializeClientConversation(admin, profile.law_firm_id, query.cliente)
@@ -96,8 +117,8 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialConversations={conversations || []}
         initialMessages={messages || []}
         initialSelectedId={selected?.id || ''}
-        templates={(templates || []).map((template: any) => ({
-          id: String(template.id),
+        templates={((templates && templates.length ? templates : DEFAULT_MESSAGE_TEMPLATES) || []).map((template: any) => ({
+          id: String(template.id || template.slug || template.name),
           name: String(template.name || ''),
           slug: String(template.slug || ''),
           shortcut: String(template.shortcut || ''),

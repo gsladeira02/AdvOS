@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 
-function slugify(value: FormDataEntryValue | null) {
+function slugify(value: any) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -11,48 +11,130 @@ function slugify(value: FormDataEntryValue | null) {
     .replace(/^_+|_+$/g, '') || 'modelo';
 }
 
-export async function POST(req: Request) {
-  const { profile } = await getCurrentProfile();
-  const admin = createAdminSupabase();
+function normalizeShortcut(value: any, fallback: string) {
+  const raw = String(value || fallback || '').trim() || fallback;
+  const withoutSlash = raw.replace(/^\/+/, '');
+  const clean = slugify(withoutSlash).replace(/_/g, '_');
+  return `/${clean || slugify(fallback)}`;
+}
+
+async function uniqueSlug(admin: any, lawFirmId: string, base: string, id?: string) {
+  const cleanBase = slugify(base);
+  for (let i = 0; i < 50; i += 1) {
+    const candidate = i === 0 ? cleanBase : `${cleanBase}_${i + 1}`;
+    let query = admin
+      .from('message_templates')
+      .select('id')
+      .eq('law_firm_id', lawFirmId)
+      .eq('slug', candidate)
+      .limit(1);
+    if (id) query = query.neq('id', id);
+    const { data } = await query.maybeSingle();
+    if (!data?.id) return candidate;
+  }
+  return `${cleanBase}_${Date.now()}`;
+}
+
+function wantsJson(req: Request) {
+  const contentType = req.headers.get('content-type') || '';
+  const accept = req.headers.get('accept') || '';
+  return contentType.includes('application/json') || accept.includes('application/json');
+}
+
+async function parseBody(req: Request) {
+  const contentType = req.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) return await req.json().catch(() => ({}));
   const form = await req.formData();
-  const intent = String(form.get('intent') || 'save');
-  const id = String(form.get('id') || '');
+  return Object.fromEntries(form.entries());
+}
 
-  if (intent === 'delete' && id) {
-    await admin.from('message_templates').delete().eq('id', id).eq('law_firm_id', profile.law_firm_id);
-    return NextResponse.redirect(new URL('/app/modelos-mensagens?ok=apagado', req.url), 303);
+function redirect(req: Request, path: string) {
+  return NextResponse.redirect(new URL(path, req.url), 303);
+}
+
+export async function GET() {
+  try {
+    const { profile } = await getCurrentProfile();
+    const admin = createAdminSupabase();
+    const { data, error } = await admin
+      .from('message_templates')
+      .select('*')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('category')
+      .order('name');
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ ok: true, templates: data || [] });
+  } catch (error: any) {
+    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar modelos.' }, { status: 400 });
   }
+}
 
-  const name = String(form.get('name') || '').trim();
-  const body = String(form.get('body') || '').trim();
-  const category = String(form.get('category') || 'geral').trim() || 'geral';
-  const active = String(form.get('active') || 'false') === 'true';
-  const slug = String(form.get('slug') || '').trim() || slugify(name);
-  const shortcutRaw = String(form.get('shortcut') || '').trim() || `/${slugify(name)}`;
-  const shortcut = shortcutRaw.startsWith('/') ? shortcutRaw : `/${shortcutRaw}`;
+export async function POST(req: Request) {
+  const jsonMode = wantsJson(req);
+  try {
+    const { profile } = await getCurrentProfile();
+    const admin = createAdminSupabase();
+    const form = await parseBody(req);
+    const intent = String(form.intent || 'save');
+    const id = String(form.id || '').trim();
 
-  if (!name || !body) {
-    return NextResponse.redirect(new URL('/app/modelos-mensagens?erro=campos', req.url), 303);
+    if (intent === 'delete' && id) {
+      const { error } = await admin.from('message_templates').delete().eq('id', id).eq('law_firm_id', profile.law_firm_id);
+      if (error) throw new Error(error.message);
+      if (jsonMode) return NextResponse.json({ ok: true, deleted: id });
+      return redirect(req, '/app/modelos-mensagens?ok=apagado');
+    }
+
+    const name = String(form.name || '').trim();
+    const body = String(form.body || '').trim();
+    const category = String(form.category || 'geral').trim() || 'geral';
+    const active = String(form.active ?? 'true') === 'true';
+
+    if (!name || !body) throw new Error('Preencha nome e mensagem do modelo.');
+
+    let slug = String(form.slug || '').trim();
+    if (!slug) slug = await uniqueSlug(admin, profile.law_firm_id, name, id || undefined);
+    else slug = await uniqueSlug(admin, profile.law_firm_id, slug, id || undefined);
+
+    const shortcut = normalizeShortcut(form.shortcut, slug || name);
+
+    const payload = {
+      law_firm_id: profile.law_firm_id,
+      name,
+      slug,
+      shortcut,
+      category,
+      body,
+      active,
+      updated_at: new Date().toISOString(),
+    };
+
+    let saved: any = null;
+    if (id) {
+      const { data, error } = await admin
+        .from('message_templates')
+        .update(payload)
+        .eq('id', id)
+        .eq('law_firm_id', profile.law_firm_id)
+        .select('*')
+        .single();
+      if (error) throw new Error(error.message);
+      saved = data;
+    } else {
+      const { data, error } = await admin
+        .from('message_templates')
+        .insert(payload)
+        .select('*')
+        .single();
+      if (error) throw new Error(error.message);
+      saved = data;
+    }
+
+    if (jsonMode) return NextResponse.json({ ok: true, template: saved });
+    return redirect(req, '/app/modelos-mensagens?ok=salvo');
+  } catch (error: any) {
+    const message = error?.message || 'Erro ao salvar modelo.';
+    if (jsonMode) return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return redirect(req, `/app/modelos-mensagens?erro=${encodeURIComponent(message)}`);
   }
-
-  const payload = {
-    law_firm_id: profile.law_firm_id,
-    name,
-    slug,
-    shortcut,
-    category,
-    body,
-    active,
-    updated_at: new Date().toISOString(),
-  };
-
-  if (id) {
-    const { error } = await admin.from('message_templates').update(payload).eq('id', id).eq('law_firm_id', profile.law_firm_id);
-    if (error) return NextResponse.redirect(new URL(`/app/modelos-mensagens?erro=${encodeURIComponent(error.message)}`, req.url), 303);
-  } else {
-    const { error } = await admin.from('message_templates').insert(payload);
-    if (error) return NextResponse.redirect(new URL(`/app/modelos-mensagens?erro=${encodeURIComponent(error.message)}`, req.url), 303);
-  }
-
-  return NextResponse.redirect(new URL('/app/modelos-mensagens?ok=salvo', req.url), 303);
 }

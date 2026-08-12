@@ -87,7 +87,24 @@ export async function POST(req: Request) {
           leadName: client?.name || contact?.profile?.name || null,
         });
 
-        const inboundMedia = message?.image || message?.document || message?.video || message?.audio || null;
+        if (message.type === 'reaction') {
+          const targetId = message?.reaction?.message_id;
+          const emoji = message?.reaction?.emoji || null;
+          if (targetId) {
+            await admin
+              .from('whatsapp_messages')
+              .update({
+                client_reaction_emoji: emoji || null,
+                client_reacted_at: emoji ? new Date().toISOString() : null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('law_firm_id', lawFirmId)
+              .eq('external_id', targetId);
+          }
+          continue;
+        }
+
+        const inboundMedia = message?.image || message?.document || message?.video || message?.audio || message?.sticker || null;
 
         await admin.from('whatsapp_messages').upsert({
           law_firm_id: lawFirmId,
