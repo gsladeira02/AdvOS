@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, CheckCheck, Clock3, FileText, Image as ImageIcon, Paperclip, Send, Trash2, Wifi, WifiOff, X } from 'lucide-react';
+import { AlertTriangle, Check, CheckCheck, ChevronDown, Clock3, FileText, Image as ImageIcon, Paperclip, Send, Trash2, Wifi, WifiOff, X } from 'lucide-react';
 import { renderMessageTemplate } from '@/lib/messageTemplates';
 
 export type WhatsappTemplateOption = {
@@ -92,6 +92,9 @@ export function WhatsappThread({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [shortcutOpen, setShortcutOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [newMessagesBelow, setNewMessagesBelow] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,9 +102,32 @@ export function WhatsappThread({
     setItems(messages || []);
   }, [messages, conversation?.id]);
 
+  function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
+    bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+    setIsAtBottom(true);
+    setNewMessagesBelow(false);
+  }
+
+  function handleMessageScroll() {
+    const node = scrollRef.current;
+    if (!node) return;
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    const nearBottom = distanceFromBottom < 80;
+    setIsAtBottom(nearBottom);
+    if (nearBottom) setNewMessagesBelow(false);
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [items.length, conversation?.id]);
+    window.setTimeout(() => scrollToBottom('auto'), 0);
+  }, [conversation?.id]);
+
+  useEffect(() => {
+    if (isAtBottom) {
+      window.setTimeout(() => scrollToBottom('smooth'), 0);
+    } else {
+      setNewMessagesBelow(true);
+    }
+  }, [items.length]);
 
   const title = useMemo(() => {
     return conversation?.clients?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
@@ -322,7 +348,7 @@ export function WhatsappThread({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
+    <div className="flex h-[calc(100vh-132px)] min-h-[520px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
         <div className="flex min-w-0 items-center gap-2">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">
@@ -350,9 +376,14 @@ export function WhatsappThread({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3">
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          onScroll={handleMessageScroll}
+          className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2"
+        >
         {!items.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pb-2">
           {items.map((message: any) => {
             const outbound = message.direction === 'outbound';
             return (
@@ -382,9 +413,21 @@ export function WhatsappThread({
           })}
           <div ref={bottomRef} />
         </div>
+        </div>
+        {(!isAtBottom || newMessagesBelow) && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom('smooth')}
+            className="absolute bottom-4 right-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#075e54] shadow-lg ring-1 ring-black/10 transition hover:bg-[#f0f2f5]"
+            title="Ir para as mensagens mais recentes"
+          >
+            <ChevronDown size={14} />
+            {newMessagesBelow ? 'Novas mensagens' : 'Ir para o fim'}
+          </button>
+        )}
       </div>
 
-      <div className="border-t border-[#d7ded4] bg-[#f0f2f5] p-2.5">
+      <div className="shrink-0 border-t border-[#d7ded4] bg-[#f0f2f5] p-2.5">
         {file && (
           <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#d7ded4] bg-white px-3 py-2 text-xs shadow-sm">
             <div className="flex min-w-0 items-center gap-2">

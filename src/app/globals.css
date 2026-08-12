@@ -22,3 +22,9 @@ input,select,textarea{font:inherit}
 .badge{display:inline-flex;border-radius:999px;padding:.26rem .5rem;font-size:.65rem;font-weight:900;white-space:nowrap}.badge-ok{background:#dcfce7;color:#166534}.badge-warn{background:#fef3c7;color:#92400e}.badge-danger{background:#fee2e2;color:#991b1b}.badge-info{background:#dbeafe;color:#1e40af}
 .mobile-readonly{display:none}
 @media(max-width:760px){.desktop-grid{display:block}.sidebar{display:none}.app-main{padding:14px!important}.hide-mobile{display:none!important}.mobile-readonly{display:block;background:#0f172a;color:white;padding:10px 14px;text-align:center;font-weight:700;font-size:.78rem}.table{font-size:.76rem;display:block;overflow-x:auto;white-space:nowrap}.table th,.table td{padding:8px 9px}}
+
+.whatsapp-message-scroll{scrollbar-width:thin;scrollbar-color:rgba(7,94,84,.48) rgba(229,221,213,.8)}
+.whatsapp-message-scroll::-webkit-scrollbar{width:10px}
+.whatsapp-message-scroll::-webkit-scrollbar-track{background:rgba(229,221,213,.8);border-radius:999px}
+.whatsapp-message-scroll::-webkit-scrollbar-thumb{background:rgba(7,94,84,.42);border:2px solid rgba(229,221,213,.8);border-radius:999px}
+.whatsapp-message-scroll::-webkit-scrollbar-thumb:hover{background:rgba(7,94,84,.62)}

@@ -112,7 +112,7 @@ export function WhatsappCentralClient({
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-132px)] gap-3 xl:grid-cols-[310px_1fr]">
+    <div className="grid h-[calc(100vh-132px)] min-h-[520px] gap-3 xl:grid-cols-[310px_1fr]">
       <section className="overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm">
         <div className="border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -142,7 +142,7 @@ export function WhatsappCentralClient({
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-246px)] overflow-auto">
+        <div className="max-h-[calc(100vh-246px)] overflow-y-auto">
           {!filtered.length && <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa encontrada.</p>}
           {filtered.map((conversation: any) => {
             const active = selected?.id === conversation.id;
