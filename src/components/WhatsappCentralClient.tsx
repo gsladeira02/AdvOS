@@ -112,13 +112,13 @@ export function WhatsappCentralClient({
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-132px)] gap-3 xl:grid-cols-[260px_1fr]">
-      <section className="overflow-hidden rounded-[16px] border border-[#e8dfcf] bg-white shadow-sm">
-        <div className="border-b border-[#eee4d4] p-2.5">
+    <div className="grid min-h-[calc(100vh-132px)] gap-3 xl:grid-cols-[310px_1fr]">
+      <section className="overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm">
+        <div className="border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-xs font-black text-slate-950">Conversas</h2>
-              <p className="text-[10px] text-slate-500">Clientes + mensagens recebidas.</p>
+              <h2 className="text-sm font-black text-slate-950">Conversas</h2>
+              <p className="text-[10px] text-slate-500">Clientes cadastrados aparecem como contatos.</p>
             </div>
             <button
               type="button"
@@ -134,10 +134,10 @@ export function WhatsappCentralClient({
           <div className="relative mt-2">
             <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              className="input rounded-xl py-1.5 pl-8 pr-2 text-[11px]"
+              className="input rounded-[20px] border-transparent bg-white py-2 pl-8 pr-2 text-[11px] shadow-sm"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar nome ou número"
+              placeholder="Pesquisar ou começar conversa"
             />
           </div>
         </div>
@@ -152,9 +152,9 @@ export function WhatsappCentralClient({
                 type="button"
                 key={conversation.id}
                 onClick={() => selectConversation(conversation.id)}
-                className={`flex w-full items-center gap-2 border-b border-[#f0e7d8] px-2.5 py-2 text-left transition hover:bg-[#fffaf2] ${active ? 'bg-[#fbf7ef]' : 'bg-white'}`}
+                className={`flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#f0f2f5]' : 'bg-white'}`}
               >
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-900 text-[10px] font-black text-white">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#075e54] text-[10px] font-black text-white">
                   {initials(title)}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -164,7 +164,7 @@ export function WhatsappCentralClient({
                   </div>
                   <div className="mt-0.5 flex items-center justify-between gap-2">
                     <p className="truncate text-[10px] font-bold text-slate-500">{conversation.phone}</p>
-                    {conversation.virtual && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500">cliente</span>}
+                    {conversation.virtual && <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">contato</span>}
                   </div>
                   <p className="mt-0.5 text-[9px] text-slate-400">{shortTime(conversation.last_message_at)}</p>
                 </div>
@@ -173,7 +173,7 @@ export function WhatsappCentralClient({
           })}
         </div>
 
-        <div className="border-t border-[#eee4d4] bg-[#fbf7ef] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
+        <div className="border-t border-[#d6ddd6] bg-[#f0f2f5] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
           {error ? error : lastUpdate ? `Atualizado: ${shortTime(lastUpdate)}` : 'Aguardando atualização.'}
         </div>
       </section>

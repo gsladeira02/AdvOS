@@ -9,10 +9,8 @@ import { getOrCreateConversation } from '@/lib/whatsappApi';
 import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, syncClientContactsToConversations } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
-async function materializeSelectedConversation(admin: any, lawFirmId: string, selectedId: string) {
-  if (!isVirtualConversationId(selectedId)) return selectedId;
-  const clientId = clientIdFromVirtualConversationId(selectedId);
-  if (!clientId) return selectedId;
+async function materializeClientConversation(admin: any, lawFirmId: string, clientId: string) {
+  if (!clientId) return '';
   const { data: client } = await admin
     .from('clients')
     .select('id,name,phone,whatsapp')
@@ -20,9 +18,15 @@ async function materializeSelectedConversation(admin: any, lawFirmId: string, se
     .eq('id', clientId)
     .maybeSingle();
   const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
-  if (!client?.id || !phone) return selectedId;
+  if (!client?.id || !phone) return '';
   const conversation = await getOrCreateConversation({ lawFirmId, clientId: client.id, phone, leadName: client.name });
   return conversation.id;
+}
+
+async function materializeSelectedConversation(admin: any, lawFirmId: string, selectedId: string) {
+  if (!isVirtualConversationId(selectedId)) return selectedId;
+  const clientId = clientIdFromVirtualConversationId(selectedId);
+  return await materializeClientConversation(admin, lawFirmId, clientId) || selectedId;
 }
 
 export default async function WhatsAppCentral({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
@@ -30,7 +34,9 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
 
-  const requestedId = await materializeSelectedConversation(admin, profile.law_firm_id, query?.conversa || '');
+  const requestedId = query?.cliente
+    ? await materializeClientConversation(admin, profile.law_firm_id, query.cliente)
+    : await materializeSelectedConversation(admin, profile.law_firm_id, query?.conversa || '');
 
   const [{ data: integration }, { data: clients }, { data: templates }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
@@ -66,6 +72,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         .select('*')
         .eq('law_firm_id', profile.law_firm_id)
         .eq('conversation_id', selected.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: true })
     : { data: [] as any[] };
 

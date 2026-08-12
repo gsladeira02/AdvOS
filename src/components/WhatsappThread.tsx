@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, Check, CheckCheck, Clock3, FileText, Image as ImageIcon, Paperclip, Send, Trash2, Wifi, WifiOff, X } from 'lucide-react';
 import { renderMessageTemplate } from '@/lib/messageTemplates';
 
 export type WhatsappTemplateOption = {
@@ -18,7 +18,7 @@ type NormalizedTemplate = WhatsappTemplateOption & { normalizedShortcut: string 
 function messageTime(value?: string) {
   if (!value) return '';
   try {
-    return new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '';
   }
@@ -47,6 +47,32 @@ function firstName(name?: string | null) {
   return String(name || '').trim().split(/\s+/)[0] || '';
 }
 
+function fileSizeLabel(size?: number | null) {
+  const bytes = Number(size || 0);
+  if (!bytes) return '';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
+
+function StatusTicks({ status }: { status?: string | null }) {
+  const value = String(status || '').toLowerCase();
+  if (value === 'failed') return <AlertTriangle size={13} className="text-red-500" aria-label="Falhou" />;
+  if (value === 'read') return <CheckCheck size={15} className="text-sky-500" aria-label="Lida" />;
+  if (value === 'delivered') return <CheckCheck size={15} className="text-slate-500" aria-label="Entregue" />;
+  if (value === 'sent') return <Check size={14} className="text-slate-500" aria-label="Enviada" />;
+  return <Clock3 size={12} className="text-slate-400" aria-label="Pendente" />;
+}
+
+function mediaKind(message: any) {
+  const type = String(message?.message_type || '').toLowerCase();
+  const mime = String(message?.mime_type || '').toLowerCase();
+  if (type === 'image' || mime.startsWith('image/')) return 'image';
+  if (type === 'video' || mime.startsWith('video/')) return 'video';
+  if (type === 'audio' || mime.startsWith('audio/')) return 'audio';
+  if (type === 'document' || message?.file_name || message?.storage_path) return 'document';
+  return 'text';
+}
+
 export function WhatsappThread({
   conversation,
   messages,
@@ -65,7 +91,9 @@ export function WhatsappThread({
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [shortcutOpen, setShortcutOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setItems(messages || []);
@@ -123,7 +151,7 @@ export function WhatsappThread({
       const haystack = normalizeSearch(`${template.normalizedShortcut} ${template.name} ${template.category || ''}`);
       return haystack.includes(term);
     });
-    return result.slice(0, 12);
+    return result.slice(0, 18);
   }, [shortcuts, slashTerm]);
 
   const previewTemplate = useMemo(() => {
@@ -139,36 +167,119 @@ export function WhatsappThread({
     setFeedback(`Modelo inserido: ${template.name}.`);
   }
 
+  async function deleteMessage(messageId: string) {
+    if (!messageId || String(messageId).startsWith('local-')) {
+      setItems((current) => current.filter((item: any) => item.id !== messageId));
+      return;
+    }
+    try {
+      const response = await fetch('/api/whatsapp/messages/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível apagar.');
+      setItems((current) => current.filter((item: any) => item.id !== messageId));
+      setFeedback('Mensagem apagada no AdvOS.');
+      onSent?.();
+    } catch (error: any) {
+      setFeedback(error?.message || 'Erro ao apagar mensagem.');
+    }
+  }
+
+  async function clearConversation() {
+    if (!conversation?.id || conversation?.virtual) return;
+    const ok = window.confirm('Apagar todas as mensagens dessa conversa dentro do AdvOS? Isso não apaga no celular do cliente.');
+    if (!ok) return;
+    try {
+      const response = await fetch('/api/whatsapp/messages/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conversation.id, scope: 'conversation' }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível limpar conversa.');
+      setItems([]);
+      setFeedback('Conversa limpa no AdvOS.');
+      onSent?.();
+    } catch (error: any) {
+      setFeedback(error?.message || 'Erro ao limpar conversa.');
+    }
+  }
+
+  async function sendTextMessage(message: string) {
+    const response = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: conversation.phone,
+        client_id: conversation.client_id,
+        message,
+      }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar.');
+    return result;
+  }
+
+  async function sendFileMessage(caption: string) {
+    if (!file) throw new Error('Nenhum arquivo selecionado.');
+    const form = new FormData();
+    form.set('file', file);
+    form.set('phone', conversation.phone || '');
+    form.set('client_id', conversation.client_id || '');
+    form.set('caption', caption || '');
+
+    const response = await fetch('/api/whatsapp/send-media', { method: 'POST', body: form });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar arquivo.');
+    return result;
+  }
+
   async function send() {
     const message = templateMessageFromText(text);
-    if (!message || sending) return;
+    if ((!message && !file) || sending) return;
     setSending(true);
     setFeedback(null);
     try {
-      const response = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: conversation.phone,
-          client_id: conversation.client_id,
-          message,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar.');
-      setItems((current) => [
-        ...current,
-        {
-          id: result.externalId || `local-${Date.now()}`,
-          direction: 'outbound',
-          body: message,
-          status: 'sent',
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      let result: any;
+      if (file) {
+        result = await sendFileMessage(message);
+        const type = result.type || mediaKind({ mime_type: file.type, file_name: file.name });
+        setItems((current) => [
+          ...current,
+          {
+            id: result.externalId || `local-${Date.now()}`,
+            direction: 'outbound',
+            message_type: type,
+            body: message || file.name,
+            status: 'sent',
+            created_at: new Date().toISOString(),
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          },
+        ]);
+        setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        result = await sendTextMessage(message);
+        setItems((current) => [
+          ...current,
+          {
+            id: result.externalId || `local-${Date.now()}`,
+            direction: 'outbound',
+            message_type: 'text',
+            body: message,
+            status: 'sent',
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
       setText('');
       setShortcutOpen(false);
-      setFeedback('Mensagem enviada.');
+      setFeedback(file ? 'Arquivo enviado.' : 'Mensagem enviada.');
       onSent?.();
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao enviar pela API oficial.');
@@ -177,30 +288,88 @@ export function WhatsappThread({
     }
   }
 
-  return (
-    <div className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-[16px] border border-[#e8dfcf] bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-[#eee4d4] bg-[#fbf7ef] px-3 py-2.5">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-black text-slate-950">{title}</h2>
-          <p className="truncate text-[10px] font-bold text-slate-500">{conversation.phone}</p>
+  function renderMessageBody(message: any) {
+    const kind = mediaKind(message);
+    const fileName = message.file_name || message.raw_payload?.document?.filename || message.body;
+    const mediaUrl = message.media_url && String(message.media_url).startsWith('http') ? String(message.media_url) : '';
+
+    if (kind === 'image') {
+      return (
+        <div className="space-y-1.5">
+          {mediaUrl ? <img src={mediaUrl} alt={fileName || 'Imagem'} className="max-h-64 rounded-xl object-cover" /> : <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2"><ImageIcon size={16} /> Imagem</div>}
+          {message.body && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
         </div>
-        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${live ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-          {live ? <Wifi size={12} /> : <WifiOff size={12} />}
-          {live ? 'Atualizando' : 'Offline'}
+      );
+    }
+
+    if (kind !== 'text') {
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2">
+            <FileText size={17} className="shrink-0" />
+            <div className="min-w-0">
+              <b className="block max-w-[260px] truncate text-[12px]">{fileName || 'Arquivo'}</b>
+              <span className="text-[10px] font-bold text-slate-500">{kind === 'audio' ? 'Áudio' : kind === 'video' ? 'Vídeo' : 'Documento'} {fileSizeLabel(message.file_size) ? `• ${fileSizeLabel(message.file_size)}` : ''}</span>
+            </div>
+          </div>
+          {message.body && message.body !== fileName && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {mediaUrl && <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-blue-700 hover:underline">Abrir arquivo</a>}
+        </div>
+      );
+    }
+
+    return <div className="whitespace-pre-wrap leading-relaxed">{message.body || '[mensagem sem texto]'}</div>;
+  }
+
+  return (
+    <div className="flex min-h-[calc(100vh-132px)] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">
+            {title.split(' ').filter(Boolean).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || '?'}
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-black">{title}</h2>
+            <p className="truncate text-[10px] font-bold text-white/75">{conversation.phone}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black sm:inline-flex ${live ? 'bg-white/15 text-white' : 'bg-white/10 text-white/70'}`}>
+            {live ? <Wifi size={12} /> : <WifiOff size={12} />}
+            {live ? 'Ao vivo' : 'Offline'}
+          </div>
+          <button
+            type="button"
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            onClick={clearConversation}
+            title="Limpar conversa no AdvOS"
+            disabled={conversation?.virtual}
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-[#fffdf8] px-3 py-3">
-        {!items.length && <p className="text-xs font-bold text-slate-500">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
-        <div className="space-y-2">
+      <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3">
+        {!items.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
+        <div className="space-y-1.5">
           {items.map((message: any) => {
             const outbound = message.direction === 'outbound';
             return (
-              <div key={message.id} className={`flex ${outbound ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[76%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'bg-[#dcf8c6] text-slate-900' : 'bg-white text-slate-900 border border-[#eee4d4]'}`}>
-                  <div className="whitespace-pre-wrap leading-relaxed">{message.body || '[mensagem sem texto]'}</div>
-                  <div className="mt-1 text-[8px] font-bold uppercase tracking-wide text-slate-500">
-                    {message.status || (outbound ? 'enviada' : 'recebida')} • {messageTime(message.created_at)}
+              <div key={message.id} className={`group flex ${outbound ? 'justify-end' : 'justify-start'}`}>
+                <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'}`}>
+                  <button
+                    type="button"
+                    onClick={() => deleteMessage(message.id)}
+                    className={`absolute top-1 hidden h-6 w-6 place-items-center rounded-full bg-black/10 text-slate-700 hover:bg-black/20 group-hover:grid ${outbound ? '-left-8' : '-right-8'}`}
+                    title="Apagar mensagem no AdvOS"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                  {renderMessageBody(message)}
+                  <div className="mt-1 flex items-center justify-end gap-1 text-[9px] font-bold text-slate-500">
+                    <span>{messageTime(message.created_at)}</span>
+                    {outbound && <StatusTicks status={message.status} />}
                   </div>
                   {message.status === 'failed' && (
                     <div className="mt-1 rounded-lg bg-red-50 px-2 py-1 text-[9px] font-bold normal-case text-red-700">
@@ -215,66 +384,102 @@ export function WhatsappThread({
         </div>
       </div>
 
-      <div className="border-t border-[#eee4d4] bg-[#fbf7ef] p-2.5">
-        <div className="relative">
-          <textarea
-            className="input min-h-[68px] resize-y rounded-xl text-xs"
-            value={text}
-            onChange={(event) => {
-              const value = event.target.value;
-              setText(value);
-              setShortcutOpen(value.trimStart().startsWith('/'));
-            }}
-            onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-                event.preventDefault();
-                send();
-              }
-              if (event.key === 'Escape') setShortcutOpen(false);
-            }}
-            placeholder="Digite a mensagem ou / para escolher um modelo. Ctrl + Enter envia."
-          />
-
-          {shortcutOpen && slashTerm !== null && shortcuts.length > 0 && (
-            <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-72 w-full overflow-auto rounded-2xl border border-[#e8dfcf] bg-white p-2 shadow-xl">
-              <div className="mb-1 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
-                Modelos rápidos
+      <div className="border-t border-[#d7ded4] bg-[#f0f2f5] p-2.5">
+        {file && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#d7ded4] bg-white px-3 py-2 text-xs shadow-sm">
+            <div className="flex min-w-0 items-center gap-2">
+              <FileText size={16} className="shrink-0 text-slate-600" />
+              <div className="min-w-0">
+                <b className="block truncate text-slate-900">{file.name}</b>
+                <span className="text-[10px] font-bold text-slate-500">{file.type || 'arquivo'} {fileSizeLabel(file.size) ? `• ${fileSizeLabel(file.size)}` : ''}</span>
               </div>
-              {shortcutSuggestions.length ? shortcutSuggestions.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  className="flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-[#fbf7ef]"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertTemplate(template)}
-                >
-                  <span className="min-w-0">
-                    <b className="block truncate text-xs text-slate-950">{template.name}</b>
-                    <span className="mt-0.5 block truncate text-[10px] text-slate-500">/{template.normalizedShortcut} • {template.category || 'geral'}</span>
-                  </span>
-                  <span className="rounded-full bg-[#fbf7ef] px-2 py-1 text-[10px] font-black text-slate-600">Selecionar</span>
-                </button>
-              )) : (
-                <p className="px-2 py-3 text-xs font-bold text-slate-500">Nenhum modelo encontrado para esse atalho.</p>
-              )}
             </div>
-          )}
+            <button type="button" className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-slate-100" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <div className="relative flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
+          <button
+            type="button"
+            className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm hover:bg-[#fffaf2]"
+            onClick={() => fileInputRef.current?.click()}
+            title="Enviar documento, imagem ou arquivo"
+          >
+            <Paperclip size={18} />
+          </button>
+
+          <div className="relative flex-1">
+            <textarea
+              className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]"
+              value={text}
+              onChange={(event) => {
+                const value = event.target.value;
+                setText(value);
+                setShortcutOpen(value.trimStart().startsWith('/'));
+              }}
+              onFocus={() => setShortcutOpen(text.trimStart().startsWith('/'))}
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                  event.preventDefault();
+                  send();
+                }
+                if (event.key === 'Escape') setShortcutOpen(false);
+              }}
+              placeholder={file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'}
+            />
+
+            {shortcutOpen && slashTerm !== null && shortcuts.length > 0 && (
+              <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-80 w-full overflow-auto rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
+                <div className="mb-1 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                  Modelos rápidos
+                </div>
+                {shortcutSuggestions.length ? shortcutSuggestions.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className="flex w-full items-start justify-between gap-3 rounded-xl px-2 py-2 text-left hover:bg-[#f0f2f5]"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => insertTemplate(template)}
+                  >
+                    <span className="min-w-0">
+                      <b className="block truncate text-xs text-slate-950">{template.name}</b>
+                      <span className="mt-0.5 block truncate text-[10px] text-slate-500">/{template.normalizedShortcut} • {template.category || 'geral'}</span>
+                    </span>
+                    <span className="rounded-full bg-[#e9edef] px-2 py-1 text-[10px] font-black text-slate-600">Usar</span>
+                  </button>
+                )) : (
+                  <p className="px-2 py-3 text-xs font-bold text-slate-500">Nenhum modelo encontrado para esse atalho.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <button className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-50" onClick={send} disabled={sending || (!text.trim() && !file)} title="Enviar">
+            <Send size={17} />
+          </button>
         </div>
 
         {previewTemplate && text.trim().startsWith('/') && (
-          <div className="mt-2 rounded-xl border border-[#eee4d4] bg-white px-3 py-2 text-[11px] text-slate-600">
+          <div className="mt-2 rounded-xl border border-[#d7ded4] bg-white px-3 py-2 text-[11px] text-slate-600">
             <b>Atalho encontrado:</b> {previewTemplate.name}. Se enviar <code>/{previewTemplate.normalizedShortcut}</code>, o AdvOS substituirá pelo modelo salvo.
           </div>
         )}
 
         {shortcuts.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {shortcuts.slice(0, 8).map((template) => (
+            {shortcuts.slice(0, 10).map((template) => (
               <button
                 key={template.id}
                 type="button"
-                className="rounded-full border border-[#eee4d4] bg-white px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-[#fffaf2]"
+                className="rounded-full border border-[#d7ded4] bg-white px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-[#fffaf2]"
                 onClick={() => insertTemplate(template)}
                 title={template.name}
               >
@@ -284,18 +489,12 @@ export function WhatsappThread({
           </div>
         )}
 
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            {feedback ? (
-              <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p>
-            ) : (
-              <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Enter quebra linha. Ctrl + Enter envia.</p>
-            )}
-          </div>
-          <button className="btn btn-primary shrink-0 !rounded-lg !px-3 !py-2 text-xs" onClick={send} disabled={sending || !text.trim()}>
-            <Send size={13} />
-            {sending ? 'Enviando...' : 'Enviar'}
-          </button>
+        <div className="mt-2 min-h-[16px]">
+          {feedback ? (
+            <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p>
+          ) : (
+            <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. O ícone de clipe envia documentos, imagens e arquivos.</p>
+          )}
         </div>
       </div>
     </div>

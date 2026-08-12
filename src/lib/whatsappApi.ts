@@ -157,6 +157,117 @@ export async function sendWhatsAppText(input: {
   return { payload, externalId, conversationId: conversation.id };
 }
 
+
+function mediaTypeFromMime(mimeType: string) {
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
+function mediaPayload(type: string, url: string, caption?: string | null, filename?: string | null) {
+  const cleanCaption = String(caption || '').trim();
+  const cleanFilename = String(filename || '').trim();
+
+  if (type === 'image') {
+    return { type: 'image', image: { link: url, ...(cleanCaption ? { caption: cleanCaption } : {}) } };
+  }
+  if (type === 'video') {
+    return { type: 'video', video: { link: url, ...(cleanCaption ? { caption: cleanCaption } : {}) } };
+  }
+  if (type === 'audio') {
+    return { type: 'audio', audio: { link: url } };
+  }
+  return {
+    type: 'document',
+    document: {
+      link: url,
+      ...(cleanFilename ? { filename: cleanFilename } : {}),
+      ...(cleanCaption ? { caption: cleanCaption } : {}),
+    },
+  };
+}
+
+export async function sendWhatsAppMedia(input: {
+  lawFirmId: string;
+  to: string;
+  mediaUrl: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  caption?: string | null;
+  clientId?: string | null;
+  sentBy?: string | null;
+  storagePath?: string | null;
+}) {
+  const config = await getWhatsAppConfig(input.lawFirmId);
+  if (!config.configured) {
+    throw new Error('WhatsApp API não configurado. Preencha Access Token e Phone Number ID em Integrações.');
+  }
+
+  const to = normalizeBrazilPhone(input.to);
+  if (!to) throw new Error('Telefone/WhatsApp do cliente não informado.');
+
+  const mediaUrl = String(input.mediaUrl || '').trim();
+  if (!mediaUrl) throw new Error('Arquivo sem URL pública temporária para envio.');
+
+  const type = mediaTypeFromMime(String(input.mimeType || ''));
+  const endpoint = `${config.baseUrl}/${config.phoneNumberId}/messages`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      ...mediaPayload(type, mediaUrl, input.caption, input.fileName),
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(graphErrorMessage(payload));
+  }
+
+  const externalId = payload?.messages?.[0]?.id || null;
+  const admin = createAdminSupabase();
+  const conversation = await getOrCreateConversation({ lawFirmId: input.lawFirmId, clientId: input.clientId, phone: to });
+  const body = String(input.caption || input.fileName || (type === 'image' ? 'Imagem' : 'Documento')).trim();
+
+  await admin.from('whatsapp_messages').insert({
+    law_firm_id: input.lawFirmId,
+    conversation_id: conversation.id,
+    client_id: input.clientId || conversation.client_id || null,
+    direction: 'outbound',
+    message_type: type,
+    body,
+    external_id: externalId,
+    status: 'sent',
+    sent_by: input.sentBy || null,
+    raw_payload: { ...payload, advos_media_url: mediaUrl, advos_storage_path: input.storagePath || null },
+    file_name: input.fileName || null,
+    file_size: input.fileSize || null,
+    mime_type: input.mimeType || null,
+    media_url: mediaUrl,
+    storage_path: input.storagePath || null,
+  });
+
+  await admin
+    .from('whatsapp_conversations')
+    .update({
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversation.id)
+    .eq('law_firm_id', input.lawFirmId);
+
+  return { payload, externalId, conversationId: conversation.id, type };
+}
+
 export async function getOrCreateConversation(input: {
   lawFirmId: string;
   clientId?: string | null;

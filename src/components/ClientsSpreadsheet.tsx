@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { MessageCircle } from 'lucide-react';
 
 export type ClientSpreadsheetRow = {
   id: string;
@@ -171,6 +172,7 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
               <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">WhatsApp</th>
               <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">E-mail</th>
               <th className="border-b border-[#eee4d4] px-3 py-2 text-left"><SortButton label="Criado" active={sortKey === 'created_at'} dir={sortDir} onClick={() => toggleSort('created_at')} /></th>
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-center font-black">WhatsApp API</th>
               <th className="border-b border-[#eee4d4] px-3 py-2 text-center font-black">Pasta</th>
             </tr>
           </thead>
@@ -188,6 +190,20 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
                 <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">{client.whatsapp || client.phone || '-'}</td>
                 <td className="px-3 py-2"><div className="max-w-[260px] truncate text-slate-700" title={client.email || ''}>{client.email || '-'}</div></td>
                 <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDate(client.created_at)}</td>
+                <td className="w-[92px] px-3 py-2 text-center">
+                  {hasWhatsApp(client) ? (
+                    <Link
+                      href={`/app/whatsapp?cliente=${client.id}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:scale-105 hover:bg-[#1ebe5d]"
+                      title="Abrir conversa pela API"
+                      aria-label="Abrir conversa pela API"
+                    >
+                      <MessageCircle size={15} />
+                    </Link>
+                  ) : (
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400" title="Cliente sem telefone">—</span>
+                  )}
+                </td>
                 <td className="w-[92px] px-3 py-2 text-center">
                   <Link href={`/app/clientes/${client.id}`} className="btn btn-secondary !rounded-lg !px-3 !py-1.5 text-[11px]">Abrir</Link>
                 </td>

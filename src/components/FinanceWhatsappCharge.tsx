@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { renderMessageTemplate } from '@/lib/messageTemplates';
 import { whatsappShareUrl, whatsappUrl } from '@/lib/whatsapp';
+import Link from 'next/link';
 
 export type ChargeTemplateOption = {
   id: string;
@@ -138,6 +139,11 @@ export function FinanceWhatsappCharge(props: {
             <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={sendByApi} disabled={sending || !props.phone}>
               {sending ? 'Enviando...' : 'Enviar pela API'}
             </button>
+            {props.clientId && props.phone && (
+              <Link href={`/app/whatsapp?cliente=${props.clientId}`} className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
+                Abrir conversa
+              </Link>
+            )}
             <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
               Abrir Web
             </a>

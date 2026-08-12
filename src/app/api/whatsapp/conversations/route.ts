@@ -87,6 +87,7 @@ export async function GET(req: Request) {
         .select('*')
         .eq('law_firm_id', profile.law_firm_id)
         .eq('conversation_id', selected.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);

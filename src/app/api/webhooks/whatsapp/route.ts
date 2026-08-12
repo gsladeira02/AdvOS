@@ -87,6 +87,8 @@ export async function POST(req: Request) {
           leadName: client?.name || contact?.profile?.name || null,
         });
 
+        const inboundMedia = message?.image || message?.document || message?.video || message?.audio || null;
+
         await admin.from('whatsapp_messages').upsert({
           law_firm_id: lawFirmId,
           conversation_id: conversation.id,
@@ -97,6 +99,9 @@ export async function POST(req: Request) {
           external_id: message.id,
           status: 'received',
           raw_payload: message,
+          file_name: inboundMedia?.filename || null,
+          mime_type: inboundMedia?.mime_type || null,
+          media_url: inboundMedia?.id || null,
           created_at: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
         }, { onConflict: 'external_id' });
 
