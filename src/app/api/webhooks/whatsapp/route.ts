@@ -29,9 +29,14 @@ export async function GET(req: Request) {
   return new NextResponse(challenge, { status: 200 });
 }
 
+function digits(value?: string | null) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 function findFirmByPhoneNumberId(rows: any[] | null, phoneNumberId?: string | null) {
-  if (!phoneNumberId) return null;
-  return (rows || []).find((row) => row?.raw_settings?.phone_number_id === phoneNumberId) || null;
+  const target = digits(phoneNumberId);
+  if (!target) return null;
+  return (rows || []).find((row) => digits(row?.raw_settings?.phone_number_id) === target) || null;
 }
 
 
@@ -123,6 +128,42 @@ async function matchClient(lawFirmId: string, phone: string) {
   }) || null;
 }
 
+
+async function saveInboundMessage(admin: any, payload: any) {
+  const externalId = String(payload.external_id || '').trim();
+  if (externalId) {
+    const { data: existing, error: existingError } = await admin
+      .from('whatsapp_messages')
+      .select('id')
+      .eq('law_firm_id', payload.law_firm_id)
+      .eq('external_id', externalId)
+      .maybeSingle();
+
+    if (existingError) throw new Error(existingError.message);
+
+    if (existing?.id) {
+      const { data, error } = await admin
+        .from('whatsapp_messages')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .eq('law_firm_id', payload.law_firm_id)
+        .select('*')
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    }
+  }
+
+  const { data, error } = await admin
+    .from('whatsapp_messages')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function POST(req: Request) {
   const payload = await req.json().catch(() => ({}));
   const admin = createAdminSupabase();
@@ -183,7 +224,7 @@ export async function POST(req: Request) {
         const inboundMedia = message?.image || message?.document || message?.video || message?.audio || message?.sticker || null;
         const cachedMedia = inboundMedia ? await cacheInboundMedia(admin, lawFirmId, inboundMedia, message.type || 'media') : null;
 
-        await admin.from('whatsapp_messages').upsert({
+        await saveInboundMessage(admin, {
           law_firm_id: lawFirmId,
           conversation_id: conversation.id,
           client_id: client?.id || null,
@@ -199,7 +240,7 @@ export async function POST(req: Request) {
           media_url: cachedMedia?.mediaUrl || inboundMedia?.id || null,
           storage_path: cachedMedia?.storagePath || null,
           created_at: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
-        }, { onConflict: 'external_id' });
+        });
 
         await admin
           .from('whatsapp_conversations')

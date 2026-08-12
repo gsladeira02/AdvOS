@@ -21,7 +21,7 @@ export default async function Financeiro() {
     admin.from('law_firms').select('name,phone').eq('id', profile.law_firm_id).maybeSingle(),
     admin
       .from('message_templates')
-      .select('id,name,body,category,active')
+      .select('id,name,body,category,active,meta_template_name,meta_template_language')
       .eq('law_firm_id', profile.law_firm_id)
       .eq('category', 'cobranca')
       .eq('active', true)
@@ -35,6 +35,8 @@ export default async function Financeiro() {
     id: String(template.id || template.slug || template.name),
     name: String(template.name || 'Modelo de cobrança'),
     body: String(template.body || ''),
+    meta_template_name: template.meta_template_name ? String(template.meta_template_name) : '',
+    meta_template_language: template.meta_template_language ? String(template.meta_template_language) : 'pt_BR',
   }));
 
   const total = installments

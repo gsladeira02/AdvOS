@@ -97,6 +97,13 @@ export async function POST(req: Request) {
     else slug = await uniqueSlug(admin, profile.law_firm_id, slug, id || undefined);
 
     const shortcut = normalizeShortcut(form.shortcut, slug || name);
+    const metaTemplateName = String(form.meta_template_name || form.metaTemplateName || '').trim()
+      .replace(/^\/+/, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9_]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+    const metaTemplateLanguage = String(form.meta_template_language || form.metaTemplateLanguage || 'pt_BR').trim() || 'pt_BR';
 
     const payload = {
       law_firm_id: profile.law_firm_id,
@@ -106,6 +113,8 @@ export async function POST(req: Request) {
       category,
       body,
       active,
+      meta_template_name: metaTemplateName || null,
+      meta_template_language: metaTemplateLanguage,
       updated_at: new Date().toISOString(),
     };
 

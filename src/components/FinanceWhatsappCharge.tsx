@@ -9,7 +9,21 @@ export type ChargeTemplateOption = {
   id: string;
   name: string;
   body: string;
+  meta_template_name?: string | null;
+  meta_template_language?: string | null;
 };
+
+function templateVariableValues(body: string, values: Record<string, string>) {
+  const seen: string[] = [];
+  const regex = /{{\s*([a-zA-Z0-9_]+)\s*}}/g;
+  let match = regex.exec(String(body || ''));
+  while (match) {
+    const key = String(match[1] || '').trim();
+    if (key && !seen.includes(key)) seen.push(key);
+    match = regex.exec(String(body || ''));
+  }
+  return seen.map((key) => values[key] || '');
+}
 
 function WhatsAppIcon() {
   return (
@@ -44,20 +58,33 @@ export function FinanceWhatsappCharge(props: {
     return templates.find((template) => template.id === selectedId) || templates[0];
   }, [selectedId, templates]);
 
-  const message = useMemo(() => {
-    if (!selectedTemplate?.body) return '';
-
-    return renderMessageTemplate(selectedTemplate.body, {
+  const contextValues = useMemo(() => {
+    const formattedValue = Number(props.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const dueDate = props.dueDate ? new Date(`${props.dueDate}T12:00:00`).toLocaleDateString('pt-BR') : '';
+    const firstName = String(props.clientName || '').trim().split(/\s+/)[0] || '';
+    return {
       cliente: props.clientName || '',
+      primeiro_nome: firstName,
       parcela: props.installmentLabel,
-      valor: Number(props.amount || 0),
+      valor: formattedValue,
+      vencimento: dueDate,
       vencimento_iso: props.dueDate || '',
       link_asaas: props.asaasUrl || '',
       escritorio: props.firmName || 'escritório',
       telefone_escritorio: props.firmPhone || '',
       usuario: props.userName || '',
-    });
-  }, [selectedTemplate, props.clientName, props.installmentLabel, props.amount, props.dueDate, props.asaasUrl, props.firmName, props.firmPhone, props.userName]);
+      usuario_nome_completo: props.userName || '',
+    };
+  }, [props.clientName, props.installmentLabel, props.amount, props.dueDate, props.asaasUrl, props.firmName, props.firmPhone, props.userName]);
+
+  const message = useMemo(() => {
+    if (!selectedTemplate?.body) return '';
+    return renderMessageTemplate(selectedTemplate.body, contextValues);
+  }, [selectedTemplate, contextValues]);
+
+  const metaTemplateName = String(selectedTemplate?.meta_template_name || '').trim();
+  const metaTemplateLanguage = String(selectedTemplate?.meta_template_language || 'pt_BR').trim() || 'pt_BR';
+  const templateParameters = useMemo(() => templateVariableValues(selectedTemplate?.body || '', contextValues), [selectedTemplate, contextValues]);
 
   const whatsappHref = props.phone ? whatsappUrl(props.phone, message) : whatsappShareUrl(message);
 
@@ -72,6 +99,9 @@ export function FinanceWhatsappCharge(props: {
           phone: props.phone,
           client_id: props.clientId,
           message,
+          template_name: metaTemplateName,
+          template_language: metaTemplateLanguage,
+          template_parameters: templateParameters,
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -79,6 +109,37 @@ export function FinanceWhatsappCharge(props: {
       setFeedback('Mensagem enviada à Meta. Confira a entrega na aba WhatsApp.');
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao enviar pela API oficial. Se for primeira mensagem ou janela de 24h fechada, a Meta exige template oficial aprovado.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function sendOfficialTemplate() {
+    if (!metaTemplateName) {
+      setFeedback('Este modelo ainda não tem nome de template oficial da Meta. Cadastre em Modelos de mensagem → Template Meta.');
+      return;
+    }
+    setSending(true);
+    setFeedback(null);
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: props.phone,
+          client_id: props.clientId,
+          message,
+          mode: 'template',
+          template_name: metaTemplateName,
+          template_language: metaTemplateLanguage,
+          template_parameters: templateParameters,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar o template oficial.');
+      setFeedback('Template oficial enviado pela API. Confira a entrega na aba WhatsApp.');
+    } catch (error: any) {
+      setFeedback(error?.message || 'Erro ao enviar template oficial pela Meta.');
     } finally {
       setSending(false);
     }
@@ -133,12 +194,20 @@ export function FinanceWhatsappCharge(props: {
 
           {feedback && <p className="mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
 
-          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">O envio direto pela API funciona para conversas dentro da janela de atendimento de 24h. Para primeira cobrança ativa fora da janela, será necessário template oficial aprovado na Meta.</p>
+          <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
+            <b>Regra da Meta:</b> texto livre só envia dentro da janela de 24h. Fora dela, use um template oficial aprovado.
+            {metaTemplateName ? <span> Este modelo está ligado ao template Meta <b>{metaTemplateName}</b>.</span> : <span> Cadastre o campo <b>Template Meta</b> em Modelos de mensagem para cobranças fora da janela.</span>}
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={sendByApi} disabled={sending || !props.phone}>
               {sending ? 'Enviando...' : 'Enviar pela API'}
             </button>
+            {metaTemplateName && (
+              <button type="button" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs" onClick={sendOfficialTemplate} disabled={sending || !props.phone}>
+                Template oficial
+              </button>
+            )}
             {props.clientId && props.phone && (
               <Link href={`/app/whatsapp?cliente=${props.clientId}`} className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
                 Abrir conversa

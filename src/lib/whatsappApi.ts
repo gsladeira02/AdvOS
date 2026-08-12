@@ -50,6 +50,53 @@ function graphErrorMessage(payload: any) {
   return `${message}${code}`;
 }
 
+function isCustomerCareWindowError(payloadOrMessage: any) {
+  const text = typeof payloadOrMessage === 'string'
+    ? payloadOrMessage
+    : graphErrorMessage(payloadOrMessage);
+  const normalized = String(text || '').toLowerCase();
+  return normalized.includes('24 hours')
+    || normalized.includes('24 horas')
+    || normalized.includes('customer last replied')
+    || normalized.includes('outside the allowed window')
+    || normalized.includes('janela de atendimento');
+}
+
+function friendlyWhatsAppError(payload: any) {
+  const message = graphErrorMessage(payload);
+  if (isCustomerCareWindowError(message)) {
+    return 'Janela de atendimento encerrada: passaram mais de 24h desde a última resposta do cliente. Pela API oficial, a Meta só permite iniciar a conversa com um template oficial aprovado. Configure o nome do template Meta no modelo de mensagem ou use Abrir Web.';
+  }
+  return message;
+}
+
+function normalizeTemplateName(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+}
+
+function cleanTemplateLanguage(value?: string | null) {
+  return String(value || 'pt_BR').trim() || 'pt_BR';
+}
+
+function templateComponents(parameters?: string[] | null) {
+  const values = (parameters || []).map((value) => String(value ?? '').trim()).filter(Boolean);
+  if (!values.length) return undefined;
+  return [{
+    type: 'body',
+    parameters: values.map((text) => ({ type: 'text', text })),
+  }];
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
 export function defaultWhatsAppBaseUrl(version = 'v22.0') {
   const cleanVersion = String(version || 'v22.0').trim().replace(/^\/+/, '') || 'v22.0';
   return `https://graph.facebook.com/${cleanVersion}`;
@@ -125,7 +172,7 @@ export async function sendWhatsAppText(input: {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(graphErrorMessage(payload));
+    throw new Error(friendlyWhatsAppError(payload));
   }
 
   const externalId = payload?.messages?.[0]?.id || null;
@@ -152,6 +199,94 @@ export async function sendWhatsAppText(input: {
     .update({
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversation.id)
+    .eq('law_firm_id', input.lawFirmId);
+
+  return { payload, externalId, conversationId: conversation.id, message: savedMessage };
+}
+
+
+export async function sendWhatsAppTemplate(input: {
+  lawFirmId: string;
+  to: string;
+  templateName: string;
+  language?: string | null;
+  parameters?: string[] | null;
+  renderedBody?: string | null;
+  clientId?: string | null;
+  sentBy?: string | null;
+}) {
+  const config = await getWhatsAppConfig(input.lawFirmId);
+  if (!config.configured) {
+    throw new Error('WhatsApp API não configurado. Preencha Access Token e Phone Number ID em Integrações.');
+  }
+
+  const to = normalizeBrazilPhone(input.to);
+  if (!to) throw new Error('Telefone/WhatsApp do cliente não informado.');
+
+  const templateName = normalizeTemplateName(input.templateName);
+  if (!templateName) throw new Error('Template oficial da Meta não informado no modelo de mensagem.');
+
+  const payloadBody: any = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: cleanTemplateLanguage(input.language) },
+    },
+  };
+
+  const components = templateComponents(input.parameters);
+  if (components) payloadBody.template.components = components;
+
+  const endpoint = `${config.baseUrl}/${config.phoneNumberId}/messages`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payloadBody),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(friendlyWhatsAppError(payload));
+  }
+
+  const externalId = payload?.messages?.[0]?.id || null;
+  const admin = createAdminSupabase();
+  const conversation = await getOrCreateConversation({ lawFirmId: input.lawFirmId, clientId: input.clientId, phone: to });
+  const body = String(input.renderedBody || `[Template oficial: ${templateName}]`).trim();
+
+  const { data: savedMessage, error: savedMessageError } = await admin.from('whatsapp_messages').insert({
+    law_firm_id: input.lawFirmId,
+    conversation_id: conversation.id,
+    client_id: input.clientId || conversation.client_id || null,
+    direction: 'outbound',
+    message_type: 'template',
+    body,
+    external_id: externalId,
+    status: 'sent',
+    sent_by: input.sentBy || null,
+    raw_payload: {
+      ...payload,
+      advos_template_name: templateName,
+      advos_template_language: cleanTemplateLanguage(input.language),
+      advos_template_parameters: input.parameters || [],
+    },
+  }).select('*').single();
+
+  if (savedMessageError) throw new Error(savedMessageError.message);
+
+  await admin
+    .from('whatsapp_conversations')
+    .update({
+      last_message_at: nowIso(),
+      updated_at: nowIso(),
     })
     .eq('id', conversation.id)
     .eq('law_firm_id', input.lawFirmId);
@@ -237,7 +372,7 @@ export async function sendWhatsAppMedia(input: {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(graphErrorMessage(payload));
+    throw new Error(friendlyWhatsAppError(payload));
   }
 
   const externalId = payload?.messages?.[0]?.id || null;
@@ -415,7 +550,7 @@ export async function sendWhatsAppReaction(input: {
   });
 
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(graphErrorMessage(payload));
+  if (!response.ok) throw new Error(friendlyWhatsAppError(payload));
 
   const { data, error } = await admin
     .from('whatsapp_messages')

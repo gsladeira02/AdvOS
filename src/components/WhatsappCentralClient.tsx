@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
@@ -47,6 +47,12 @@ export function WhatsappCentralClient({
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const supabase = useMemo(() => createBrowserSupabase(), []);
+  const selectedIdRef = useRef(initialSelectedId || initialConversations?.[0]?.id || '');
+  const queryRef = useRef('');
+  const loadingRef = useRef(false);
+
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { queryRef.current = query; }, [query]);
 
   const selected = useMemo(() => {
     return conversations.find((item: any) => item.id === selectedId) || conversations[0] || null;
@@ -62,71 +68,95 @@ export function WhatsappCentralClient({
     });
   }, [conversations, query]);
 
-  const load = useCallback(async (targetId = selectedId, silent = true, searchTerm = query) => {
+  const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
+    if (loadingRef.current && silent) return;
+    const effectiveTargetId = typeof targetId === 'string' ? targetId : selectedIdRef.current;
+    const effectiveSearch = typeof searchTerm === 'string' ? searchTerm : queryRef.current;
     if (!silent) setLoading(true);
+    loadingRef.current = true;
     try {
       const params = new URLSearchParams();
-      if (targetId) params.set('conversationId', targetId);
-      const cleanSearch = String(searchTerm || '').trim();
+      if (effectiveTargetId) params.set('conversationId', effectiveTargetId);
+      const cleanSearch = String(effectiveSearch || '').trim();
       if (cleanSearch) params.set('q', cleanSearch);
-      const response = await fetch(`/api/whatsapp/conversations${params.toString() ? `?${params.toString()}` : ''}`, { cache: 'no-store' });
+      params.set('_', String(Date.now()));
+      const response = await fetch(`/api/whatsapp/conversations?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Erro ao carregar mensagens.');
-      const nextSelectedId = result.selectedId || targetId || result.conversations?.[0]?.id || '';
+      const nextSelectedId = result.selectedId || effectiveTargetId || result.conversations?.[0]?.id || '';
       setConversations(result.conversations || []);
-      setMessages((result.messages || []).filter((message: any) => !nextSelectedId || !message?.conversation_id || message.conversation_id === nextSelectedId));
-      setSelectedId(nextSelectedId);
+      setMessages((result.messages || []).filter((message: any) => {
+        if (!nextSelectedId) return true;
+        if (!message?.conversation_id) return true;
+        return String(message.conversation_id) === String(nextSelectedId);
+      }));
+      if (nextSelectedId && nextSelectedId !== selectedIdRef.current) {
+        selectedIdRef.current = nextSelectedId;
+        setSelectedId(nextSelectedId);
+      }
       setLastUpdate(result.fetchedAt || new Date().toISOString());
       setError(null);
     } catch (err: any) {
       setError(err?.message || 'Não foi possível atualizar as conversas.');
     } finally {
+      loadingRef.current = false;
       if (!silent) setLoading(false);
     }
-  }, [selectedId, query]);
+  }, []);
 
 
   useEffect(() => {
     const channel = supabase
-      .channel(`advos-whatsapp-${selectedId || 'all'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => load(selectedId, true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages' }, () => load(selectedId, true))
+      .channel('advos-whatsapp-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages' }, () => load())
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, selectedId, load]);
+  }, [supabase, load]);
 
   useEffect(() => {
-    const id = window.setInterval(() => load(selectedId, true, query), 1800);
-    const onFocus = () => load(selectedId, true, query);
+    load(selectedIdRef.current, true, queryRef.current);
+    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 1200);
+    const onFocus = () => load(selectedIdRef.current, true, queryRef.current);
+    const onVisibility = () => {
+      if (!document.hidden) load(selectedIdRef.current, true, queryRef.current);
+    };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [load, selectedId, query]);
+  }, [load]);
 
   useEffect(() => {
-    const id = window.setTimeout(() => load(selectedId, true, query), 250);
+    const id = window.setTimeout(() => load(selectedIdRef.current, true, query), 250);
     return () => window.clearTimeout(id);
-  }, [query]);
+  }, [query, load]);
 
   function selectConversation(id: string) {
+    selectedIdRef.current = id;
     setSelectedId(id);
     window.history.replaceState(null, '', `/app/whatsapp?conversa=${id}`);
     setMessages([]);
-    load(id, false, query);
+    load(id, false, queryRef.current);
   }
 
   function handleThreadSent(nextConversationId?: string) {
     const target = nextConversationId || selected?.id || selectedId;
-    if (target && target !== selectedId) {
+    if (target && target !== selectedIdRef.current) {
+      selectedIdRef.current = target;
       setSelectedId(target);
       window.history.replaceState(null, '', `/app/whatsapp?conversa=${target}`);
     }
-    load(target, true, query);
+    load(target, false, queryRef.current);
   }
 
   return (

@@ -56,6 +56,8 @@ export default async function ModelosMensagens() {
         category: String(template.category || 'geral'),
         body: String(template.body || ''),
         active: template.active !== false,
+        meta_template_name: template.meta_template_name ? String(template.meta_template_name) : '',
+        meta_template_language: template.meta_template_language ? String(template.meta_template_language) : 'pt_BR',
       }))} />
     </div>
   );

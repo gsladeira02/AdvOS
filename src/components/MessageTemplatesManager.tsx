@@ -11,6 +11,8 @@ export type MessageTemplateRow = {
   category?: string;
   body: string;
   active?: boolean;
+  meta_template_name?: string | null;
+  meta_template_language?: string | null;
 };
 
 const categories = [
@@ -45,6 +47,7 @@ function emptyTemplate(): MessageTemplateRow {
     shortcut: '/',
     category: 'cobranca',
     active: true,
+    meta_template_language: 'pt_BR',
     body: '',
   };
 }
@@ -100,6 +103,8 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
       shortcut: shortcutHint(template.shortcut, template.name),
       category: template.category || 'geral',
       active: String(template.active !== false),
+      meta_template_name: template.meta_template_name || '',
+      meta_template_language: template.meta_template_language || 'pt_BR',
       body: template.body,
     };
 
@@ -192,7 +197,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
             </button>
           </div>
         </div>
-        <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_180px_180px_120px]">
+        <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_160px_160px_110px_190px_120px]">
           <input className="input compact-input" value={draft.name} onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value, shortcut: d.shortcut && d.shortcut !== '/' ? d.shortcut : shortcutHint('', event.target.value) }))} placeholder="Nome do modelo" />
           <input className="input compact-input" value={draft.shortcut || ''} onChange={(event) => setDraft((d) => ({ ...d, shortcut: event.target.value }))} placeholder="/cobranca" />
           <select className="input compact-input" value={draft.category || 'geral'} onChange={(event) => setDraft((d) => ({ ...d, category: event.target.value }))}>
@@ -202,7 +207,9 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
             <option value="true">Ativo</option>
             <option value="false">Inativo</option>
           </select>
-          <textarea className="input min-h-[130px] lg:col-span-4" value={draft.body} onChange={(event) => setDraft((d) => ({ ...d, body: event.target.value }))} placeholder="Digite a mensagem pronta..." />
+          <input className="input compact-input" value={draft.meta_template_name || ''} onChange={(event) => setDraft((d) => ({ ...d, meta_template_name: event.target.value }))} placeholder="Template Meta oficial" />
+          <input className="input compact-input" value={draft.meta_template_language || 'pt_BR'} onChange={(event) => setDraft((d) => ({ ...d, meta_template_language: event.target.value }))} placeholder="pt_BR" />
+          <textarea className="input min-h-[130px] lg:col-span-6" value={draft.body} onChange={(event) => setDraft((d) => ({ ...d, body: event.target.value }))} placeholder="Digite a mensagem pronta..." />
         </div>
       </section>
 
@@ -227,13 +234,15 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
         </div>
 
         <div className="overflow-x-auto">
-          <table className="spreadsheet min-w-[980px]">
+          <table className="spreadsheet min-w-[1180px]">
             <thead>
               <tr>
                 <th>Nome</th>
                 <th>Atalho</th>
                 <th>Categoria</th>
                 <th>Status</th>
+                <th>Template Meta</th>
+                <th>Idioma</th>
                 <th>Mensagem</th>
                 <th className="text-center">Ações</th>
               </tr>
@@ -245,6 +254,8 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
                   <td className="w-[150px]"><input className="sheet-input" value={template.shortcut || ''} onChange={(event) => patchTemplate(template.id, { shortcut: event.target.value })} /></td>
                   <td className="w-[150px]"><select className="sheet-input" value={template.category || 'geral'} onChange={(event) => patchTemplate(template.id, { category: event.target.value })}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td>
                   <td className="w-[110px]"><select className="sheet-input" value={template.active === false ? 'false' : 'true'} onChange={(event) => patchTemplate(template.id, { active: event.target.value === 'true' })}><option value="true">Ativo</option><option value="false">Inativo</option></select></td>
+                  <td className="w-[180px]"><input className="sheet-input" value={template.meta_template_name || ''} onChange={(event) => patchTemplate(template.id, { meta_template_name: event.target.value })} placeholder="cobranca_vencida" /></td>
+                  <td className="w-[90px]"><input className="sheet-input" value={template.meta_template_language || 'pt_BR'} onChange={(event) => patchTemplate(template.id, { meta_template_language: event.target.value })} /></td>
                   <td><textarea className="sheet-input min-h-[58px] resize-y leading-relaxed" value={template.body || ''} onChange={(event) => patchTemplate(template.id, { body: event.target.value })} /></td>
                   <td className="w-[132px] text-center">
                     <div className="inline-flex items-center gap-1.5">

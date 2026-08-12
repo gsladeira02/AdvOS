@@ -412,9 +412,11 @@ export function WhatsappThread({
           body: message || (type === 'sticker' ? '[Figurinha]' : file.name),
           status: 'sent',
           created_at: new Date().toISOString(),
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
+          file_name: result.message?.file_name || file.name,
+          file_size: result.message?.file_size || file.size,
+          mime_type: result.message?.mime_type || file.type,
+          media_url: result.message?.media_url || null,
+          storage_path: result.message?.storage_path || null,
           optimistic: true,
         };
         setFile(null);
@@ -473,6 +475,38 @@ export function WhatsappThread({
       );
     }
 
+    if (kind === 'audio') {
+      return (
+        <div className="space-y-1.5">
+          <div className="rounded-2xl bg-black/5 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">Áudio</span>
+              {fileSizeLabel(message.file_size) && <span className="text-[10px] font-bold text-slate-500">{fileSizeLabel(message.file_size)}</span>}
+            </div>
+            {mediaUrl ? (
+              <audio controls preload="metadata" className="w-[260px] max-w-full" src={mediaUrl}>
+                Seu navegador não suporta reprodução de áudio.
+              </audio>
+            ) : (
+              <div className="text-[11px] font-bold text-slate-500">Áudio recebido. Aguarde a mídia ficar disponível.</div>
+            )}
+          </div>
+          {message.body && message.body !== '[Áudio recebido]' && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar áudio</a>}
+        </div>
+      );
+    }
+
+    if (kind === 'video') {
+      return (
+        <div className="space-y-1.5">
+          {mediaUrl ? <video controls preload="metadata" src={mediaUrl} className="max-h-64 w-[280px] max-w-full rounded-xl bg-black" /> : <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2"><FileText size={16} /> Vídeo recebido</div>}
+          {message.body && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar vídeo</a>}
+        </div>
+      );
+    }
+
     if (kind !== 'text') {
       return (
         <div className="space-y-1.5">
@@ -480,7 +514,7 @@ export function WhatsappThread({
             <FileText size={17} className="shrink-0" />
             <div className="min-w-0">
               <b className="block max-w-[260px] truncate text-[12px]">{fileName || 'Arquivo'}</b>
-              <span className="text-[10px] font-bold text-slate-500">{kind === 'audio' ? 'Áudio' : kind === 'video' ? 'Vídeo' : 'Documento'} {fileSizeLabel(message.file_size) ? `• ${fileSizeLabel(message.file_size)}` : ''}</span>
+              <span className="text-[10px] font-bold text-slate-500">Documento {fileSizeLabel(message.file_size) ? `• ${fileSizeLabel(message.file_size)}` : ''}</span>
             </div>
           </div>
           {message.body && message.body !== fileName && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
