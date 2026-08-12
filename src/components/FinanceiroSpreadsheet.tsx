@@ -76,12 +76,12 @@ function SortButton(props: {
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded-lg px-1 py-1 text-left font-black uppercase tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+      className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-left font-black uppercase tracking-wide text-slate-500 hover:bg-slate-100 hover:text-slate-950"
       onClick={props.onClick}
       title={`Ordenar por ${props.label.toLowerCase()}`}
     >
       <span>{props.label}</span>
-      <span className="text-sm leading-none text-slate-900">{props.active ? (props.dir === 'asc' ? '↑' : '↓') : '↕'}</span>
+      <span className="text-[12px] leading-none text-slate-900">{props.active ? (props.dir === 'asc' ? '↑' : '↓') : '↕'}</span>
     </button>
   );
 }
@@ -100,7 +100,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
       .filter((i: any) => {
         const client = i.financial_contracts?.clients;
         const label = installmentLabel(i);
-        const haystack = normalize(`${client?.name || ''} ${label} ${i.status || ''} ${i.external_id || ''}`);
+        const haystack = normalize(`${client?.name || ''} ${label} ${i.status || ''}`);
         const due = String(i.due_date || '');
 
         if (clientFilter && client?.id !== clientFilter) return false;
@@ -145,24 +145,24 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
 
   return (
     <section className="card mb-6 overflow-hidden">
-      <div className="border-b border-[#eee4d4] p-5">
+      <div className="border-b border-[#eee4d4] p-4">
         <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Tabela financeira</h2>
-            <p className="text-sm text-slate-500">Os filtros alteram a tabela automaticamente. Use as setas em vencimento e valor para ordenar.</p>
+            <h2 className="text-base font-black text-slate-950">Tabela financeira</h2>
+            <p className="text-xs text-slate-500">Filtre por cliente, status e período. Clique nas setas de vencimento ou valor para ordenar.</p>
           </div>
-          <div className="text-sm font-bold text-slate-600">
+          <div className="text-xs font-bold text-slate-600">
             {filteredInstallments.length} cobrança(s) • {money(filteredTotal)}
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-6">
-          <select className="input md:col-span-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+        <div className="mt-3 grid gap-2 md:grid-cols-7">
+          <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
             <option value="">Todos os clientes</option>
             {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
           </select>
 
-          <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} title="Filtrar por status">
             <option value="atrasado">Atrasadas</option>
             <option value="em_aberto">Em aberto</option>
             <option value="pendente">Pendentes</option>
@@ -170,34 +170,32 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
             <option value="todos">Todas</option>
           </select>
 
-          <input className="input" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} type="date" title="Data inicial" />
-          <input className="input" value={dateTo} onChange={(event) => setDateTo(event.target.value)} type="date" title="Data final" />
-          <button type="button" className="btn btn-ghost" onClick={clearFilters}>Limpar</button>
-
+          <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} type="date" title="Data inicial" />
+          <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateTo} onChange={(event) => setDateTo(event.target.value)} type="date" title="Data final" />
           <input
-            className="input md:col-span-6"
+            className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Buscar por cliente, parcela ou ID Asaas"
+            placeholder="Buscar cliente ou parcela"
           />
+          <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={clearFilters}>Limpar</button>
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-[1100px] w-full border-collapse bg-white text-sm">
-          <thead className="bg-[#fbf7ef] text-[11px] uppercase tracking-wide text-slate-500">
+        <table className="min-w-[860px] w-full border-collapse bg-white text-xs">
+          <thead className="bg-[#fbf7ef] text-[10px] uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left font-black">Cliente</th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left">
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Cliente</th>
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-left">
                 <SortButton label="Vencimento" active={sortKey === 'due_date'} dir={sortDir} onClick={() => toggleSort('due_date')} />
               </th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left">
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-left">
                 <SortButton label="Valor" active={sortKey === 'amount'} dir={sortDir} onClick={() => toggleSort('amount')} />
               </th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left font-black">Parcela</th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left font-black">Status</th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left font-black">Asaas</th>
-              <th className="border-b border-[#eee4d4] px-4 py-3 text-left font-black">WhatsApp</th>
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Parcela</th>
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Status</th>
+              <th className="border-b border-[#eee4d4] px-3 py-2 text-center font-black">WhatsApp</th>
             </tr>
           </thead>
           <tbody>
@@ -209,25 +207,26 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
 
               return (
                 <tr key={item.id} className="border-b border-[#f0e7d8] align-top hover:bg-[#fffaf2]">
-                  <td className="px-4 py-3">
-                    <div className="max-w-[240px] truncate text-sm font-black text-slate-950" title={client?.name || ''}>{client?.name || '-'}</div>
-                    <div className="mt-1 text-[11px] text-slate-500">{phone || 'Sem telefone'}</div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{dateBR(item.due_date)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-black text-slate-900">{money(item.amount)}</td>
-                  <td className="px-4 py-3">
-                    <div className="max-w-[260px] truncate font-bold text-slate-800" title={label}>{label}</div>
-                    {item.external_id && <div className="mt-1 text-[11px] text-slate-400">ID Asaas: {item.external_id}</div>}
-                  </td>
-                  <td className="px-4 py-3"><span className={`badge ${statusBadge(item.status)}`}>{statusLabel(item.status)}</span></td>
-                  <td className="px-4 py-3">
-                    {url ? (
-                      <Link href={url} target="_blank" className="text-xs font-black text-blue-700 hover:underline">Abrir cobrança</Link>
+                  <td className="px-3 py-2">
+                    {client?.id ? (
+                      <Link
+                        href={`/app/clientes/${client.id}`}
+                        className="block max-w-[230px] truncate text-xs font-black text-slate-950 hover:text-blue-700 hover:underline"
+                        title={client?.name || ''}
+                      >
+                        {client?.name || '-'}
+                      </Link>
                     ) : (
-                      <span className="text-xs font-bold text-slate-400">Sem link</span>
+                      <div className="max-w-[230px] truncate text-xs font-black text-slate-950" title={client?.name || ''}>{client?.name || '-'}</div>
                     )}
                   </td>
-                  <td className="w-[260px] px-4 py-3">
+                  <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">{dateBR(item.due_date)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">{money(item.amount)}</td>
+                  <td className="px-3 py-2">
+                    <div className="max-w-[300px] truncate font-semibold text-slate-800" title={label}>{label}</div>
+                  </td>
+                  <td className="px-3 py-2"><span className={`badge !px-2 !py-1 !text-[10px] ${statusBadge(item.status)}`}>{statusLabel(item.status)}</span></td>
+                  <td className="w-[88px] px-3 py-2 text-center">
                     <FinanceWhatsappCharge
                       paid={item.status === 'pago'}
                       clientName={client?.name}

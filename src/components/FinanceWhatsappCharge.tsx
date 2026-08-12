@@ -10,6 +10,14 @@ export type ChargeTemplateOption = {
   body: string;
 };
 
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="h-4 w-4 fill-current">
+      <path d="M16 3.5A12.4 12.4 0 0 0 5.4 22.3L4 28.5l6.3-1.5A12.4 12.4 0 1 0 16 3.5Zm0 22.6c-2 0-3.8-.6-5.4-1.6l-.4-.2-3.4.8.8-3.3-.3-.4A10.2 10.2 0 1 1 16 26.1Zm5.7-7.6c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.6 0-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9s1.2 3.3 1.4 3.6c.2.2 2.4 3.7 5.8 5.1.8.3 1.5.5 2 .7.8.3 1.6.2 2.2.1.7-.1 1.8-.8 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4Z" />
+    </svg>
+  );
+}
+
 export function FinanceWhatsappCharge(props: {
   disabled?: boolean;
   paid?: boolean;
@@ -50,41 +58,70 @@ export function FinanceWhatsappCharge(props: {
   const whatsappHref = props.phone ? whatsappUrl(props.phone, message) : whatsappShareUrl(message);
 
   if (props.paid) {
-    return <button className="btn w-full cursor-not-allowed justify-center opacity-50" disabled>Cobrança paga</button>;
+    return (
+      <button
+        className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70"
+        disabled
+        title="Cobrança paga"
+        type="button"
+      >
+        <WhatsAppIcon />
+      </button>
+    );
   }
 
   if (props.disabled || !templates.length) {
-    return <button className="btn w-full cursor-not-allowed justify-center opacity-50" disabled>Cobrar no WhatsApp</button>;
+    return (
+      <button
+        className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70"
+        disabled
+        title="Nenhum modelo de cobrança disponível"
+        type="button"
+      >
+        <WhatsAppIcon />
+      </button>
+    );
   }
 
   return (
-    <div className="space-y-3">
-      <button type="button" className="btn btn-primary w-full justify-center" onClick={() => setOpen((value) => !value)}>
-        Cobrar no WhatsApp
+    <div className="relative inline-block text-left">
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition hover:scale-105 hover:bg-[#1ebe5d]"
+        onClick={() => setOpen((value) => !value)}
+        title="Cobrar pelo WhatsApp"
+        aria-label="Cobrar pelo WhatsApp"
+      >
+        <WhatsAppIcon />
       </button>
 
       {open && (
-        <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 shadow-sm">
-          <label className="text-[11px] font-black uppercase tracking-wide text-slate-500">Modelo de cobrança</label>
-          <select className="input mt-2" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+        <div className="mt-2 w-[330px] max-w-[78vw] rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-left shadow-lg">
+          <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Modelo de cobrança</label>
+          <select className="input mt-2 !rounded-lg !px-3 !py-2 text-xs" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
 
-          <div className="mt-3 max-h-44 overflow-auto rounded-xl border border-[#eee4d4] bg-white p-3 text-xs leading-relaxed text-slate-600 whitespace-pre-wrap">
+          <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-[#eee4d4] bg-white p-3 text-[11px] leading-relaxed text-slate-600 whitespace-pre-wrap">
             {message || 'Selecione um modelo para visualizar a mensagem.'}
           </div>
 
           {!props.phone && (
-            <p className="mt-2 text-xs font-bold text-amber-700">
+            <p className="mt-2 text-[11px] font-bold text-amber-700">
               Cliente sem WhatsApp/telefone. O WhatsApp abrirá sem destinatário para você escolher manualmente.
             </p>
           )}
 
-          <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-primary mt-3 w-full justify-center">
-            Abrir WhatsApp com este modelo
-          </a>
+          <div className="mt-3 flex items-center gap-2">
+            <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs">
+              Abrir WhatsApp
+            </a>
+            <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={() => setOpen(false)}>
+              Fechar
+            </button>
+          </div>
         </div>
       )}
     </div>
