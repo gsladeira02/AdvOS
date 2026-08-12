@@ -99,6 +99,46 @@ function statusValue(status?: string | null) {
   return String(status || '').toLowerCase();
 }
 
+
+function statusRank(status?: string | null) {
+  const value = statusValue(status);
+  if (value === 'failed') return 99;
+  if (value === 'read') return 4;
+  if (value === 'delivered') return 3;
+  if (value === 'sent') return 2;
+  if (value === 'received') return 1;
+  return 0;
+}
+
+function bestStatus(current?: string | null, incoming?: string | null) {
+  const next = statusValue(incoming);
+  const old = statusValue(current);
+  if (!next) return current || null;
+  if (!old) return incoming || null;
+  // Falha precisa aparecer imediatamente. Fora isso, não deixamos a interface voltar de lida para enviada.
+  if (next === 'failed') return incoming || null;
+  if (old === 'failed' && next !== 'sent' && next !== 'delivered' && next !== 'read') return current || null;
+  return statusRank(next) >= statusRank(old) ? incoming || null : current || null;
+}
+
+function mergeMessageRecord(current: MessageListItem, incoming: MessageListItem) {
+  const merged: MessageListItem = {
+    ...current,
+    ...incoming,
+    status: bestStatus(current?.status, incoming?.status) || incoming?.status || current?.status,
+    delivered_at: incoming?.delivered_at || current?.delivered_at || null,
+    read_at: incoming?.read_at || current?.read_at || null,
+    error_message: incoming?.error_message || current?.error_message || null,
+    media_url: incoming?.media_url || current?.media_url || null,
+    storage_path: incoming?.storage_path || current?.storage_path || null,
+    mime_type: incoming?.mime_type || current?.mime_type || null,
+    file_name: incoming?.file_name || current?.file_name || null,
+    file_size: incoming?.file_size || current?.file_size || null,
+  };
+
+  if (incoming?.id && !String(incoming.id).startsWith('local-')) merged.optimistic = false;
+  return merged;
+}
 function StatusTicks({ status }: { status?: string | null }) {
   const value = statusValue(status);
   if (value === 'failed') return <AlertTriangle size={13} className="text-red-500" aria-label="Falhou" />;
@@ -253,7 +293,7 @@ function appendMessagePreservingHistory(currentMessages: MessageListItem[], newM
 
     if (sameId || sameExternal || sameLocalEquivalent || stableMessageKey(item) === key) {
       if (!inserted) {
-        next.push({ ...item, ...newMessage, optimistic: newMessage.optimistic ?? item.optimistic });
+        next.push(mergeMessageRecord(item, newMessage));
         inserted = true;
       }
       continue;
@@ -269,15 +309,20 @@ function mergeMessageLists(serverMessages: MessageListItem[], currentMessages: M
   const merged: MessageListItem[] = [];
 
   for (const message of serverMessages || []) {
-    if (!merged.some((item) => sameMessage(item, message))) merged.push(message);
+    if (!message) continue;
+    const index = merged.findIndex((item) => sameMessage(item, message));
+    if (index >= 0) merged[index] = mergeMessageRecord(merged[index], message);
+    else merged.push(message);
   }
 
   // Nunca trocar a tela por uma lista parcial. Isso evita o bug em que, após enviar,
   // a API retornava só a mensagem nova por alguns instantes e o histórico sumia até F5.
+  // Quando o servidor traz a mesma mensagem com status novo, a versão do servidor vence.
   for (const current of currentMessages || []) {
     if (!current) continue;
-    const hasServerEquivalent = merged.some((message) => sameMessage(current, message));
-    if (!hasServerEquivalent) merged.push(current);
+    const index = merged.findIndex((message) => sameMessage(current, message));
+    if (index >= 0) merged[index] = mergeMessageRecord(current, merged[index]);
+    else merged.push(current);
   }
 
   return merged.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
@@ -401,7 +446,7 @@ export function WhatsappThread({
   }, [initialDraft, conversation?.id, onDraftApplied]);
 
   useEffect(() => {
-    if (!live || conversation?.virtual) return;
+    if (!live) return;
     refreshThreadMessages(true);
     const interval = window.setInterval(() => refreshThreadMessages(true), 900);
     const onFocus = () => refreshThreadMessages(true);
@@ -415,7 +460,7 @@ export function WhatsappThread({
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [conversation?.id, conversation?.virtual, live]);
+  }, [conversation?.id, live]);
 
   useEffect(() => {
     return () => {

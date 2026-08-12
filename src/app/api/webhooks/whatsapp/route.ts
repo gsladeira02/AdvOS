@@ -257,19 +257,35 @@ export async function POST(req: Request) {
       }
 
       for (const status of value?.statuses || []) {
-        const updates: any = { status: status.status || 'status', raw_payload: status };
+        const now = new Date().toISOString();
+        const updates: any = {
+          status: status.status || 'status',
+          raw_payload: status,
+          updated_at: now,
+        };
         if (status.status === 'delivered') updates.delivered_at = new Date(Number(status.timestamp || Date.now() / 1000) * 1000).toISOString();
         if (status.status === 'read') updates.read_at = new Date(Number(status.timestamp || Date.now() / 1000) * 1000).toISOString();
         const statusError = status.errors?.[0];
         if (statusError) {
+          updates.status = 'failed';
           updates.error_message = statusError.error_data?.details || statusError.message || statusError.title || `Erro ${statusError.code || ''}`.trim();
         }
 
-        await admin
+        const { data: updatedMessage } = await admin
           .from('whatsapp_messages')
           .update(updates)
           .eq('law_firm_id', lawFirmId)
-          .eq('external_id', status.id);
+          .eq('external_id', status.id)
+          .select('id,conversation_id')
+          .maybeSingle();
+
+        if (updatedMessage?.conversation_id) {
+          await admin
+            .from('whatsapp_conversations')
+            .update({ updated_at: now })
+            .eq('law_firm_id', lawFirmId)
+            .eq('id', updatedMessage.conversation_id);
+        }
       }
     }
   }

@@ -234,7 +234,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={!error} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} />
+        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} />
       ) : (
         <section className="rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
           Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.
