@@ -130,3 +130,15 @@ Depois configure em `/app/integracoes`:
 9. Assine o campo `messages` no painel da Meta.
 
 Observação: mensagens livres pela API funcionam dentro da janela de atendimento de 24h. Fora da janela, a Meta pode exigir template oficial aprovado.
+
+## AdvOS V9.10
+
+Correções do WhatsApp:
+- Reprodução de áudios recebidos dentro da conversa.
+- Botão para salvar áudios e demais mídias.
+- Polling mais agressivo e Realtime mais estável para evitar precisar atualizar a página.
+- Webhook deixou de depender de upsert por constraint de external_id, evitando notificação sem mensagem salva.
+- Envio pelo Financeiro com suporte a template oficial aprovado da Meta quando a janela de 24h estiver fechada.
+- Modelos de mensagem agora podem guardar o nome do template oficial Meta e o idioma.
+
+Após atualizar, rode `supabase/v9_10_whatsapp_audio_realtime_templates.sql` no Supabase.
