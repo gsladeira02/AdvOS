@@ -21,6 +21,7 @@ export function FinanceWhatsappCharge(props: {
   asaasUrl?: string | null;
   firmName?: string | null;
   firmPhone?: string | null;
+  userName?: string | null;
   templates: ChargeTemplateOption[];
 }) {
   const templates = props.templates || [];
@@ -42,8 +43,9 @@ export function FinanceWhatsappCharge(props: {
       link_asaas: props.asaasUrl || '',
       escritorio: props.firmName || 'escritório',
       telefone_escritorio: props.firmPhone || '',
+      usuario: props.userName || '',
     });
-  }, [selectedTemplate, props.clientName, props.installmentLabel, props.amount, props.dueDate, props.asaasUrl, props.firmName, props.firmPhone]);
+  }, [selectedTemplate, props.clientName, props.installmentLabel, props.amount, props.dueDate, props.asaasUrl, props.firmName, props.firmPhone, props.userName]);
 
   const whatsappHref = props.phone ? whatsappUrl(props.phone, message) : whatsappShareUrl(message);
 

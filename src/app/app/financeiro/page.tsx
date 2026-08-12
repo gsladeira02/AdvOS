@@ -254,6 +254,7 @@ export default async function Financeiro({ searchParams }: { searchParams?: Prom
                   asaasUrl={url}
                   firmName={firm?.name}
                   firmPhone={firm?.phone}
+                  userName={profile.full_name}
                   templates={chargeTemplates}
                 />
               </div>

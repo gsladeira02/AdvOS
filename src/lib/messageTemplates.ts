@@ -44,12 +44,15 @@ export function firstName(name?: string | null) {
 
 export function renderMessageTemplate(template: string, values: Record<string, any>) {
   const clientName = String(values.cliente || '').trim();
+  const userName = String(values.usuario || values.userName || values.nome_usuario || '').trim();
   const linkAsaas = String(values.link_asaas || '').trim();
   const linkZapSign = String(values.link_zapsign || '').trim();
 
   const vars: Record<string, string> = {
     cliente: clientName,
     primeiro_nome: String(values.primeiro_nome || firstName(clientName) || clientName || 'tudo bem').trim(),
+    usuario: firstName(userName) || userName || 'equipe',
+    usuario_nome_completo: userName || 'equipe',
     servico: String(values.servico || '').trim(),
     parcela: String(values.parcela || 'Cobrança de honorários').trim(),
     valor: typeof values.valor === 'number' ? money(values.valor) : String(values.valor || '').trim(),
