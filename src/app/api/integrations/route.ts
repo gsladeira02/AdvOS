@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const f = await req.formData();
   const provider = str(f.get('provider'));
 
-  if (!['zapsign', 'asaas'].includes(provider)) {
+  if (!['zapsign', 'asaas', 'whatsapp'].includes(provider)) {
     return NextResponse.json({ error: 'Integração inválida.' }, { status: 400 });
   }
 
@@ -25,10 +25,17 @@ export async function POST(req: Request) {
 
   const existing = await admin
     .from('integration_settings')
-    .select('id,api_token,token_last4,webhook_secret')
+    .select('id,api_token,token_last4,webhook_secret,raw_settings')
     .eq('law_firm_id', profile.law_firm_id)
     .eq('provider', provider)
     .maybeSingle();
+
+  const rawSettings: any = provider === 'whatsapp' ? {
+    phone_number_id: str(f.get('phone_number_id')),
+    waba_id: str(f.get('waba_id')),
+    business_phone: str(f.get('business_phone')),
+    graph_version: str(f.get('graph_version')) || 'v22.0',
+  } : existing.data?.raw_settings || null;
 
   const payload: any = {
     law_firm_id: profile.law_firm_id,
@@ -38,6 +45,7 @@ export async function POST(req: Request) {
     api_base_url: apiBaseUrl,
     default_billing_type: provider === 'asaas' ? str(f.get('default_billing_type')) || 'BOLETO' : null,
     webhook_secret: webhookSecret || existing.data?.webhook_secret || null,
+    raw_settings: rawSettings,
     status: enabled ? 'configurado' : 'desativado',
     updated_at: new Date().toISOString(),
   };

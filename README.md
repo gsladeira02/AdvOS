@@ -99,3 +99,34 @@ Esta versão adiciona uma tela para importar clientes e cobranças exportados do
 5. O AdvOS cruza cliente por ID Asaas, CPF/CNPJ, e-mail, telefone e nome.
 
 A importação cria clientes faltantes, vincula `asaas_customer_id`, cria cobranças no financeiro e evita duplicidade quando encontrar ID externo de cobrança.
+
+## V9.2 - WhatsApp Cloud API oficial
+
+Esta versão adiciona integração direta com a API oficial da Meta/WhatsApp:
+
+- nova aba `WhatsApp` no menu lateral;
+- configuração em `Integrações > WhatsApp API`;
+- envio de mensagem pela API dentro do Financeiro;
+- fallback para abrir WhatsApp Web;
+- webhook em `/api/webhooks/whatsapp` para receber mensagens e status;
+- conversas salvas no Supabase e vinculadas ao cliente pelo telefone/WhatsApp.
+
+Após atualizar os arquivos, rode no Supabase:
+
+```sql
+-- supabase/v9_2_whatsapp_api.sql
+```
+
+Depois configure em `/app/integracoes`:
+
+1. Ative a integração WhatsApp.
+2. Cole o Access Token permanente da Meta.
+3. Informe o Phone Number ID.
+4. Informe o WABA ID, se tiver.
+5. Informe o número oficial.
+6. Crie e salve o Verify Token.
+7. Teste a conexão.
+8. Configure na Meta o webhook: `NEXT_PUBLIC_APP_URL/api/webhooks/whatsapp`.
+9. Assine o campo `messages` no painel da Meta.
+
+Observação: mensagens livres pela API funcionam dentro da janela de atendimento de 24h. Fora da janela, a Meta pode exigir template oficial aprovado.

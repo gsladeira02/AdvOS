@@ -229,6 +229,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
                   <td className="w-[88px] px-3 py-2 text-center">
                     <FinanceWhatsappCharge
                       paid={item.status === 'pago'}
+                      clientId={client?.id}
                       clientName={client?.name}
                       phone={phone}
                       installmentLabel={label}

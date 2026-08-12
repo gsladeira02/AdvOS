@@ -21,6 +21,7 @@ function WhatsAppIcon() {
 export function FinanceWhatsappCharge(props: {
   disabled?: boolean;
   paid?: boolean;
+  clientId?: string | null;
   clientName?: string | null;
   phone?: string | null;
   installmentLabel: string;
@@ -35,6 +36,8 @@ export function FinanceWhatsappCharge(props: {
   const templates = props.templates || [];
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(templates[0]?.id || '');
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const selectedTemplate = useMemo(() => {
     return templates.find((template) => template.id === selectedId) || templates[0];
@@ -57,14 +60,32 @@ export function FinanceWhatsappCharge(props: {
 
   const whatsappHref = props.phone ? whatsappUrl(props.phone, message) : whatsappShareUrl(message);
 
+  async function sendByApi() {
+    setSending(true);
+    setFeedback(null);
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: props.phone,
+          client_id: props.clientId,
+          message,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar pela API.');
+      setFeedback('Mensagem enviada pela API oficial do WhatsApp.');
+    } catch (error: any) {
+      setFeedback(error?.message || 'Erro ao enviar pela API oficial. Se a janela de 24h estiver fechada, use template aprovado na Meta ou abra pelo WhatsApp Web.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (props.paid) {
     return (
-      <button
-        className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70"
-        disabled
-        title="Cobrança paga"
-        type="button"
-      >
+      <button className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70" disabled title="Cobrança paga" type="button">
         <WhatsAppIcon />
       </button>
     );
@@ -72,12 +93,7 @@ export function FinanceWhatsappCharge(props: {
 
   if (props.disabled || !templates.length) {
     return (
-      <button
-        className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70"
-        disabled
-        title="Nenhum modelo de cobrança disponível"
-        type="button"
-      >
+      <button className="inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full bg-slate-200 text-slate-400 opacity-70" disabled title="Nenhum modelo de cobrança disponível" type="button">
         <WhatsAppIcon />
       </button>
     );
@@ -96,7 +112,7 @@ export function FinanceWhatsappCharge(props: {
       </button>
 
       {open && (
-        <div className="mt-2 w-[330px] max-w-[78vw] rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-left shadow-lg">
+        <div className="mt-2 w-[360px] max-w-[78vw] rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-left shadow-lg">
           <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Modelo de cobrança</label>
           <select className="input mt-2 !rounded-lg !px-3 !py-2 text-xs" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
             {templates.map((template) => (
@@ -110,13 +126,18 @@ export function FinanceWhatsappCharge(props: {
 
           {!props.phone && (
             <p className="mt-2 text-[11px] font-bold text-amber-700">
-              Cliente sem WhatsApp/telefone. O WhatsApp abrirá sem destinatário para você escolher manualmente.
+              Cliente sem WhatsApp/telefone. O envio pela API exige telefone; o WhatsApp Web abrirá sem destinatário.
             </p>
           )}
 
-          <div className="mt-3 flex items-center gap-2">
-            <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs">
-              Abrir WhatsApp
+          {feedback && <p className="mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={sendByApi} disabled={sending || !props.phone}>
+              {sending ? 'Enviando...' : 'Enviar pela API'}
+            </button>
+            <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
+              Abrir Web
             </a>
             <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={() => setOpen(false)}>
               Fechar
