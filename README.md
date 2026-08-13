@@ -1,15 +1,19 @@
-# AdvOS V9.27
+# AdvOS V9.28
 
 Sistema jurídico interno do escritório, com acesso pela internet, Supabase, Next.js e Vercel.
 
-## Correções da V9.27
+## Correções da V9.28
 
-Esta versão mantém todo o hardening da V9.26 e corrige dois pontos operacionais:
+Esta versão mantém o hardening da V9.26 e as correções da V9.27, além de ajustar o fluxo da Central do WhatsApp:
 
-- logout reforçado no navegador e no servidor, com botão também no mobile e retorno sempre ao `/login` do domínio atual;
-- WhatsApp com Realtime autenticado explicitamente e polling resiliente como fallback para novas mensagens/conversas aparecerem sem F5.
+- mensagens recebidas passam a promover a conversa com base nas mensagens realmente visíveis;
+- nenhuma conversa ou contato abre automaticamente ao entrar na central;
+- `Esc` fecha a conversa atual e volta ao estado sem conversa selecionada;
+- botão de fechar conversa disponível no cabeçalho;
+- polling antigo não consegue reabrir uma conversa após ela ser fechada;
+- mensagens não são marcadas como lidas até a conversa ser realmente aberta.
 
-**Não existe SQL novo para a V9.27.** Se o `v9_26_security_hardening.sql` já foi executado, não rode novamente por causa desta atualização. Asaas e ZapSign continuam no projeto e podem permanecer sem configuração até serem usados no futuro.
+**Não existe SQL novo para a V9.28.** Se o `v9_26_security_hardening.sql` já foi executado, não rode novamente por causa desta atualização. Asaas e ZapSign continuam no projeto e podem permanecer sem configuração até serem usados no futuro.
 
 
 ## Atualização da V9.25 para V9.26
