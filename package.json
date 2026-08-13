@@ -1,6 +1,6 @@
 {
   "name": "advos-v8-4",
-  "version": "9.26.0",
+  "version": "9.27.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -1,6 +1,16 @@
-# AdvOS V9.26
+# AdvOS V9.27
 
 Sistema jurídico interno do escritório, com acesso pela internet, Supabase, Next.js e Vercel.
+
+## Correções da V9.27
+
+Esta versão mantém todo o hardening da V9.26 e corrige dois pontos operacionais:
+
+- logout reforçado no navegador e no servidor, com botão também no mobile e retorno sempre ao `/login` do domínio atual;
+- WhatsApp com Realtime autenticado explicitamente e polling resiliente como fallback para novas mensagens/conversas aparecerem sem F5.
+
+**Não existe SQL novo para a V9.27.** Se o `v9_26_security_hardening.sql` já foi executado, não rode novamente por causa desta atualização. Asaas e ZapSign continuam no projeto e podem permanecer sem configuração até serem usados no futuro.
+
 
 ## Atualização da V9.25 para V9.26
 
@@ -28,7 +38,7 @@ WHATSAPP_APP_SECRET=
 
 As demais variáveis opcionais estão documentadas em `.env.example`.
 
-## Segurança da V9.26
+## Segurança herdada da V9.26
 
 - autenticação do servidor revalidada via Supabase Auth;
 - `service_role` somente server-side;
