@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, Plus, Power, PowerOff, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
 import { MessageTemplatesManager, type MessageTemplateRow } from '@/components/MessageTemplatesManager';
 
 const COLORS = [
@@ -108,6 +108,19 @@ export function WhatsappSettingsCenter({
     if (result) { if (isNew) setTagDraft({ name: '', color: 'slate' }); setFeedback(isNew ? 'Tag cadastrada.' : 'Tag atualizada.'); }
   }
 
+  async function setTagActive(tag: any, active: boolean) {
+    const result = await api({ action: 'set_tag_active', id: tag.id, active });
+    if (result) setFeedback(active ? 'Tag ativada.' : 'Tag desativada. Ela não aparece para novas seleções, mas pode ser reativada quando quiser.');
+  }
+
+  async function deleteTag(tag: any) {
+    const name = String(tag?.name || 'esta tag');
+    const confirmed = window.confirm(`Excluir definitivamente a tag \"${name}\"?\n\nEla será removida de todas as conversas em que estiver aplicada. Essa ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    const result = await api({ action: 'delete_tag', id: tag.id });
+    if (result) setFeedback('Tag excluída definitivamente.');
+  }
+
   async function saveStage(stage: any, isNew = false) {
     const result = await api({ action: 'save_stage', id: stage.id || '', stageKey: stage.stage_key || '', name: stage.name, color: stage.color, active: stage.active !== false, sortOrder: stage.sort_order || 0, outcome: stage.outcome || 'open' });
     if (result) { if (isNew) setStageDraft({ name: '', color: 'sky', outcome: 'open' }); setFeedback(isNew ? 'Etapa cadastrada.' : 'Etapa atualizada.'); }
@@ -159,12 +172,22 @@ export function WhatsappSettingsCenter({
             <div className="divide-y divide-[#eee7dc]">
               {localTags.map((tag: any) => (
                 <div key={tag.id} className="p-3">
-                  <div className="grid gap-3 xl:grid-cols-[minmax(190px,1fr)_auto_120px_minmax(150px,auto)_auto] xl:items-center">
+                  <div className={`grid gap-3 xl:grid-cols-[minmax(190px,1fr)_auto_minmax(150px,auto)_auto] xl:items-center ${tag.active === false ? 'opacity-75' : ''}`}>
                     <input className="input compact-input" value={tag.name || ''} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, name: e.target.value } : row))} aria-label="Nome da tag" />
                     <ColorPalette compact value={tag.color || 'slate'} onChange={(color) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, color } : row))} />
-                    <select className="input compact-input" value={tag.active === false ? 'false' : 'true'} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, active: e.target.value === 'true' } : row))}><option value="true">Ativa</option><option value="false">Desativada</option></select>
-                    <TagPreview name={tag.name} color={tag.color} />
-                    <div className="flex items-center gap-1.5 xl:justify-end"><button type="button" disabled={busy} onClick={() => saveTag(tag)} className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-white" title="Salvar"><Save size={13}/></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Excluir a tag \"${tag.name}\"?`)) void api({ action:'delete_tag', id: tag.id }); }} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700" title="Excluir"><Trash2 size={13}/></button></div>
+                    <div className="min-w-0">
+                      <TagPreview name={tag.name} color={tag.color} />
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black ${tag.active === false ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>{tag.active === false ? 'Desativada' : 'Ativa'}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 xl:justify-end">
+                      <button type="button" disabled={busy || !String(tag.name || '').trim()} onClick={() => saveTag(tag)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-slate-900 px-2.5 text-[10px] font-black text-white disabled:opacity-50" title="Salvar alterações"><Save size={13}/>Salvar</button>
+                      {tag.active === false ? (
+                        <button type="button" disabled={busy} onClick={() => setTagActive(tag, true)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-black text-emerald-700 disabled:opacity-50" title="Ativar tag"><Power size={13}/>Ativar</button>
+                      ) : (
+                        <button type="button" disabled={busy} onClick={() => setTagActive(tag, false)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 text-[10px] font-black text-amber-800 disabled:opacity-50" title="Desativar tag"><PowerOff size={13}/>Desativar</button>
+                      )}
+                      <button type="button" disabled={busy} onClick={() => deleteTag(tag)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 text-[10px] font-black text-red-700 disabled:opacity-50" title="Excluir definitivamente"><Trash2 size={13}/>Excluir</button>
+                    </div>
                   </div>
                 </div>
               ))}

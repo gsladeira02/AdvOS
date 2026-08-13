@@ -66,17 +66,73 @@ export async function POST(req: Request) {
       return await settingsResponse(admin, profile.law_firm_id);
     }
 
+    if (action === 'set_tag_active') {
+      const id = text(body?.id, 80);
+      if (!id) throw new Error('Tag inválida.');
+      const active = body?.active === true;
+      const { data, error } = await admin
+        .from('whatsapp_tags')
+        .update({ active, updated_at: new Date().toISOString() })
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data?.id) throw new Error('Tag não encontrada.');
+      return await settingsResponse(admin, profile.law_firm_id);
+    }
+
     if (action === 'delete_tag') {
       const id = text(body?.id, 80);
       if (!id) throw new Error('Tag inválida.');
-      const { count } = await admin
+
+      const { data: tag, error: tagError } = await admin
+        .from('whatsapp_tags')
+        .select('id,name')
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', id)
+        .maybeSingle();
+      if (tagError) throw new Error(tagError.message);
+      if (!tag?.id) throw new Error('Tag não encontrada.');
+
+      const { data: links, error: linksError } = await admin
         .from('whatsapp_conversation_tags')
-        .select('conversation_id', { count: 'exact', head: true })
+        .select('conversation_id')
         .eq('law_firm_id', profile.law_firm_id)
         .eq('tag_id', id);
-      if (Number(count || 0) > 0) throw new Error('Essa tag já está em uso. Desative-a em vez de excluir.');
-      const { error } = await admin.from('whatsapp_tags').delete().eq('law_firm_id', profile.law_firm_id).eq('id', id);
+      if (linksError) throw new Error(linksError.message);
+
+      const conversationIds = Array.from(new Set((links || []).map((row: any) => String(row?.conversation_id || '')).filter(Boolean)));
+      const { error } = await admin
+        .from('whatsapp_tags')
+        .delete()
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', id);
       if (error) throw new Error(error.message);
+
+      // A FK remove os vínculos relacionais em cascata. Também limpamos o array legado
+      // mantido por compatibilidade com versões antigas e pesquisas simples.
+      if (conversationIds.length) {
+        const { data: conversations, error: conversationsError } = await admin
+          .from('whatsapp_conversations')
+          .select('id,tags')
+          .eq('law_firm_id', profile.law_firm_id)
+          .in('id', conversationIds);
+        if (conversationsError) throw new Error(conversationsError.message);
+        const removedName = String(tag.name || '').trim().toLocaleLowerCase('pt-BR');
+        for (const conversation of conversations || []) {
+          const nextTags = (Array.isArray(conversation?.tags) ? conversation.tags : [])
+            .map((value: any) => String(value || '').trim())
+            .filter((value: string) => value && value.toLocaleLowerCase('pt-BR') !== removedName);
+          const { error: updateError } = await admin
+            .from('whatsapp_conversations')
+            .update({ tags: nextTags, updated_at: new Date().toISOString() })
+            .eq('law_firm_id', profile.law_firm_id)
+            .eq('id', conversation.id);
+          if (updateError) throw new Error(updateError.message);
+        }
+      }
+
       return await settingsResponse(admin, profile.law_firm_id);
     }
 
