@@ -52,7 +52,8 @@ create table if not exists clients (
   address text,
   notes text,
   asaas_customer_id text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists cases (

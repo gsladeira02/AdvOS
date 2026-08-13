@@ -166,3 +166,11 @@ Para instalar no Android:
 1. Abrir `https://adv-os.vercel.app` no Chrome.
 2. Tocar no menu de três pontos.
 3. Tocar em Instalar app ou Adicionar à tela inicial.
+
+
+## V9.20 - Hotfix clients.updated_at
+
+Corrige o erro `column clients.updated_at does not exist` na central do WhatsApp/PWA.
+
+- Remove dependência do campo `clients.updated_at` nas consultas do WhatsApp.
+- Inclui migration `supabase/v9_20_clients_updated_at_hotfix.sql` para adicionar o campo de forma segura no banco existente.
