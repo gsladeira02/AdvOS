@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, CheckCircle2, Clock3, Inbox, MessageCircle, RefreshCw, TrendingUp, Users, XCircle } from 'lucide-react';
+import { Archive, BarChart3, CheckCircle2, Clock3, Inbox, MessageCircle, RefreshCw, TrendingUp, Users, XCircle } from 'lucide-react';
 
 const toneMap: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700',
@@ -113,7 +113,8 @@ export function WhatsappDashboard({ initialDashboard, leadPlural = 'Leads' }: { 
           <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-1">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-[10px] font-black uppercase text-emerald-700">Atendimento</p><p className="mt-1 text-xl font-black text-emerald-950">{dashboard.conversations.atendimento}</p></div>
             <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3"><p className="text-[10px] font-black uppercase text-indigo-700">Financeiro/Jurídico</p><p className="mt-1 text-xl font-black text-indigo-950">{dashboard.conversations.financeiroJuridico}</p></div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-black uppercase text-slate-600">Total de conversas</p><p className="mt-1 text-xl font-black text-slate-950">{dashboard.conversations.total}</p></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center gap-1.5"><Archive size={12} className="text-slate-500"/><p className="text-[10px] font-black uppercase text-slate-600">Encerradas</p></div><p className="mt-1 text-xl font-black text-slate-950">{dashboard.conversations.closed || 0}</p></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] font-black uppercase text-slate-600">Conversas ativas</p><p className="mt-1 text-xl font-black text-slate-950">{dashboard.conversations.total}</p></div>
             <div className="rounded-xl border border-amber-100 bg-amber-50 p-3"><p className="text-[10px] font-black uppercase text-amber-700">Novos últimos 30 dias</p><p className="mt-1 text-xl font-black text-amber-950">{dashboard.leads.new30d}</p></div>
           </div>
         </section>

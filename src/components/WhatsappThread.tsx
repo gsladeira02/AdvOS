@@ -365,7 +365,7 @@ export function WhatsappThread({
   onDraftApplied?: () => void;
   onSent?: (conversationId?: string) => void;
   onBack?: () => void;
-  onConversationChanged?: () => void;
+  onConversationChanged?: (change?: any) => void;
 }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<MessageListItem[]>(messages || []);
@@ -398,6 +398,7 @@ export function WhatsappThread({
   const appliedDraftRef = useRef('');
 
   const visibleItems = items || [];
+  const isClosed = Boolean(conversation?.closed_at);
 
   function clearRecordedAudio() {
     setRecordedAudio((current) => {
@@ -1089,10 +1090,10 @@ export function WhatsappThread({
             {live ? <Wifi size={12} /> : <WifiOff size={12} />}
             {live ? 'Ao vivo' : 'Offline'}
           </div>
-          <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Ligação pelo WhatsApp" onClick={() => setCallMode('voice')}>
+          <button type="button" disabled={isClosed} className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40" title={isClosed ? 'Reabra o atendimento para ligar' : 'Ligação pelo WhatsApp'} onClick={() => setCallMode('voice')}>
             <Phone size={15} />
           </button>
-          <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Videochamada pelo WhatsApp" onClick={() => setCallMode('video')}>
+          <button type="button" disabled={isClosed} className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40" title={isClosed ? 'Reabra o atendimento para iniciar videochamada' : 'Videochamada pelo WhatsApp'} onClick={() => setCallMode('video')}>
             <Video size={15} />
           </button>
           <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" onClick={clearConversation} title="Limpar conversa no AdvOS" disabled={conversation?.virtual}>
@@ -1165,6 +1166,13 @@ export function WhatsappThread({
         )}
       </div>
 
+      {isClosed ? (
+        <div className="shrink-0 border-t border-[#d7ded4] bg-[#f0f2f5] p-3">
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-sm">
+            Atendimento encerrado. Reabra a conversa acima para enviar mensagens, mídias ou iniciar chamadas.
+          </div>
+        </div>
+      ) : (
       <div className="shrink-0 border-t border-[#d7ded4] bg-[#f0f2f5] p-2.5">
         {file && (
           <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#d7ded4] bg-white px-3 py-2 text-xs shadow-sm">
@@ -1300,8 +1308,9 @@ export function WhatsappThread({
           {recording ? <p className="break-safe text-[10px] font-black leading-relaxed text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="break-safe text-[10px] font-bold leading-relaxed text-slate-600">{feedback}</p> : <p className="break-safe text-[10px] leading-relaxed text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>
+      )}
 
-      {specialKind && (
+      {!isClosed && specialKind && (
         <WhatsappSpecialComposer
           kind={specialKind}
           conversation={conversation}
@@ -1309,7 +1318,7 @@ export function WhatsappThread({
           onSent={(conversationId) => { onSent?.(conversationId || conversation?.id); window.setTimeout(() => refreshThreadMessages(true), 250); }}
         />
       )}
-      {callMode && <WhatsappCallPanel conversation={conversation} mode={callMode} onClose={() => setCallMode(null)} />}
+      {!isClosed && callMode && <WhatsappCallPanel conversation={conversation} mode={callMode} onClose={() => setCallMode(null)} />}
     </div>
   );
 }

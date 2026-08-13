@@ -1,13 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Tag, UserPlus, X } from 'lucide-react';
+import { Archive, Check, ChevronDown, RotateCcw, Tag, UserPlus, X } from 'lucide-react';
 
 const colorClasses: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700', sky: 'bg-sky-100 text-sky-700', emerald: 'bg-emerald-100 text-emerald-700', violet: 'bg-violet-100 text-violet-700', amber: 'bg-amber-100 text-amber-800', rose: 'bg-rose-100 text-rose-700', red: 'bg-red-100 text-red-700', green: 'bg-green-100 text-green-700', indigo: 'bg-indigo-100 text-indigo-700',
 };
 function tagTone(value?: string) { return colorClasses[String(value || '')] || colorClasses.slate; }
 function departmentLabel(value?: string | null) { return value === 'financeiro_juridico' ? 'Financeiro/Jurídico' : 'Atendimento'; }
+function closedAtLabel(value?: string | null) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
 
 export function WhatsappConversationControls({
   conversation,
@@ -20,7 +28,7 @@ export function WhatsappConversationControls({
   availableTags?: any[];
   leadStages?: any[];
   leadLabel?: string;
-  onChanged?: () => void;
+  onChanged?: (change?: any) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -52,6 +60,7 @@ export function WhatsappConversationControls({
   const isClient = Boolean(conversation?.client_id || conversation?.clients?.id);
   const isLead = Boolean(!isClient && conversation?.lead);
   const department = conversation?.department || 'atendimento';
+  const isClosed = Boolean(conversation?.closed_at);
 
   async function action(payload: Record<string, any>) {
     setBusy(true); setFeedback(null);
@@ -61,7 +70,7 @@ export function WhatsappConversationControls({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível atualizar a conversa.');
-      onChanged?.();
+      onChanged?.(result);
       return result;
     } catch (error: any) {
       setFeedback(error?.message || 'Não foi possível atualizar a conversa.');
@@ -99,8 +108,19 @@ export function WhatsappConversationControls({
     <>
       <div className="shrink-0 border-b border-[#d7ded4] bg-white px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${department === 'financeiro_juridico' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>{departmentLabel(department)}</span>
-          <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'set_department', department: department === 'atendimento' ? 'financeiro_juridico' : 'atendimento' })} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Transferir para {department === 'atendimento' ? 'Financeiro/Jurídico' : 'Atendimento'}</button>
+          {isClosed ? (
+            <>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700"><Archive size={10}/>Encerrada</span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-500">Origem: {departmentLabel(conversation?.closed_from_department || department)}</span>
+              <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'reopen_conversation' })} className="inline-flex items-center gap-1 rounded-full bg-[#075e54] px-2.5 py-1 text-[9px] font-black text-white transition hover:bg-[#064e47] disabled:opacity-50"><RotateCcw size={10}/>Reabrir atendimento</button>
+            </>
+          ) : (
+            <>
+              <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${department === 'financeiro_juridico' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>{departmentLabel(department)}</span>
+              <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'set_department', department: department === 'atendimento' ? 'financeiro_juridico' : 'atendimento' })} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Transferir para {department === 'atendimento' ? 'Financeiro/Jurídico' : 'Atendimento'}</button>
+              <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'close_conversation' })} className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"><Archive size={10}/>Encerrar</button>
+            </>
+          )}
 
           {isLead && (
             <select value={conversation?.lead?.stage || leadStage} disabled={busy} onChange={(event) => action({ action: 'update_lead', stage: event.target.value })} className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800 outline-none" title={`Etapa do ${leadLabel.toLowerCase()}`}>
@@ -131,6 +151,7 @@ export function WhatsappConversationControls({
           </div>
         )}
 
+        {isClosed && <p className="mt-1.5 text-[9px] font-bold text-slate-500">Encerrada em {closedAtLabel(conversation?.closed_at) || 'data não informada'}. O histórico permanece disponível.</p>}
         {isLead && <p className="mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'} · só vira cliente após confirmação manual.</p>}
         {feedback && <p className="mt-1.5 text-[9px] font-bold text-slate-600">{feedback}</p>}
       </div>

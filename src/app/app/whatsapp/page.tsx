@@ -99,14 +99,16 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       || (contacts || []).find((item: any) => item.id === selectedId || item.conversation_id === selectedId)
       || null)
     : null;
-  const requestedAllowedView = requestedView === 'dashboard' || requestedView === 'financeiro_juridico' || requestedView === 'atendimento' || (requestedView === 'configuracoes' && canConfigure)
+  const requestedAllowedView = requestedView === 'dashboard' || requestedView === 'financeiro_juridico' || requestedView === 'atendimento' || requestedView === 'encerrados' || (requestedView === 'configuracoes' && canConfigure)
     ? requestedView
     : '';
   const initialView = requestedAllowedView
     ? requestedAllowedView
-    : selected?.department === 'financeiro_juridico'
-      ? 'financeiro_juridico'
-      : 'atendimento';
+    : selected?.closed_at
+      ? 'encerrados'
+      : selected?.department === 'financeiro_juridico'
+        ? 'financeiro_juridico'
+        : 'atendimento';
 
   const { data: messages } = selected && !selected.virtual
     ? await admin
@@ -124,7 +126,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     <div>
       <PageHeader
         title="WhatsApp"
-        subtitle={`Atendimento e Financeiro/Jurídico com ${String(whatsappSettings.preferences?.lead_label_plural || 'Leads').toLowerCase()}, tags, clientes e histórico centralizado.`}
+        subtitle={`Atendimento, Financeiro/Jurídico e Encerrados com ${String(whatsappSettings.preferences?.lead_label_plural || 'Leads').toLowerCase()}, tags, clientes e histórico centralizado.`}
         action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar integração</Link>}
       />
 

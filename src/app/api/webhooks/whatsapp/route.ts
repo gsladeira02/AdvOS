@@ -295,11 +295,18 @@ export async function POST(req: Request) {
           });
         }
 
+        const reopenedDepartment = conversation?.closed_at
+          ? (conversation?.closed_from_department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento')
+          : (conversation?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento');
+
         const { error: conversationUpdateError } = await admin
           .from('whatsapp_conversations')
           .update({
             client_id: client?.id || conversation.client_id || null,
             lead_name: client?.name || contact?.profile?.name || conversation.lead_name || null,
+            status: 'aberta',
+            department: reopenedDepartment,
+            closed_at: null,
             last_message_at: messageCreatedAt,
             unread_count: Number(conversation.unread_count || 0) + 1,
             updated_at: new Date().toISOString(),

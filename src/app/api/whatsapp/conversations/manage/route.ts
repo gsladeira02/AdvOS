@@ -105,7 +105,49 @@ export async function POST(req: Request) {
 
     const conversation = await loadConversation(admin, profile.law_firm_id, conversationId);
 
+    if (action === 'close_conversation') {
+      if (conversation?.closed_at) {
+        return NextResponse.json({ ok: true, closed: true, alreadyClosed: true, closedAt: conversation.closed_at });
+      }
+      const department = DEPARTMENTS.has(String(conversation?.department || '')) ? String(conversation.department) : 'atendimento';
+      const closedAt = new Date().toISOString();
+      const { error } = await admin
+        .from('whatsapp_conversations')
+        .update({
+          status: 'encerrada',
+          closed_at: closedAt,
+          closed_from_department: department,
+          updated_at: closedAt,
+        })
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', conversationId);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, closed: true, closedAt, department });
+    }
+
+    if (action === 'reopen_conversation') {
+      const department = DEPARTMENTS.has(String(conversation?.closed_from_department || ''))
+        ? String(conversation.closed_from_department)
+        : DEPARTMENTS.has(String(conversation?.department || ''))
+          ? String(conversation.department)
+          : 'atendimento';
+      const now = new Date().toISOString();
+      const { error } = await admin
+        .from('whatsapp_conversations')
+        .update({
+          status: 'aberta',
+          department,
+          closed_at: null,
+          updated_at: now,
+        })
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', conversationId);
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, reopened: true, department });
+    }
+
     if (action === 'set_department') {
+      if (conversation?.closed_at) return NextResponse.json({ ok: false, error: 'Reabra a conversa antes de transferir de setor.' }, { status: 400 });
       const department = text(body?.department, 40);
       if (!DEPARTMENTS.has(department)) return NextResponse.json({ ok: false, error: 'Setor inválido.' }, { status: 400 });
       const { error } = await admin

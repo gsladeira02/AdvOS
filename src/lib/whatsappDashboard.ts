@@ -15,7 +15,7 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
       .eq('law_firm_id', lawFirmId),
     admin
       .from('whatsapp_conversations')
-      .select('id,department,unread_count,last_message_at')
+      .select('id,department,unread_count,last_message_at,closed_at')
       .eq('law_firm_id', lawFirmId),
     admin
       .from('whatsapp_lead_stages')
@@ -57,7 +57,9 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
   }
 
   const conversationRows = conversations || [];
-  const unreadConversations = conversationRows.filter((conversation: any) => Number(conversation.unread_count || 0) > 0);
+  const activeConversationRows = conversationRows.filter((conversation: any) => !conversation.closed_at);
+  const closedConversationRows = conversationRows.filter((conversation: any) => Boolean(conversation.closed_at));
+  const unreadConversations = activeConversationRows.filter((conversation: any) => Number(conversation.unread_count || 0) > 0);
   const decisionBase = wonLeads.length + lostLeads.length;
 
   const tagCounts = new Map<string, { id: string; name: string; color: string; count: number }>();
@@ -84,9 +86,11 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
       byStage,
     },
     conversations: {
-      total: conversationRows.length,
-      atendimento: conversationRows.filter((conversation: any) => (conversation.department || 'atendimento') === 'atendimento').length,
-      financeiroJuridico: conversationRows.filter((conversation: any) => conversation.department === 'financeiro_juridico').length,
+      total: activeConversationRows.length,
+      totalWithClosed: conversationRows.length,
+      atendimento: activeConversationRows.filter((conversation: any) => (conversation.department || 'atendimento') === 'atendimento').length,
+      financeiroJuridico: activeConversationRows.filter((conversation: any) => conversation.department === 'financeiro_juridico').length,
+      closed: closedConversationRows.length,
       unreadConversations: unreadConversations.length,
       unreadMessages: unreadConversations.reduce((sum: number, conversation: any) => sum + Number(conversation.unread_count || 0), 0),
     },
