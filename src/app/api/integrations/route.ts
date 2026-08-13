@@ -1,34 +1,27 @@
+import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { defaultBaseUrl, tokenLast4 } from '@/lib/integrations';
+import { defaultBaseUrl, safeIntegrationBaseUrl, tokenLast4 } from '@/lib/integrations';
 
 function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
 }
 
-function sanitizeGraphBaseUrl(value: string) {
-  const raw = String(value || '').trim();
-  const markdown = raw.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-  const clean = (markdown?.[2] || raw).replace(/^<|>$/g, '').replace(/\s+/g, '').replace(/\/+$/, '');
-  const match = clean.match(/^(https:\/\/graph\.facebook\.com\/v[0-9.]+)/i);
-  return match?.[1] || clean;
-}
-
 export async function POST(req: Request) {
-  const { session, profile } = await getCurrentProfile();
+  const { session, profile } = await getCurrentAdminProfile();
   const f = await req.formData();
-  const provider = str(f.get('provider'));
+  const provider = str(f.get('provider')) as 'zapsign' | 'asaas' | 'whatsapp';
 
   if (!['zapsign', 'asaas', 'whatsapp'].includes(provider)) {
     return NextResponse.json({ error: 'Integração inválida.' }, { status: 400 });
   }
 
-  const environment = str(f.get('environment')) || 'sandbox';
+  const environment = str(f.get('environment')) === 'producao' ? 'producao' : 'sandbox';
   const apiToken = str(f.get('api_token'));
-  const apiBaseUrlRaw = str(f.get('api_base_url')) || defaultBaseUrl(provider as any, environment);
-  const apiBaseUrl = provider === 'whatsapp' ? sanitizeGraphBaseUrl(apiBaseUrlRaw) : apiBaseUrlRaw;
-  const webhookSecret = str(f.get('webhook_secret'));
+  const requestedBaseUrl = str(f.get('api_base_url')) || defaultBaseUrl(provider, environment);
+  const apiBaseUrl = safeIntegrationBaseUrl(provider, environment, requestedBaseUrl);
+  const submittedWebhookSecret = str(f.get('webhook_secret'));
   const enabled = str(f.get('enabled')) === 'true';
   const admin = createAdminSupabase();
 
@@ -48,6 +41,10 @@ export async function POST(req: Request) {
     profile_picture_note: str(f.get('profile_picture_note')),
   } : existing.data?.raw_settings || null;
 
+  const zapsignSecret = provider === 'zapsign'
+    ? (existing.data?.webhook_secret || randomBytes(32).toString('hex'))
+    : null;
+
   const payload: any = {
     law_firm_id: profile.law_firm_id,
     provider,
@@ -55,7 +52,7 @@ export async function POST(req: Request) {
     environment,
     api_base_url: apiBaseUrl,
     default_billing_type: provider === 'asaas' ? str(f.get('default_billing_type')) || 'BOLETO' : null,
-    webhook_secret: webhookSecret || existing.data?.webhook_secret || null,
+    webhook_secret: zapsignSecret || submittedWebhookSecret || existing.data?.webhook_secret || null,
     raw_settings: rawSettings,
     status: enabled ? 'configurado' : 'desativado',
     updated_at: new Date().toISOString(),
@@ -73,7 +70,7 @@ export async function POST(req: Request) {
     .from('integration_settings')
     .upsert(payload, { onConflict: 'law_firm_id,provider' });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return NextResponse.json({ error: 'Não foi possível salvar a integração.' }, { status: 400 });
 
   await admin.from('activity_logs').insert({
     law_firm_id: profile.law_firm_id,

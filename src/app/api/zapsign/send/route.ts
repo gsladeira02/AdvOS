@@ -51,20 +51,19 @@ export async function POST(req: Request) {
     return NextResponse.redirect(new URL('/app/documentos?zap=configuracao', req.url), 303);
   }
 
-  if (!doc.external_url) {
-    await saveSignature({ ...basePayload, status: 'sem_pdf_publico' });
-    return NextResponse.redirect(new URL('/app/documentos?zap=sem-pdf', req.url), 303);
+  if (!doc.storage_path) {
+    // O servidor não baixa PDFs de URLs arbitrárias. Isso evita SSRF e
+    // garante que apenas arquivos já armazenados no bucket privado sejam enviados.
+    await saveSignature({ ...basePayload, status: 'sem_arquivo_privado' });
+    return NextResponse.redirect(new URL('/app/clientes?zap=sem-arquivo', req.url), 303);
   }
 
   try {
-    const pdfResponse = await fetch(doc.external_url);
-    if (!pdfResponse.ok) throw new Error('Não foi possível baixar o PDF informado.');
-    const contentType = pdfResponse.headers.get('content-type') || '';
-    if (!contentType.includes('pdf') && !doc.external_url.toLowerCase().includes('.pdf')) {
-      throw new Error('O link informado não parece ser um PDF público.');
-    }
+    const { data: storedFile, error: downloadError } = await admin.storage.from('documents').download(doc.storage_path);
+    if (downloadError || !storedFile) throw new Error('Não foi possível carregar o PDF privado.');
+    if (storedFile.size > 25 * 1024 * 1024) throw new Error('PDF excede o limite de 25 MB.');
 
-    const arrayBuffer = await pdfResponse.arrayBuffer();
+    const arrayBuffer = await storedFile.arrayBuffer();
     const base64Pdf = Buffer.from(arrayBuffer).toString('base64');
     const phoneNumber = cleanPhone(signerPhone);
 

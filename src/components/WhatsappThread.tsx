@@ -162,10 +162,13 @@ function mediaKind(message: any) {
 }
 function mediaDisplayUrl(message: any) {
   const id = String(message?.id || '').trim();
-  if (message?.storage_path && id && !id.startsWith('local-')) return `/api/whatsapp/media/${encodeURIComponent(id)}`;
+  if (id && !id.startsWith('local-')) return `/api/whatsapp/media/${encodeURIComponent(id)}`;
+
+  // Somente previews locais podem usar URL direta (blob:). Mídia persistida sempre
+  // passa pelo endpoint autenticado do AdvOS, evitando URLs externas arbitrárias no DOM.
   const direct = String(message?.media_url || message?.raw_payload?.advos_media_url || '').trim();
-  if (direct.startsWith('http')) return direct;
-  return id && !id.startsWith('local-') ? `/api/whatsapp/media/${encodeURIComponent(id)}` : '';
+  if (id.startsWith('local-') && direct.startsWith('blob:')) return direct;
+  return '';
 }
 
 function mediaDownloadUrl(message: any) {

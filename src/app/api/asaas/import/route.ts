@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { assertContentLength, SecurityError } from '@/lib/security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 50_000;
+const ALLOWED_IMPORT_EXTENSIONS = /\.(xlsx|xls|csv)$/i;
 
 type ExistingClient = {
   id: string;
@@ -190,8 +195,14 @@ function safeRedirect(req: Request, params: Record<string, string | number>) {
 }
 
 export async function POST(req: Request) {
-  const { session, profile } = await getCurrentProfile();
+  const { session, profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
+  try {
+    assertContentLength(req, 12 * 1024 * 1024);
+  } catch (error: any) {
+    const message = error instanceof SecurityError ? error.message : 'Arquivo muito grande.';
+    return safeRedirect(req, { erro: message });
+  }
   const form = await req.formData();
   const file = form.get('file');
   const importType = str(form.get('import_type')) || 'auto';
@@ -204,11 +215,18 @@ export async function POST(req: Request) {
   }
 
   const fileName = file.name || 'importacao-asaas.xlsx';
+  if (!ALLOWED_IMPORT_EXTENSIONS.test(fileName)) {
+    return safeRedirect(req, { erro: 'Formato não permitido. Envie XLSX, XLS ou CSV.' });
+  }
+  if (!file.size || file.size > MAX_IMPORT_FILE_SIZE) {
+    return safeRedirect(req, { erro: 'A planilha deve ter no máximo 10 MB.' });
+  }
   const stats: ImportStats = { insertedClients: 0, updatedClients: 0, insertedPayments: 0, updatedPayments: 0, skippedRows: 0, errors: [] };
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const rows = readRows(fileName, buffer);
+    if (rows.length > MAX_IMPORT_ROWS) return safeRedirect(req, { erro: `A planilha excede o limite de ${MAX_IMPORT_ROWS.toLocaleString('pt-BR')} linhas.` });
     if (!rows.length) return safeRedirect(req, { erro: 'Nenhuma linha encontrada no arquivo.' });
 
     const { data: existingRows } = await admin

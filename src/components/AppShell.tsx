@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { createServerSupabase } from '@/lib/supabase/server';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import { CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
 
@@ -28,20 +29,16 @@ const mobileItems = [
 ] as const;
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const supabase = await createServerSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect('/login');
-
-  const { data: profile } = await supabase
+  const { session, profile } = await getCurrentProfile();
+  const admin = createAdminSupabase();
+  const { data: profileWithFirm } = await admin
     .from('profiles')
     .select('*, law_firms(name)')
-    .eq('auth_user_id', session.user.id)
+    .eq('id', profile.id)
     .maybeSingle();
 
-  if (profile?.status && profile.status !== 'ativo') redirect('/login?erro=inativo');
-
-  if (profile?.law_firm_id) {
-    const { data: sub } = await supabase
+  if (profile.law_firm_id) {
+    const { data: sub } = await admin
       .from('subscriptions')
       .select('status,current_period_end,grace_until')
       .eq('law_firm_id', profile.law_firm_id)
@@ -53,8 +50,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const firmName = profile?.law_firms?.name || 'AdvOS interno';
-  const userName = profile?.full_name || session.user.email || 'Usuário';
+  const navigationItems = isAdminRole(profile.role)
+    ? items
+    : items.filter(([href]) => !['/app/usuarios', '/app/integracoes', '/app/integracoes/asaas/importar'].includes(href));
+
+  const firmName = profileWithFirm?.law_firms?.name || 'AdvOS interno';
+  const userName = profile.full_name || session.user.email || 'Usuário';
 
   return (
     <div className="page-shell">
@@ -66,7 +67,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className="flex w-full flex-1 flex-col gap-1 overflow-y-auto pb-3 pr-0.5">
-            {items.map(([href, label, Icon]) => (
+            {navigationItems.map(([href, label, Icon]) => (
               <Link key={href} href={href} title={label} aria-label={label} className="group flex h-8 items-center gap-2 rounded-xl px-2 text-[11px] font-black text-slate-600 transition hover:bg-[#fbf7ef] hover:text-slate-950">
                 <Icon size={14} className="shrink-0 text-slate-500 transition group-hover:text-slate-900" />
                 <span className="truncate leading-none">{label}</span>

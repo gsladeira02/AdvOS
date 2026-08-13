@@ -8,16 +8,16 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
 
 export default async function Financeiro() {
-  const { supabase, profile } = await getCurrentProfile();
+  const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
 
   const [items, clients, firmRes, templatesRes] = await Promise.all([
-    supabase
+    admin
       .from('financial_installments')
       .select('*, financial_contracts(description, clients(id,name,doc,email,phone,whatsapp,asaas_customer_id))')
       .eq('law_firm_id', profile.law_firm_id)
       .order('due_date', { ascending: true }),
-    supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id).order('name'),
+    admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id).order('name'),
     admin.from('law_firms').select('name,phone').eq('id', profile.law_firm_id).maybeSingle(),
     admin
       .from('message_templates')

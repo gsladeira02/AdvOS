@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export default async function Configuracoes(){
-  const {supabase,profile}=await getCurrentProfile();
-  const {data:firm}=await supabase.from('law_firms').select('*').eq('id',profile.law_firm_id).maybeSingle();
-  const {data:sub}=await supabase.from('subscriptions').select('*').eq('law_firm_id',profile.law_firm_id).maybeSingle();
+  const {profile}=await getCurrentProfile();
+  const admin=createAdminSupabase();
+  const {data:firm}=await admin.from('law_firms').select('*').eq('id',profile.law_firm_id).maybeSingle();
+  const {data:sub}=await admin.from('subscriptions').select('*').eq('law_firm_id',profile.law_firm_id).maybeSingle();
   const needsSetup = !firm?.name || !firm?.email || !firm?.phone;
+  const canAdmin = isAdminRole(profile.role);
 
   return <div>
     <PageHeader title="Configurações" subtitle="Atualize os dados do escritório, do seu usuário e do acesso ao sistema." />
@@ -14,7 +17,7 @@ export default async function Configuracoes(){
       Complete os dados principais do escritório para manter cadastros, documentos e comunicações corretamente identificados.
     </section>}
     <div className="grid gap-6 lg:grid-cols-2">
-      <form action="/api/settings" method="post" className="card p-6">
+      {canAdmin && <form action="/api/settings" method="post" className="card p-6">
         <input type="hidden" name="section" value="firm" />
         <h2 className="text-xl font-black">Escritório</h2>
         <div className="mt-5 space-y-4">
@@ -30,7 +33,7 @@ export default async function Configuracoes(){
           <div><label className="label">Endereço</label><input name="address" defaultValue={firm?.address||''} className="input mt-1" /></div>
         </div>
         <button className="btn btn-primary mt-6">Salvar escritório</button>
-      </form>
+      </form>}
 
       <form action="/api/settings" method="post" className="card p-6">
         <input type="hidden" name="section" value="profile" />
@@ -46,7 +49,7 @@ export default async function Configuracoes(){
         <button className="btn btn-primary mt-6">Salvar usuário</button>
       </form>
 
-      <form action="/api/settings" method="post" className="card p-6 lg:col-span-2">
+      {canAdmin && <form action="/api/settings" method="post" className="card p-6 lg:col-span-2">
         <input type="hidden" name="section" value="subscription" />
         <h2 className="text-xl font-black">Acesso interno</h2>
         <p className="mt-1 text-sm text-slate-500">Controle interno do período de acesso do escritório.</p>
@@ -57,7 +60,7 @@ export default async function Configuracoes(){
           <div><label className="label">Tolerância até</label><input name="grace_until" type="date" defaultValue={sub?.grace_until||''} className="input mt-1" /></div>
         </div>
         <button className="btn btn-primary mt-6">Salvar acesso</button>
-      </form>
+      </form>}
     </div>
   </div>
 }

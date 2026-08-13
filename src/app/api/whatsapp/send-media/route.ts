@@ -3,6 +3,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
+import { assertContentLength, SecurityError } from '@/lib/security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -111,6 +112,7 @@ async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) 
 export async function POST(req: Request) {
   try {
     const { session, profile } = await getCurrentProfile();
+    assertContentLength(req, 18 * 1024 * 1024);
     const form = await req.formData();
     const file = form.get('file');
     const phone = normalizeBrazilPhone(str(form.get('phone') || form.get('to')));
@@ -140,7 +142,7 @@ export async function POST(req: Request) {
     });
     if (upload.error) throw new Error(upload.error.message);
 
-    const signed = await admin.storage.from('documents').createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+    const signed = await admin.storage.from('documents').createSignedUrl(storagePath, 60 * 15);
     if (signed.error || !signed.data?.signedUrl) {
       await admin.storage.from('documents').remove([storagePath]).catch(() => null);
       throw new Error(signed.error?.message || 'Não foi possível gerar link temporário do arquivo.');
@@ -183,6 +185,7 @@ export async function POST(req: Request) {
       throw error;
     }
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar arquivo pelo WhatsApp.' }, { status: 400 });
+    const status = error instanceof SecurityError ? error.status : 400;
+    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar arquivo pelo WhatsApp.' }, { status });
   }
 }

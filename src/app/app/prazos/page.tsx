@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import { dateBR, deadlineClass } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -20,11 +21,12 @@ function priorityLabel(value?: string) {
 }
 
 export default async function Prazos() {
-  const { supabase, profile } = await getCurrentProfile();
+  const { profile } = await getCurrentProfile();
+  const admin = createAdminSupabase();
   const [deadlines, clients, cases] = await Promise.all([
-    supabase.from('deadlines').select('*, clients(name), cases(case_number)').eq('law_firm_id', profile.law_firm_id).order('due_date'),
-    supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
-    supabase.from('cases').select('id,case_number').eq('law_firm_id', profile.law_firm_id),
+    admin.from('deadlines').select('*, clients(name), cases(case_number)').eq('law_firm_id', profile.law_firm_id).order('due_date'),
+    admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
+    admin.from('cases').select('id,case_number').eq('law_firm_id', profile.law_firm_id),
   ]);
 
   const rows = deadlines.data || [];

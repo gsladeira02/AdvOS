@@ -1,8 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { assertContentLength, SecurityError } from '@/lib/security';
 
 export const runtime = 'nodejs';
+
+const MAX_FILES_PER_REQUEST = 10;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const BLOCKED_EXTENSIONS = /\.(?:html?|svg|js|mjs|cjs|exe|dll|msi|bat|cmd|com|scr|ps1|sh|jar)$/i;
+const BLOCKED_MIME_TYPES = new Set([
+  'text/html',
+  'image/svg+xml',
+  'application/javascript',
+  'text/javascript',
+  'application/x-msdownload',
+  'application/x-sh',
+]);
+
+function validateFile(file: File) {
+  if (file.size > MAX_FILE_SIZE) return 'Cada arquivo deve ter no máximo 25 MB.';
+  if (BLOCKED_EXTENSIONS.test(file.name || '')) return 'Este tipo de arquivo não é permitido.';
+  if (BLOCKED_MIME_TYPES.has(String(file.type || '').toLowerCase())) return 'Este tipo de arquivo não é permitido.';
+  return null;
+}
 
 function str(v: FormDataEntryValue | null) { return String(v || '').trim(); }
 function safeName(value: string) {
@@ -22,6 +42,12 @@ function displayNameFromFile(file: File, customTitle?: string) {
 
 export async function POST(req: Request) {
   const { profile } = await getCurrentProfile();
+  try {
+    assertContentLength(req, MAX_FILES_PER_REQUEST * MAX_FILE_SIZE + 1024 * 1024);
+  } catch (error: any) {
+    const payload = { error: error instanceof SecurityError ? error.message : 'Envio muito grande.' };
+    return NextResponse.json(payload, { status: 413 });
+  }
   const form = await req.formData();
   const clientId = str(form.get('client_id'));
   const ajax = str(form.get('ajax')) === '1';
@@ -53,6 +79,19 @@ export async function POST(req: Request) {
     return ajax ? NextResponse.json(payload, { status: 400 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
   }
 
+  if (files.length > MAX_FILES_PER_REQUEST) {
+    const payload = { error: `Envie no máximo ${MAX_FILES_PER_REQUEST} arquivos por vez.` };
+    return ajax ? NextResponse.json(payload, { status: 413 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
+  }
+
+  for (const file of files) {
+    const validationError = validateFile(file);
+    if (validationError) {
+      const payload = { error: validationError };
+      return ajax ? NextResponse.json(payload, { status: 415 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
+    }
+  }
+
   const titles = form.getAll('titles').map((value) => String(value || '').trim());
   const legacyTitle = str(form.get('title'));
   const uploaded: any[] = [];
@@ -71,7 +110,7 @@ export async function POST(req: Request) {
     });
 
     if (upload.error) {
-      const payload = { error: upload.error.message, uploaded };
+      const payload = { error: 'Não foi possível armazenar o arquivo.', uploaded };
       return ajax ? NextResponse.json(payload, { status: 400 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
     }
 
@@ -87,7 +126,7 @@ export async function POST(req: Request) {
 
     if (insertError) {
       await admin.storage.from('documents').remove([storagePath]).catch(() => null);
-      const payload = { error: insertError.message, uploaded };
+      const payload = { error: 'Arquivo armazenado, mas não foi possível registrar o documento.', uploaded };
       return ajax ? NextResponse.json(payload, { status: 400 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
     }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeInternalPath } from '@/lib/security';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getIntegrationConfig } from '@/lib/integrations';
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
   const f = await req.formData();
   const installmentId = str(f.get('installment_id'));
   const requestedBillingType = str(f.get('billingType'));
-  const redirectTo = str(f.get('redirect_to')) || '/app/financeiro';
+  const redirectTo = safeInternalPath(str(f.get('redirect_to')), '/app/financeiro');
   const admin = createAdminSupabase();
 
   const { data: installment } = await admin

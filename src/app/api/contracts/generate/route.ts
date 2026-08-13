@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeInternalPath } from '@/lib/security';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
@@ -576,6 +577,6 @@ export async function POST(req: Request) {
     entity_id: generated?.id || null,
   });
 
-  const redirectTo = data.redirect_to || (data.client_id ? `/app/clientes/${data.client_id}?gerado=1` : '/app/clientes?gerado=1');
+  const redirectTo = safeInternalPath(data.redirect_to, data.client_id ? `/app/clientes/${data.client_id}?gerado=1` : '/app/clientes?gerado=1');
   return NextResponse.redirect(new URL(redirectTo, req.url), 303);
 }

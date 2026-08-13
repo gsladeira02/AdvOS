@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { firstTextFromInboundMessage, getOrCreateConversation, getWhatsAppConfig } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
+import { readRawBody, verifyMetaWebhookSignature, SecurityError } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -84,8 +85,15 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     });
     if (!fileResponse.ok) throw new Error('Falha ao baixar mídia recebida.');
 
+    const maxInboundMedia = 25 * 1024 * 1024;
+    const declaredSize = Number(fileResponse.headers.get('content-length') || meta.file_size || 0);
+    if (Number.isFinite(declaredSize) && declaredSize > maxInboundMedia) {
+      throw new Error('Mídia recebida excede o limite seguro de 25 MB.');
+    }
+
     const mimeType = meta.mime_type || mediaNode?.mime_type || fileResponse.headers.get('content-type') || 'application/octet-stream';
     const bytes = Buffer.from(await fileResponse.arrayBuffer());
+    if (bytes.length > maxInboundMedia) throw new Error('Mídia recebida excede o limite seguro de 25 MB.');
     const baseName = safeFileName(mediaNode?.filename || `${messageType}-${mediaId}.${extensionFromMime(mimeType)}`);
     const storagePath = `${lawFirmId}/whatsapp/inbound/${Date.now()}-${baseName}`;
 
@@ -95,10 +103,8 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     });
     if (upload.error) throw new Error(upload.error.message);
 
-    const signed = await admin.storage.from('documents').createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
     return {
-      mediaUrl: signed.data?.signedUrl || null,
+      mediaUrl: mediaId,
       storagePath,
       mimeType,
       fileSize: Number(meta.file_size || bytes.length || 0) || null,
@@ -166,7 +172,26 @@ async function saveInboundMessage(admin: any, payload: any) {
 }
 
 export async function POST(req: Request) {
-  const payload = await req.json().catch(() => ({}));
+  let payload: any;
+  try {
+    const rawBody = await readRawBody(req, 2 * 1024 * 1024);
+    const appSecret = String(process.env.WHATSAPP_APP_SECRET || '').trim();
+
+    // Em produção, eventos da Meta só são aceitos quando o corpo possui
+    // X-Hub-Signature-256 válida, calculada com o App Secret da aplicação Meta.
+    if (!appSecret && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ ok: false, error: 'Webhook não configurado com App Secret.' }, { status: 503 });
+    }
+    if (appSecret && !verifyMetaWebhookSignature(rawBody, req.headers.get('x-hub-signature-256'), appSecret)) {
+      return NextResponse.json({ ok: false, error: 'Assinatura inválida.' }, { status: 401 });
+    }
+
+    payload = rawBody ? JSON.parse(rawBody) : {};
+  } catch (error: any) {
+    const status = error instanceof SecurityError ? error.status : 400;
+    return NextResponse.json({ ok: false, error: 'Webhook inválido.' }, { status });
+  }
+
   const admin = createAdminSupabase();
 
   const { data: integrations } = await admin

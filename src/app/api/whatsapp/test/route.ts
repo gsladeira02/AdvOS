@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getWhatsAppConfig } from '@/lib/whatsappApi';
 
 export async function POST(req: Request) {
   try {
-    const { profile } = await getCurrentProfile();
+    const { profile } = await getCurrentAdminProfile();
     const config = await getWhatsAppConfig(profile.law_firm_id);
 
     if (!config.enabled || !config.token || !config.phoneNumberId) {

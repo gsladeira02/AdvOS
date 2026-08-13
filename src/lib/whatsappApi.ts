@@ -1,4 +1,5 @@
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { safeIntegrationBaseUrl } from '@/lib/integrations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export type WhatsAppConfig = {
@@ -117,7 +118,7 @@ export async function getWhatsAppConfig(lawFirmId: string): Promise<WhatsAppConf
   const wabaId = String(raw.waba_id || process.env.WHATSAPP_WABA_ID || '').trim().replace(/\D/g, '');
   const businessPhone = raw.business_phone || process.env.WHATSAPP_BUSINESS_PHONE || '';
   const version = raw.graph_version || process.env.WHATSAPP_GRAPH_VERSION || 'v22.0';
-  const baseUrl = normalizeBaseUrl(data?.api_base_url || process.env.WHATSAPP_API_BASE_URL || defaultWhatsAppBaseUrl(version));
+  const baseUrl = safeIntegrationBaseUrl('whatsapp', data?.environment || 'producao', data?.api_base_url || process.env.WHATSAPP_API_BASE_URL || defaultWhatsAppBaseUrl(version));
   const verifyToken = data?.webhook_secret || process.env.WHATSAPP_VERIFY_TOKEN || '';
 
   return {
@@ -481,11 +482,11 @@ export async function sendWhatsAppMediaBuffer(input: {
     external_id: externalId,
     status: 'sent',
     sent_by: input.sentBy || null,
-    raw_payload: { ...payload, advos_media_id: mediaId, advos_media_url: input.mediaUrl || null, advos_storage_path: input.storagePath || null },
+    raw_payload: { ...payload, advos_media_id: mediaId, advos_storage_path: input.storagePath || null },
     file_name: input.fileName || null,
     file_size: input.fileSize || null,
     mime_type: input.mimeType || null,
-    media_url: input.mediaUrl || null,
+    media_url: null,
     storage_path: input.storagePath || null,
   }).select('*').single();
 
@@ -562,11 +563,11 @@ export async function sendWhatsAppMedia(input: {
     external_id: externalId,
     status: 'sent',
     sent_by: input.sentBy || null,
-    raw_payload: { ...payload, advos_media_url: mediaUrl, advos_storage_path: input.storagePath || null },
+    raw_payload: { ...payload, advos_storage_path: input.storagePath || null },
     file_name: input.fileName || null,
     file_size: input.fileSize || null,
     mime_type: input.mimeType || null,
-    media_url: mediaUrl,
+    media_url: null,
     storage_path: input.storagePath || null,
   }).select('*').single();
 

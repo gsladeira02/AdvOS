@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { assertContentLength, readJsonBody, SecurityError } from '@/lib/security';
 
 function slugify(value: any) {
   return String(value || '')
@@ -43,7 +44,8 @@ function wantsJson(req: Request) {
 
 async function parseBody(req: Request) {
   const contentType = req.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) return await req.json().catch(() => ({}));
+  assertContentLength(req, 256 * 1024);
+  if (contentType.includes('application/json')) return await readJsonBody(req, 256 * 1024);
   const form = await req.formData();
   return Object.fromEntries(form.entries());
 }
@@ -143,7 +145,8 @@ export async function POST(req: Request) {
     return redirect(req, '/app/modelos-mensagens?ok=salvo');
   } catch (error: any) {
     const message = error?.message || 'Erro ao salvar modelo.';
-    if (jsonMode) return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    const status = error instanceof SecurityError ? error.status : 400;
+    if (jsonMode) return NextResponse.json({ ok: false, error: message }, { status });
     return redirect(req, `/app/modelos-mensagens?erro=${encodeURIComponent(message)}`);
   }
 }

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error('Erro ao salvar cliente:', error);
-    return NextResponse.redirect(new URL(`/app/clientes?erro=${encodeURIComponent(error.message)}`, req.url), 303);
+    return NextResponse.redirect(new URL('/app/clientes?erro=salvar', req.url), 303);
   }
 
   const contactPhone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');

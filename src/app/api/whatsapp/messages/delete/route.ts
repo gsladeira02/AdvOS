@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { readJsonBody, SecurityError } from '@/lib/security';
 
 function str(value: any) {
   return String(value || '').trim();
@@ -9,7 +10,7 @@ function str(value: any) {
 export async function POST(req: Request) {
   try {
     const { session, profile } = await getCurrentProfile();
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, 32768);
     const messageId = str(body.messageId);
     const conversationId = str(body.conversationId);
     const scope = str(body.scope);
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao apagar mensagem.' }, { status: 400 });
+    const status = error instanceof SecurityError ? error.status : 400;
+    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao apagar mensagem.' }, { status });
   }
 }

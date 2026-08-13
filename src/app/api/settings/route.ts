@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 function str(v: FormDataEntryValue | null){ return String(v || '').trim(); }
 
@@ -8,6 +8,10 @@ export async function POST(req:Request){
   const f=await req.formData();
   const section=str(f.get('section'));
   const admin=createAdminSupabase();
+
+  if ((section === 'firm' || section === 'subscription') && !isAdminRole(profile.role)) {
+    return NextResponse.json({ error: 'Apenas o administrador pode alterar estas configurações.' }, { status: 403 });
+  }
 
   if(section==='firm'){
     const {error}=await admin.from('law_firms').update({
@@ -18,7 +22,7 @@ export async function POST(req:Request){
       email:str(f.get('email')) || null,
       address:str(f.get('address')) || null
     }).eq('id',profile.law_firm_id);
-    if(error) return NextResponse.json({error:error.message},{status:400});
+    if(error) return NextResponse.json({error:'Não foi possível salvar as configurações.'},{status:400});
     await admin.from('activity_logs').insert({law_firm_id:profile.law_firm_id,auth_user_id:session.user.id,action:'atualizou_escritorio',entity:'law_firms',entity_id:profile.law_firm_id});
   }
 
@@ -28,7 +32,7 @@ export async function POST(req:Request){
       phone:str(f.get('phone')) || null,
       oab_number:str(f.get('oab_number')) || null
     }).eq('id',profile.id).eq('law_firm_id',profile.law_firm_id);
-    if(error) return NextResponse.json({error:error.message},{status:400});
+    if(error) return NextResponse.json({error:'Não foi possível salvar as configurações.'},{status:400});
     await admin.from('activity_logs').insert({law_firm_id:profile.law_firm_id,auth_user_id:session.user.id,action:'atualizou_perfil',entity:'profiles',entity_id:profile.id});
   }
 
@@ -40,7 +44,7 @@ export async function POST(req:Request){
       grace_until:str(f.get('grace_until')) || null
     };
     const {error}=await admin.from('subscriptions').update(payload).eq('law_firm_id',profile.law_firm_id);
-    if(error) return NextResponse.json({error:error.message},{status:400});
+    if(error) return NextResponse.json({error:'Não foi possível salvar as configurações.'},{status:400});
     await admin.from('activity_logs').insert({law_firm_id:profile.law_firm_id,auth_user_id:session.user.id,action:'atualizou_acesso',entity:'subscriptions'});
   }
 

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import { money } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -10,10 +11,11 @@ function statusLabel(value?: string) {
 }
 
 export default async function Processos() {
-  const { supabase, profile } = await getCurrentProfile();
+  const { profile } = await getCurrentProfile();
+  const admin = createAdminSupabase();
   const [cases, clients] = await Promise.all([
-    supabase.from('cases').select('*, clients(name)').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }),
-    supabase.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
+    admin.from('cases').select('*, clients(name)').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }),
+    admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
   ]);
 
   const rows = cases.data || [];

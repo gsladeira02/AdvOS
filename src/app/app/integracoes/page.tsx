@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 
 function integrationStatus(row: any) {
@@ -26,7 +26,7 @@ function statusMessage(kind: 'asaas' | 'whatsapp', code?: string) {
 
 export default async function Integracoes({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
-  const { profile } = await getCurrentProfile();
+  const { profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
   const { data: rows } = await admin
     .from('integration_settings')
@@ -89,13 +89,24 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
             <div>
               <label className="label">Base URL</label>
-              <input name="api_base_url" className="input mt-1" defaultValue={zapsign?.api_base_url || 'https://api.zapsign.com.br/api/v1'} />
+              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value="https://api.zapsign.com.br/api/v1" />
             </div>
 
             <div>
               <label className="label">Webhook no ZapSign</label>
               <input className="input mt-1 bg-slate-50" readOnly value={`${appUrl}/api/webhooks/zapsign`} />
             </div>
+
+            {zapsign?.webhook_secret && (
+              <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600">
+                <p className="font-black text-slate-900">Autenticação do webhook ZapSign</p>
+                <p className="mt-1">Cadastre um cabeçalho personalizado no webhook da ZapSign:</p>
+                <div className="mt-2 grid gap-2">
+                  <input className="input bg-white" readOnly value="X-AdvOS-Webhook-Token" aria-label="Nome do cabeçalho do webhook ZapSign" />
+                  <input className="input bg-white font-mono text-xs" readOnly value={zapsign.webhook_secret} aria-label="Token do webhook ZapSign" />
+                </div>
+              </div>
+            )}
 
             <button className="btn btn-primary">Salvar ZapSign</button>
           </form>
@@ -147,13 +158,13 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               </div>
               <div>
                 <label className="label">Base URL</label>
-                <input name="api_base_url" className="input mt-1" defaultValue={asaas?.api_base_url || 'https://api-sandbox.asaas.com/v3'} />
+                <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value={asaas?.environment === 'producao' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3'} />
               </div>
             </div>
 
             <div>
               <label className="label">Token do webhook</label>
-              <input name="webhook_secret" className="input mt-1" defaultValue={asaas?.webhook_secret || ''} placeholder="Token para validar eventos do Asaas" />
+              <input name="webhook_secret" type="password" className="input mt-1" placeholder={asaas?.webhook_secret ? "Token salvo. Deixe vazio para manter." : "Token para validar eventos do Asaas"} />
             </div>
 
             <div>
@@ -243,7 +254,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
             <div>
               <label className="label">Base URL</label>
-              <input name="api_base_url" className="input mt-1" defaultValue={whatsapp?.api_base_url || 'https://graph.facebook.com/v22.0'} />
+              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value={`https://graph.facebook.com/${whatsappRaw.graph_version || 'v22.0'}`} />
             </div>
 
             <div>
@@ -254,7 +265,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             <div>
               <label className="label">Webhook na Meta</label>
               <input className="input mt-1 bg-slate-50" readOnly value={`${appUrl}/api/webhooks/whatsapp`} />
-              <p className="mt-2 text-xs text-slate-500">Use esta URL no Meta Developers e assine o campo messages.</p>
+              <p className="mt-2 text-xs text-slate-500">Use esta URL no Meta Developers e assine o campo messages. Em produção, configure também WHATSAPP_APP_SECRET na Vercel para validar X-Hub-Signature-256.</p>
             </div>
 
             {whatsapp?.notes && <p className="break-safe rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {whatsapp.notes}</p>}

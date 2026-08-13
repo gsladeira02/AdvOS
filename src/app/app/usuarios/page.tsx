@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/PageHeader';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 function statusLabel(value?: string) {
   const labels: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', suspenso: 'Suspenso' };
@@ -9,8 +10,9 @@ function statusLabel(value?: string) {
 }
 
 export default async function Usuarios() {
-  const { supabase, profile } = await getCurrentProfile();
-  const { data } = await supabase.from('profiles').select('*').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false });
+  const { profile } = await getCurrentAdminProfile();
+  const admin = createAdminSupabase();
+  const { data } = await admin.from('profiles').select('*').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false });
   const users = data || [];
 
   return (

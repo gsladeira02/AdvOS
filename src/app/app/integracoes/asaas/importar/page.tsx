@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { dateBR } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ function importTypeLabel(value?: string) {
 
 export default async function ImportarAsaas({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
-  const { profile } = await getCurrentProfile();
+  const { profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
 
   const [servicesRes, batchesRes] = await Promise.all([

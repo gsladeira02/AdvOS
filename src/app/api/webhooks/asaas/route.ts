@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { readJsonBody, safeEqual, SecurityError } from '@/lib/security';
 
 function mapWebhookStatus(event?: string, status?: string) {
   const e = String(event || '').toUpperCase();
@@ -21,69 +22,75 @@ function linkPayload(payment: any) {
 }
 
 export async function POST(req: Request) {
-  const payload = await req.json().catch(() => ({}));
-  const payment = payload?.payment || payload;
-  const admin = createAdminSupabase();
-  const externalId = payment?.id;
-  const externalReference = payment?.externalReference;
+  try {
+    const receivedToken = req.headers.get('asaas-access-token') || '';
+    if (!receivedToken) return NextResponse.json({ ok: false, error: 'Webhook não autorizado.' }, { status: 401 });
 
-  let installment: any = null;
-  if (externalId) {
-    const result = await admin
-      .from('financial_installments')
-      .select('id,law_firm_id')
-      .eq('external_id', externalId)
-      .maybeSingle();
-    installment = result.data;
-  }
-
-  if (!installment && externalReference) {
-    const result = await admin
-      .from('financial_installments')
-      .select('id,law_firm_id')
-      .eq('id', externalReference)
-      .maybeSingle();
-    installment = result.data;
-  }
-
-  if (installment?.law_firm_id) {
-    const { data: config } = await admin
+    const admin = createAdminSupabase();
+    const { data: configs } = await admin
       .from('integration_settings')
-      .select('webhook_secret')
-      .eq('law_firm_id', installment.law_firm_id)
+      .select('law_firm_id,webhook_secret')
       .eq('provider', 'asaas')
-      .maybeSingle();
+      .eq('enabled', true);
 
-    const expected = config?.webhook_secret;
-    const received = req.headers.get('asaas-access-token') || '';
-    if (expected && received !== expected) {
+    const config = (configs || []).find((row: any) => safeEqual(receivedToken, row.webhook_secret));
+    if (!config?.law_firm_id) {
       return NextResponse.json({ ok: false, error: 'Webhook não autorizado.' }, { status: 401 });
     }
-  }
 
-  const status = mapWebhookStatus(payload?.event, payment?.status);
+    const payload: any = await readJsonBody(req, 1024 * 1024);
+    const payment = payload?.payment || payload;
+    const externalId = String(payment?.id || '').trim();
+    const externalReference = String(payment?.externalReference || '').trim();
 
-  if (installment) {
-    await admin.from('financial_installments').update({
-      status,
+    let installment: any = null;
+    if (externalId) {
+      const result = await admin
+        .from('financial_installments')
+        .select('id,law_firm_id')
+        .eq('law_firm_id', config.law_firm_id)
+        .eq('external_id', externalId)
+        .maybeSingle();
+      installment = result.data;
+    }
+
+    if (!installment && externalReference) {
+      const result = await admin
+        .from('financial_installments')
+        .select('id,law_firm_id')
+        .eq('law_firm_id', config.law_firm_id)
+        .eq('id', externalReference)
+        .maybeSingle();
+      installment = result.data;
+    }
+
+    const status = mapWebhookStatus(payload?.event, payment?.status);
+
+    if (installment) {
+      await admin.from('financial_installments').update({
+        status,
+        provider: 'asaas',
+        external_id: externalId || null,
+        integration_status: 'webhook_atualizado',
+        paid_at: status === 'pago' ? new Date().toISOString().slice(0, 10) : null,
+        ...linkPayload(payment),
+        raw_payload: payload,
+        updated_at: new Date().toISOString(),
+      }).eq('id', installment.id).eq('law_firm_id', config.law_firm_id);
+    }
+
+    await admin.from('webhook_events').insert({
+      law_firm_id: config.law_firm_id,
       provider: 'asaas',
-      external_id: externalId || null,
-      integration_status: 'webhook_atualizado',
-      paid_at: status === 'pago' ? new Date().toISOString().slice(0, 10) : null,
-      ...linkPayload(payment),
-      raw_payload: payload,
-      updated_at: new Date().toISOString(),
-    }).eq('id', installment.id);
+      event_id: payload?.id || externalId || null,
+      event_type: payload?.event || payment?.status || null,
+      payload,
+      processed_at: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    const status = error instanceof SecurityError ? error.status : 400;
+    return NextResponse.json({ ok: false, error: 'Webhook inválido.' }, { status });
   }
-
-  await admin.from('webhook_events').insert({
-    law_firm_id: installment?.law_firm_id || null,
-    provider: 'asaas',
-    event_id: payload?.id || externalId || null,
-    event_type: payload?.event || payment?.status || null,
-    payload,
-    processed_at: new Date().toISOString(),
-  });
-
-  return NextResponse.json({ ok: true });
 }

@@ -12,6 +12,7 @@ type IntegrationRow = {
   webhook_secret: string | null;
   default_billing_type: string | null;
   status: string | null;
+  raw_settings?: Record<string, any> | null;
 };
 
 function normalizeBaseUrl(url: string) {
@@ -24,6 +25,24 @@ export function defaultBaseUrl(provider: Provider, environment?: string | null) 
   }
   if (provider === 'whatsapp') return 'https://graph.facebook.com/v22.0';
   return 'https://api.zapsign.com.br/api/v1';
+}
+
+export function safeIntegrationBaseUrl(provider: Provider, environment?: string | null, candidate?: string | null) {
+  const env = environment === 'producao' ? 'producao' : 'sandbox';
+
+  if (provider === 'asaas') return defaultBaseUrl('asaas', env);
+  if (provider === 'zapsign') return defaultBaseUrl('zapsign', env);
+
+  const fallback = defaultBaseUrl('whatsapp', env);
+  const raw = normalizeBaseUrl(String(candidate || fallback).trim());
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'graph.facebook.com') return fallback;
+    const match = url.pathname.match(/^\/v\d+(?:\.\d+)?$/i);
+    return match ? `https://graph.facebook.com${match[0]}` : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function getIntegrationConfig(lawFirmId: string, provider: Provider) {
@@ -39,10 +58,10 @@ export async function getIntegrationConfig(lawFirmId: string, provider: Provider
   const envBase = provider === 'zapsign' ? process.env.ZAPSIGN_API_BASE_URL : provider === 'asaas' ? process.env.ASAAS_API_BASE_URL : process.env.WHATSAPP_API_BASE_URL;
   const token = data?.api_token || envToken || '';
   const environment = data?.environment || 'sandbox';
-  const baseUrl = normalizeBaseUrl(data?.api_base_url || envBase || defaultBaseUrl(provider, environment));
+  const baseUrl = safeIntegrationBaseUrl(provider, environment, data?.api_base_url || envBase || null);
 
   return {
-    row: data,
+    row: data as IntegrationRow | null,
     enabled: Boolean(data?.enabled),
     configured: Boolean(data?.enabled && token),
     token,

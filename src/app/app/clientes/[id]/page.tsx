@@ -9,13 +9,6 @@ import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
 import { dateBR, money } from '@/lib/utils';
 import { ClientFileUploader } from '@/components/ClientFileUploader';
 
-async function signedUrl(path?: string | null) {
-  if (!path) return '';
-  const admin = createAdminSupabase();
-  const { data } = await admin.storage.from('documents').createSignedUrl(path, 60 * 60);
-  return data?.signedUrl || '';
-}
-
 function docLabel(type?: string) {
   if (type === 'procuracao_hipossuficiencia') return 'Procuração com hipossuficiência';
   if (type === 'procuracao_simples') return 'Procuração sem hipossuficiência';
@@ -38,7 +31,7 @@ function linkFromInstallment(i: any) {
 export default async function PastaCliente({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string>> }) {
   const { id } = await params;
   const query = await searchParams;
-  const { supabase, profile } = await getCurrentProfile();
+  const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
 
   const { data: client } = await admin
@@ -51,25 +44,25 @@ export default async function PastaCliente({ params, searchParams }: { params: P
   if (!client) notFound();
 
   const [docsRes, generatedRes, casesRes, profilesRes, servicesRes] = await Promise.all([
-    supabase
+    admin
       .from('documents')
       .select('*, cases(case_number,area,action_type), document_signatures(signature_url,status)')
       .eq('law_firm_id', profile.law_firm_id)
       .eq('client_id', id)
       .order('created_at', { ascending: false }),
-    supabase
+    admin
       .from('generated_contracts')
       .select('*')
       .eq('law_firm_id', profile.law_firm_id)
       .eq('client_id', id)
       .order('created_at', { ascending: false }),
-    supabase
+    admin
       .from('cases')
       .select('*')
       .eq('law_firm_id', profile.law_firm_id)
       .eq('client_id', id)
       .order('created_at', { ascending: false }),
-    supabase
+    admin
       .from('profiles')
       .select('full_name,email,phone,oab_number')
       .eq('law_firm_id', profile.law_firm_id)
@@ -84,7 +77,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
   const generated = generatedRes.data || [];
   const financialIds = generated.map((g: any) => g.financial_contract_id).filter(Boolean);
   const installmentsRes = financialIds.length
-    ? await supabase.from('financial_installments').select('*').eq('law_firm_id', profile.law_firm_id).in('contract_id', financialIds).order('due_date')
+    ? await admin.from('financial_installments').select('*').eq('law_firm_id', profile.law_firm_id).in('contract_id', financialIds).order('due_date')
     : { data: [] as any[] };
 
   const installmentsByContract = new Map<string, any[]>();
@@ -93,10 +86,10 @@ export default async function PastaCliente({ params, searchParams }: { params: P
     installmentsByContract.get(i.contract_id)!.push(i);
   }
 
-  const docs = await Promise.all((docsRes.data || []).map(async (d: any) => ({
+  const docs = (docsRes.data || []).map((d: any) => ({
     ...d,
-    download_url: d.external_url || await signedUrl(d.storage_path),
-  })));
+    download_url: d.storage_path ? `/api/documents/file/${encodeURIComponent(d.id)}` : d.external_url || '',
+  }));
 
   const services = servicesRes.data || [];
   const selectedService = services.find((s: any) => s.id === client.service_id);
@@ -279,8 +272,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
               </form>
             </td>
             <td>{d.cases?.case_number || d.cases?.action_type || '-'}</td>
-            <td>{d.document_signatures?.[0]?.signature_url ? <Link className="font-bold text-blue-700" href={d.document_signatures[0].signature_url} target="_blank">ZapSign</Link> : (d.signature_status || '-')}</td>
-            <td>{d.download_url ? <Link className="font-bold text-blue-700" href={d.download_url} target="_blank">abrir arquivo</Link> : '-'}</td>
+            <td>{d.document_signatures?.[0]?.signature_url ? <Link className="font-bold text-blue-700" href={d.document_signatures[0].signature_url} target="_blank" rel="noreferrer">ZapSign</Link> : (d.signature_status || '-')}</td>
+            <td>{d.download_url ? <Link className="font-bold text-blue-700" href={d.download_url} target="_blank" rel="noreferrer">abrir arquivo</Link> : '-'}</td>
             <td>{dateBR(d.created_at)}</td>
             <td>
               <form action="/api/client-files/delete" method="post">
@@ -309,10 +302,10 @@ export default async function PastaCliente({ params, searchParams }: { params: P
                 <b className="break-safe">{docLabel(g.document_type)}</b>
                 <p className="break-safe text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
-              {wa ? <Link className="btn btn-primary" href={wa} target="_blank">Enviar links no WhatsApp</Link> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
+              {wa ? <Link className="btn btn-primary" href={wa} target="_blank" rel="noreferrer">Enviar links no WhatsApp</Link> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-              <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
+              <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
               <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} ${asaasLinks.length === 1 ? 'link' : 'links'} de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
               <p><b>Data:</b> {dateBR(g.contract_date)}</p>
             </div>
@@ -326,7 +319,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
                     <td>{dateBR(i.due_date)}</td>
                     <td>{money(i.amount || 0)}</td>
                     <td><span className={`badge ${statusClass(i.integration_status || i.status)}`}>{i.integration_status || i.status || 'pendente'}</span></td>
-                    <td>{url ? <Link href={url} target="_blank" className="font-bold text-blue-700">abrir</Link> : '-'}</td>
+                    <td>{url ? <Link href={url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir</Link> : '-'}</td>
                     <td>
                       <form action="/api/asaas/create-payment" method="post" className="flex min-w-[210px] gap-2">
                         <input type="hidden" name="installment_id" value={i.id} />

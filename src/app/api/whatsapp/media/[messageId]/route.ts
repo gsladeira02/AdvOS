@@ -32,6 +32,15 @@ function mediaIdFromMessage(message: any) {
   return mediaUrl && !mediaUrl.startsWith('http') ? mediaUrl : '';
 }
 
+function canRenderInline(mime?: string | null) {
+  const clean = str(mime).toLowerCase().split(';')[0].trim();
+  return new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/amr',
+    'video/mp4', 'application/pdf',
+  ]).has(clean);
+}
+
 function extensionFromMime(mime?: string | null) {
   const clean = str(mime).toLowerCase();
   if (clean.includes('jpeg')) return 'jpg';
@@ -66,14 +75,27 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
     const filename = safeFilename(message.file_name || mediaNode(message)?.filename || message.body, `whatsapp-${message.id}`);
 
     if (message.storage_path) {
-      const signed = await admin.storage.from('documents').createSignedUrl(message.storage_path, 60 * 10, {
-        download: download ? filename : false,
-      });
-      if (signed.data?.signedUrl) return NextResponse.redirect(signed.data.signedUrl, 302);
+      const { data: stored, error: storedError } = await admin.storage.from('documents').download(message.storage_path);
+      if (!storedError && stored) {
+        const maxMedia = 25 * 1024 * 1024;
+        if (stored.size > maxMedia) return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
+        const bytes = Buffer.from(await stored.arrayBuffer());
+        if (bytes.length > maxMedia) return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
+        const contentType = message.mime_type || stored.type || 'application/octet-stream';
+        const finalName = filename.includes('.') ? filename : `${filename}.${extensionFromMime(contentType)}`;
+        const disposition = !download && canRenderInline(contentType) ? 'inline' : 'attachment';
+        return new NextResponse(bytes, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': String(bytes.length),
+            'Cache-Control': 'private, no-store, max-age=0',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Disposition': `${disposition}; filename="${finalName.replace(/"/g, '')}"`,
+          },
+        });
+      }
     }
-
-    const direct = str(message.media_url);
-    if (direct.startsWith('http')) return NextResponse.redirect(direct, 302);
 
     const mediaId = mediaIdFromMessage(message);
     if (!mediaId) return new NextResponse('Essa mensagem não possui mídia disponível para baixar.', { status: 404 });
@@ -97,20 +119,30 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
     });
     if (!fileResponse.ok) throw new Error('Não foi possível baixar a mídia da Meta.');
 
+    const maxMedia = 25 * 1024 * 1024;
+    const declaredSize = Number(fileResponse.headers.get('content-length') || meta.file_size || 0);
+    if (Number.isFinite(declaredSize) && declaredSize > maxMedia) {
+      return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
+    }
+
     const contentType = meta.mime_type || message.mime_type || fileResponse.headers.get('content-type') || 'application/octet-stream';
     const bytes = Buffer.from(await fileResponse.arrayBuffer());
+    if (bytes.length > maxMedia) return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
     const finalName = filename.includes('.') ? filename : `${filename}.${extensionFromMime(contentType)}`;
+    const disposition = !download && canRenderInline(contentType) ? 'inline' : 'attachment';
 
     return new NextResponse(bytes, {
       status: 200,
       headers: {
         'Content-Type': contentType,
         'Content-Length': String(bytes.length),
-        'Cache-Control': 'private, max-age=300',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${finalName.replace(/"/g, '')}"`,
+        'Cache-Control': 'private, no-store, max-age=0',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Disposition': `${disposition}; filename="${finalName.replace(/"/g, '')}"`,
       },
     });
-  } catch (error: any) {
-    return new NextResponse(error?.message || 'Erro ao carregar mídia.', { status: 400 });
+  } catch (error) {
+    console.error('Erro ao carregar mídia do WhatsApp:', error);
+    return new NextResponse('Não foi possível carregar a mídia.', { status: 400 });
   }
 }

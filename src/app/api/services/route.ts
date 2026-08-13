@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error('Erro ao salvar serviço:', error);
-    return NextResponse.redirect(new URL(`/app/servicos?erro=${encodeURIComponent(error.message)}`, req.url), 303);
+    return NextResponse.redirect(new URL('/app/servicos?erro=salvar', req.url), 303);
   }
 
   return NextResponse.redirect(new URL('/app/servicos?salvo=1', req.url), 303);

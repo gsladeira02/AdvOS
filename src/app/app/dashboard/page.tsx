@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
-import { getCurrentSession } from '@/lib/current';
+import { getCurrentProfile } from '@/lib/current';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 import { dateBR, deadlineClass, money } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -17,35 +18,15 @@ function statusLabel(value?: string) {
 }
 
 export default async function Dashboard() {
-  const { supabase, session } = await getCurrentSession();
-  const { data: profile } = await supabase.from('profiles').select('*').eq('auth_user_id', session.user.id).maybeSingle();
-
-  if (!profile) {
-    return (
-      <div>
-        <PageHeader title="Painel principal" subtitle="AdvOS interno para organização do escritório." />
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard label="Clientes" value={0} detail="Aguardando configuração" />
-          <StatCard label="Processos ativos" value={0} />
-          <StatCard label="Prazos" value={0} />
-          <StatCard label="A receber" value={money(0)} />
-        </div>
-        <section className="card mt-6 p-6">
-          <h2 className="text-xl font-black">Configuração pendente</h2>
-          <p className="mt-2 max-w-2xl text-slate-600">O acesso já está funcionando. Para liberar os cadastros do escritório, abra Configurações e preencha os dados iniciais do AdvOS.</p>
-          <Link href="/app/configuracoes" className="btn btn-primary mt-5 inline-flex">Abrir configurações</Link>
-        </section>
-      </div>
-    );
-  }
-
+  const { profile } = await getCurrentProfile();
+  const admin = createAdminSupabase();
   const lawFirmId = profile.law_firm_id;
   const [clients, cases, deadlines, tasks, finance] = await Promise.all([
-    supabase.from('clients').select('id', { count: 'exact', head: true }).eq('law_firm_id', lawFirmId),
-    supabase.from('cases').select('id,status').eq('law_firm_id', lawFirmId),
-    supabase.from('deadlines').select('id,title,due_date,status').eq('law_firm_id', lawFirmId).order('due_date').limit(8),
-    supabase.from('tasks').select('id,title,status,due_date').eq('law_firm_id', lawFirmId).neq('status', 'concluida').limit(6),
-    supabase.from('financial_installments').select('amount,status').eq('law_firm_id', lawFirmId),
+    admin.from('clients').select('id', { count: 'exact', head: true }).eq('law_firm_id', lawFirmId),
+    admin.from('cases').select('id,status').eq('law_firm_id', lawFirmId),
+    admin.from('deadlines').select('id,title,due_date,status').eq('law_firm_id', lawFirmId).order('due_date').limit(8),
+    admin.from('tasks').select('id,title,status,due_date').eq('law_firm_id', lawFirmId).neq('status', 'concluida').limit(6),
+    admin.from('financial_installments').select('amount,status').eq('law_firm_id', lawFirmId),
   ]);
 
   const activeCases = (cases.data || []).filter((caseRow: any) => caseRow.status !== 'arquivado').length;

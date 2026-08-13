@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getIntegrationConfig } from '@/lib/integrations';
 
@@ -10,7 +10,7 @@ function fallbackSecret() {
 }
 
 export async function POST(req: Request) {
-  const { session, profile } = await getCurrentProfile();
+  const { session, profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
   let config = await getIntegrationConfig(profile.law_firm_id, 'asaas');
 

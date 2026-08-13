@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { sendWhatsAppTemplate, sendWhatsAppText } from '@/lib/whatsappApi';
+import { readJsonBody, SecurityError } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -26,7 +27,7 @@ function isCustomerCareWindowError(message: string) {
 export async function POST(req: Request) {
   try {
     const { session, profile } = await getCurrentProfile();
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, 131072);
 
     const phone = str(body.phone || body.to);
     const message = str(body.message);
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       throw error;
     }
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar WhatsApp.' }, { status: 400 });
+    const status = error instanceof SecurityError ? error.status : 400;
+    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar WhatsApp.' }, { status });
   }
 }
