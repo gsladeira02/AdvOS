@@ -1,176 +1,52 @@
-# AdvOS V7
+# AdvOS V9.26
 
-Sistema jurídico interno, desktop-first, com login direto, geração de PDF, ZapSign, Asaas, WhatsApp e pasta em nuvem por cliente.
+Sistema jurídico interno do escritório, com acesso pela internet, Supabase, Next.js e Vercel.
 
-## Principais mudanças da V7
+## Atualização da V9.25 para V9.26
 
-- O usuário consegue acessar as abas mesmo sem preencher os dados cadastrais do escritório.
-- No primeiro login, o AdvOS cria automaticamente um escritório provisório chamado **Escritório sem cadastro**.
-- Os dados do escritório podem ser completados depois em **Configurações**.
-- A lista de clientes agora abre uma **pasta do cliente**.
-- A pasta do cliente mostra documentos gerados, documentos enviados manualmente, processos vinculados e contratos gerados.
-- A pasta do cliente permite upload de arquivos para o Supabase Storage privado.
-- Dentro da pasta de cada cliente é possível gerar PDF de contrato/procuração, enviar para ZapSign, criar cobranças no Asaas e preparar botão de WhatsApp.
-- O botão de WhatsApp usa o número cadastrado no cliente e envia mensagem com link da ZapSign e links das cobranças Asaas.
+Esta versão inclui hardening de segurança. A ordem recomendada é:
 
-## Instalação para quem já está na V5
+1. Configure na Vercel `WHATSAPP_APP_SECRET` com o App Secret da aplicação Meta.
+2. Publique o código da V9.26.
+3. Rode `supabase/v9_26_security_hardening.sql` no SQL Editor do Supabase.
+4. Em Integrações, confirme os webhooks do Asaas, ZapSign e WhatsApp.
+5. Ative Leaked Password Protection no Supabase Auth.
+6. Rode `supabase/v9_26_security_verify.sql` e o Security Advisor.
+7. Teste as principais telas e integrações.
 
-1. Substitua os arquivos do GitHub por esta versão.
-2. Rode no Supabase:
+> Não rode o SQL de hardening antes de publicar a V9.26: versões anteriores ainda dependem de acesso direto do navegador a algumas tabelas e podem parar de funcionar.
 
-```sql
-supabase/v6_migration.sql
-```
-
-3. Faça redeploy na Vercel.
-4. Entre no sistema normalmente.
-
-## Instalação nova
-
-1. Crie projeto no Supabase.
-2. Rode `supabase/schema.sql`.
-3. Crie o primeiro usuário em `Authentication > Users`.
-4. Configure as variáveis na Vercel:
+## Variáveis principais
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_APP_URL=
+WHATSAPP_APP_SECRET=
 ```
 
-5. Suba o projeto no GitHub e faça deploy na Vercel.
-6. Entre com o usuário criado no Supabase Auth.
-7. Complete os dados do escritório depois em `/app/configuracoes` quando quiser.
+As demais variáveis opcionais estão documentadas em `.env.example`.
+
+## Segurança da V9.26
+
+- autenticação do servidor revalidada via Supabase Auth;
+- `service_role` somente server-side;
+- CRUD jurídico pelo backend;
+- RLS e privilégios mínimos no Data API;
+- bucket `documents` privado e sem acesso direto pelo JWT do navegador;
+- documentos/mídias persistidos servidos por endpoints autenticados;
+- assinatura do webhook Meta e tokens de webhook Asaas/ZapSign;
+- proteção contra alteração de Base URL de integrações/SSRF;
+- PWA sem cache de telas ou dados autenticados;
+- limites de payload/upload, proteção CSRF e headers de segurança;
+- Next.js/React/SheetJS atualizados para versões corrigidas usadas nesta revisão.
+
+Leia `SECURITY_AUDIT_V9_26.md` antes do deploy.
 
 ## Observações
 
-- O ZIP não inclui `package-lock.json`.
-- O bucket `documents` é privado.
-- Os arquivos da pasta do cliente são abertos por signed URL gerada no servidor.
-- Para ZapSign e Asaas funcionarem, configure as chaves em `/app/integracoes`.
-
-
-## AdvOS V8
-
-- Aba Documentos removida do menu lateral; documentos ficam dentro da pasta do cliente.
-- Nova aba Serviços para cadastrar serviços jurídicos do escritório.
-- Cada cliente pode ter um serviço prestado vinculado.
-- O serviço vinculado é usado como base no objeto do contrato e no valor padrão da cobrança.
-- Para atualizar da V7, rode `supabase/v8_migration.sql`.
-
-## AdvOS V8.3 - Asaas
-
-Esta versão reforça a integração com o Asaas:
-
-- Configuração da API Key em `/app/integracoes`.
-- Teste de conexão com o Asaas.
-- Criação automática de webhook do Asaas.
-- Validação do header `asaas-access-token` no webhook.
-- Criação/atualização de cobranças sem duplicar parcelas já integradas.
-- Botão para gerar/atualizar cobranças Asaas diretamente na pasta do cliente.
-- Links de cobrança ficam disponíveis para envio por WhatsApp.
-
-Após atualizar os arquivos, rode no Supabase:
-
-```sql
--- supabase/v8_3_asaas_integration.sql
-```
-
-Depois configure em `/app/integracoes`:
-
-1. Ambiente: Sandbox ou Produção.
-2. API Key do Asaas.
-3. Tipo padrão: Boleto, Pix ou Cliente escolhe.
-4. Token de segurança do webhook.
-5. Salvar Asaas.
-6. Testar conexão.
-7. Criar webhook no Asaas.
-
-
-## V8.4 - Importação inicial do Asaas
-
-Esta versão adiciona uma tela para importar clientes e cobranças exportados do Asaas em CSV/XLSX.
-
-1. Rode no Supabase: `supabase/v8_4_asaas_initial_import.sql`.
-2. Faça redeploy na Vercel.
-3. Acesse `Integrações > Asaas > Importação inicial`.
-4. Envie o arquivo exportado do Asaas.
-5. O AdvOS cruza cliente por ID Asaas, CPF/CNPJ, e-mail, telefone e nome.
-
-A importação cria clientes faltantes, vincula `asaas_customer_id`, cria cobranças no financeiro e evita duplicidade quando encontrar ID externo de cobrança.
-
-## V9.2 - WhatsApp Cloud API oficial
-
-Esta versão adiciona integração direta com a API oficial da Meta/WhatsApp:
-
-- nova aba `WhatsApp` no menu lateral;
-- configuração em `Integrações > WhatsApp API`;
-- envio de mensagem pela API dentro do Financeiro;
-- fallback para abrir WhatsApp Web;
-- webhook em `/api/webhooks/whatsapp` para receber mensagens e status;
-- conversas salvas no Supabase e vinculadas ao cliente pelo telefone/WhatsApp.
-
-Após atualizar os arquivos, rode no Supabase:
-
-```sql
--- supabase/v9_2_whatsapp_api.sql
-```
-
-Depois configure em `/app/integracoes`:
-
-1. Ative a integração WhatsApp.
-2. Cole o Access Token permanente da Meta.
-3. Informe o Phone Number ID.
-4. Informe o WABA ID, se tiver.
-5. Informe o número oficial.
-6. Crie e salve o Verify Token.
-7. Teste a conexão.
-8. Configure na Meta o webhook: `NEXT_PUBLIC_APP_URL/api/webhooks/whatsapp`.
-9. Assine o campo `messages` no painel da Meta.
-
-Observação: mensagens livres pela API funcionam dentro da janela de atendimento de 24h. Fora da janela, a Meta pode exigir template oficial aprovado.
-
-## AdvOS V9.10
-
-Correções do WhatsApp:
-- Reprodução de áudios recebidos dentro da conversa.
-- Botão para salvar áudios e demais mídias.
-- Polling mais agressivo e Realtime mais estável para evitar precisar atualizar a página.
-- Webhook deixou de depender de upsert por constraint de external_id, evitando notificação sem mensagem salva.
-- Envio pelo Financeiro com suporte a template oficial aprovado da Meta quando a janela de 24h estiver fechada.
-- Modelos de mensagem agora podem guardar o nome do template oficial Meta e o idioma.
-
-Após atualizar, rode `supabase/v9_10_whatsapp_audio_realtime_templates.sql` no Supabase.
-
-## V9.19 - PWA do WhatsApp
-
-Esta versão adiciona suporte completo a PWA:
-
-- Manifest em `/manifest.json` com start URL em `/app/whatsapp`.
-- Service Worker em `/sw.js`.
-- Ícones `192x192`, `512x512` e Apple Touch Icon.
-- Cabeçalho e barra inferior mobile para uso instalado no celular.
-- Central do WhatsApp ajustada para tela de celular/PWA.
-- A lista de conversas e a conversa funcionam como telas separadas no mobile.
-- O cache do Service Worker ignora `/api/whatsapp/*` e `/app/whatsapp` para não travar mensagens antigas.
-
-Para instalar no iPhone:
-
-1. Abrir `https://adv-os.vercel.app` no Safari.
-2. Tocar em Compartilhar.
-3. Tocar em Adicionar à Tela de Início.
-
-Para instalar no Android:
-
-1. Abrir `https://adv-os.vercel.app` no Chrome.
-2. Tocar no menu de três pontos.
-3. Tocar em Instalar app ou Adicionar à tela inicial.
-
-
-## V9.20 - Hotfix clients.updated_at
-
-Corrige o erro `column clients.updated_at does not exist` na central do WhatsApp/PWA.
-
-- Remove dependência do campo `clients.updated_at` nas consultas do WhatsApp.
-- Inclui migration `supabase/v9_20_clients_updated_at_hotfix.sql` para adicionar o campo de forma segura no banco existente.
+- O pacote não inclui `.env`, `.git`, `node_modules` nem `package-lock.json`.
+- O bucket `documents` deve continuar privado.
+- Usuários novos devem ser criados por um administrador do AdvOS; `/api/setup` não cria escritório ou perfil automaticamente.
+- Em produção, o webhook do WhatsApp exige `WHATSAPP_APP_SECRET` válido.

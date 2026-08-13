@@ -1,4 +1,4 @@
-const CACHE_NAME = 'advos-pwa-v9-21';
+const CACHE_NAME = 'advos-pwa-v9-26-static-only';
 const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.json',
@@ -24,50 +24,37 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-function shouldBypassCache(url, request) {
-  if (request.method !== 'GET') return true;
-  if (url.pathname === '/' || url.pathname === '/login') return true;
-  if (url.pathname.startsWith('/api/')) return true;
-  if (url.pathname.includes('/auth/')) return true;
-  if (url.pathname.startsWith('/app/whatsapp')) return true;
-  if (url.searchParams.has('_')) return true;
-  return false;
-}
-
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (url.origin !== self.location.origin || shouldBypassCache(url, request)) {
-    event.respondWith(fetch(request));
+  if (url.origin !== self.location.origin || request.method !== 'GET') return;
+
+  // Nunca armazenar páginas autenticadas, APIs, login ou respostas de navegação.
+  // Dados jurídicos permanecem somente na resposta de rede e não no Cache Storage do PWA.
+  if (
+    request.mode === 'navigate' ||
+    url.pathname.startsWith('/app/') ||
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/auth/') ||
+    url.pathname === '/login' ||
+    url.pathname === '/'
+  ) {
+    if (request.mode === 'navigate') {
+      event.respondWith(fetch(request).catch(() => caches.match('/offline.html')));
+    }
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => null);
-          return response;
-        })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('/offline.html')))
-    );
-    return;
-  }
+  if (!STATIC_ASSETS.includes(url.pathname)) return;
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => null);
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => null);
+      }
+      return response;
+    }))
   );
 });
