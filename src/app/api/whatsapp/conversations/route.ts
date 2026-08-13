@@ -15,7 +15,7 @@ async function getClientForVirtual(admin: any, lawFirmId: string, virtualId: str
 
   const { data } = await admin
     .from('clients')
-    .select('id,law_firm_id,name,phone,whatsapp,created_at,updated_at')
+    .select('id,law_firm_id,name,phone,whatsapp,created_at')
     .eq('law_firm_id', lawFirmId)
     .eq('id', clientId)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
 
     const { data: rawClientContacts, error: clientsError } = await admin
       .from('clients')
-      .select('id,law_firm_id,name,phone,whatsapp,created_at,updated_at')
+      .select('id,law_firm_id,name,phone,whatsapp,created_at')
       .eq('law_firm_id', profile.law_firm_id)
       .order('name');
 
