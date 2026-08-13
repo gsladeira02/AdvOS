@@ -51,7 +51,7 @@ export default async function Financeiro() {
     <div>
       <PageHeader
         title="Financeiro"
-        subtitle={`Pendente: ${money(total)}. Atrasado: ${money(overdueTotal)}. Cobranças em formato de planilha com filtros automáticos e cobrança por WhatsApp.`}
+        subtitle={`Pendente: ${money(total)} • Atrasado: ${money(overdueTotal)}`}
       />
 
       <FinanceiroSpreadsheet
@@ -68,7 +68,7 @@ export default async function Financeiro() {
           <h2 className="text-lg font-black text-slate-950">Cadastrar cobrança manual</h2>
           <p className="text-sm text-slate-500">Use quando precisar lançar uma cobrança que ainda não veio do Asaas.</p>
         </div>
-        <form action="/api/finance" method="post" className="grid gap-4 md:grid-cols-5">
+        <form action="/api/finance" method="post" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <select className="input" name="client_id">
             <option value="">Cliente</option>
             {clientsList.map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}
@@ -81,7 +81,7 @@ export default async function Financeiro() {
             <option>pago</option>
             <option>atrasado</option>
           </select>
-          <button className="btn btn-primary md:col-span-5">Cadastrar cobrança</button>
+          <button className="btn btn-primary md:col-span-2 xl:col-span-5">Cadastrar cobrança</button>
         </form>
       </section>
     </div>

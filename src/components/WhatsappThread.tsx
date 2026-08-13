@@ -639,7 +639,7 @@ export function WhatsappThread({
       setFeedback('Mensagem apagada no AdvOS.');
       onSent?.(conversation?.id);
     } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao apagar mensagem. Rode o SQL V9.8 se o problema continuar.');
+      setFeedback(error?.message || 'Não foi possível apagar a mensagem. Tente novamente.');
     }
   }
 
@@ -919,7 +919,7 @@ export function WhatsappThread({
       return (
         <div className="space-y-1.5">
           {mediaUrl ? <img src={mediaUrl} alt={fileName || 'Figurinha'} className="max-h-32 rounded-xl object-contain" /> : <div className="text-4xl leading-none">{message.body && !String(message.body).startsWith('[') ? message.body : '⭐'}</div>}
-          {message.body && !String(message.body).startsWith('[') && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {message.body && !String(message.body).startsWith('[') && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar</a>}
         </div>
       );
@@ -929,7 +929,7 @@ export function WhatsappThread({
       return (
         <div className="space-y-1.5">
           {mediaUrl ? <img src={mediaUrl} alt={fileName || 'Imagem'} className="max-h-64 rounded-xl object-cover" /> : <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2"><ImageIcon size={16} /> Imagem</div>}
-          {message.body && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {message.body && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar imagem</a>}
         </div>
       );
@@ -951,7 +951,7 @@ export function WhatsappThread({
               <div className="text-[11px] font-bold text-slate-500">Áudio recebido. Aguarde a mídia ficar disponível.</div>
             )}
           </div>
-          {message.body && message.body !== '[Áudio recebido]' && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {message.body && message.body !== '[Áudio recebido]' && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar áudio</a>}
         </div>
       );
@@ -961,7 +961,7 @@ export function WhatsappThread({
       return (
         <div className="space-y-1.5">
           {mediaUrl ? <video controls preload="metadata" src={mediaUrl} className="max-h-64 w-[280px] max-w-full rounded-xl bg-black" /> : <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2"><FileText size={16} /> Vídeo recebido</div>}
-          {message.body && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {message.body && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar vídeo</a>}
         </div>
       );
@@ -973,17 +973,17 @@ export function WhatsappThread({
           <div className="flex items-center gap-2 rounded-xl bg-black/5 px-3 py-2">
             <FileText size={17} className="shrink-0" />
             <div className="min-w-0">
-              <b className="block max-w-[260px] truncate text-[12px]">{fileName || 'Arquivo'}</b>
+              <b className="break-safe block max-w-[260px] text-[12px] leading-tight">{fileName || 'Arquivo'}</b>
               <span className="text-[10px] font-bold text-slate-500">Documento {fileSizeLabel(message.file_size) ? `• ${fileSizeLabel(message.file_size)}` : ''}</span>
             </div>
           </div>
-          {message.body && message.body !== fileName && <div className="whitespace-pre-wrap leading-relaxed">{message.body}</div>}
+          {message.body && message.body !== fileName && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {mediaUrl && <div className="flex flex-wrap gap-2"><a href={mediaUrl} target="_blank" rel="noreferrer" className="text-[10px] font-black text-blue-700 hover:underline">Abrir arquivo</a>{downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar</a>}</div>}
         </div>
       );
     }
 
-    return <div className="whitespace-pre-wrap leading-relaxed">{message.body || '[mensagem sem texto]'}</div>;
+    return <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body || '[mensagem sem texto]'}</div>;
   }
 
   return (
@@ -999,7 +999,7 @@ export function WhatsappThread({
             {title.split(' ').filter(Boolean).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || '?'}
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-black">{title}</h2>
+            <h2 className="break-safe text-sm font-black leading-tight">{title}</h2>
             <p className="truncate text-[10px] font-bold text-white/75">{conversation.phone}</p>
           </div>
         </div>
@@ -1081,7 +1081,7 @@ export function WhatsappThread({
             <div className="flex min-w-0 items-center gap-2">
               <FileText size={16} className="shrink-0 text-slate-600" />
               <div className="min-w-0">
-                <b className="block truncate text-slate-900">{file.name}</b>
+                <b className="break-safe block text-slate-900 leading-tight">{file.name}</b>
                 <span className="text-[10px] font-bold text-slate-500">{file.type || 'arquivo'} {file.name.toLowerCase().endsWith('.webp') ? '• será enviado como figurinha' : ''} {fileSizeLabel(file.size) ? `• ${fileSizeLabel(file.size)}` : ''}</span>
               </div>
             </div>
@@ -1149,13 +1149,13 @@ export function WhatsappThread({
             )}
 
             {emojiOpen && (
-              <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 grid w-[310px] grid-cols-10 gap-1 rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
+              <div className="whatsapp-emoji-picker absolute bottom-[calc(100%+8px)] left-0 z-20 grid w-[310px] grid-cols-10 gap-1 rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
                 {emojiOptions.map((emoji) => <button key={emoji} type="button" className="grid h-8 w-8 place-items-center rounded-lg text-lg hover:bg-[#f0f2f5]" onClick={() => appendToText(emoji)}>{emoji}</button>)}
               </div>
             )}
 
             {stickerOpen && (
-              <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 w-[310px] rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
+              <div className="whatsapp-sticker-picker absolute bottom-[calc(100%+8px)] left-0 z-20 w-[310px] rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
                 <div className="mb-2 px-2 text-[10px] font-black uppercase tracking-wide text-slate-500">Figurinhas rápidas</div>
                 <div className="grid grid-cols-4 gap-2">
                   {quickStickers.map((emoji) => <button key={emoji} type="button" className="grid h-14 place-items-center rounded-xl bg-[#f0f2f5] text-3xl hover:bg-[#e2e8f0]" onClick={() => { appendToText(emoji); setStickerOpen(false); }}>{emoji}</button>)}
@@ -1197,7 +1197,7 @@ export function WhatsappThread({
         )}
 
         <div className="mt-2 min-h-[16px]">
-          {recording ? <p className="truncate text-[10px] font-black text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="truncate text-[10px] font-bold text-slate-600">{feedback}</p> : <p className="truncate text-[10px] text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
+          {recording ? <p className="break-safe text-[10px] font-black leading-relaxed text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="break-safe text-[10px] font-bold leading-relaxed text-slate-600">{feedback}</p> : <p className="break-safe text-[10px] leading-relaxed text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>
     </div>

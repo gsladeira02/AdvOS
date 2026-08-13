@@ -152,11 +152,11 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
             <p className="text-xs text-slate-500">Filtre por cliente, status e período. Clique nas setas de vencimento ou valor para ordenar.</p>
           </div>
           <div className="text-xs font-bold text-slate-600">
-            {filteredInstallments.length} cobrança(s) • {money(filteredTotal)}
+            {filteredInstallments.length} {filteredInstallments.length === 1 ? 'cobrança' : 'cobranças'} • {money(filteredTotal)}
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-7">
+        <div className="mt-3 grid gap-2 md:grid-cols-4 xl:grid-cols-8">
           <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
             <option value="">Todos os clientes</option>
             {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}

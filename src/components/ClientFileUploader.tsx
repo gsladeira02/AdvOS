@@ -107,15 +107,15 @@ export function ClientFileUploader({ clientId }: { clientId: string }) {
 
       {files.length > 0 && (
         <div className="rounded-3xl border border-[#eee4d4] bg-[#fbf7ef] p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <b>{files.length} documento(s) selecionado(s)</b>
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <b>{files.length} {files.length === 1 ? 'documento selecionado' : 'documentos selecionados'}</b>
             <button type="button" className="text-sm font-bold text-red-700" onClick={() => setFiles([])}>Limpar seleção</button>
           </div>
           <div className="space-y-3">
             {files.map((item, index) => (
               <div key={item.id} className="grid gap-3 rounded-2xl border border-[#eee4d4] bg-white p-3 md:grid-cols-[1fr_1fr_auto] md:items-center">
-                <div>
-                  <p className="font-bold text-[#12213a]">{item.file.name}</p>
+                <div className="min-w-0">
+                  <p className="break-safe font-bold text-[#12213a]" title={item.file.name}>{item.file.name}</p>
                   <p className="text-xs text-slate-500">{humanSize(item.file.size)}</p>
                 </div>
                 <input
@@ -134,7 +134,7 @@ export function ClientFileUploader({ clientId }: { clientId: string }) {
 
       {error && <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <button type="button" className="btn btn-primary" disabled={sending || !files.length} onClick={submit}>
           {sending ? 'Enviando...' : 'Enviar para a pasta'}
         </button>

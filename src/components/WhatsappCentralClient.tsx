@@ -335,7 +335,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} min-w-0`}>
+        <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
           <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
         </div>
       ) : (

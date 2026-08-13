@@ -39,12 +39,12 @@ export default async function ModelosMensagens() {
     <div>
       <PageHeader
         title="Modelos de mensagem"
-        subtitle="Crie, edite e salve atalhos como /cobranca para usar dentro da central do WhatsApp."
+        subtitle="Crie e organize mensagens prontas para usar na central do WhatsApp."
       />
 
       {error && (
         <section className="panel mb-4 border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">
-          Erro ao carregar modelos: {error.message}. Rode o SQL V9.8 no Supabase e atualize a página.
+          Não foi possível carregar os modelos de mensagem. Atualize a página ou contate o administrador.
         </section>
       )}
 

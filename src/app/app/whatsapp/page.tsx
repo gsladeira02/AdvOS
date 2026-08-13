@@ -132,13 +132,13 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     <div>
       <PageHeader
         title="WhatsApp"
-        subtitle="Central compacta com contatos dos clientes, busca, atualização automática e atalhos de modelos como /cobranca. Ctrl + Enter envia."
-        action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar API</Link>}
+        subtitle="Atendimento centralizado com conversas, contatos e modelos de mensagem."
+        action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar integração</Link>}
       />
 
       {!active && (
         <section className="card mb-6 border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
-          WhatsApp API ainda não está totalmente configurado. Vá em Integrações, preencha Access Token e Phone Number ID, salve e teste a conexão.
+          A integração do WhatsApp ainda não está concluída. Acesse Integrações para revisar a configuração e testar a conexão.
         </section>
       )}
 

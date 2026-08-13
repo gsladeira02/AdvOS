@@ -132,7 +132,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
       }
       setFeedback(`Modelo salvo: ${saved.name}.`);
     } catch (error: any) {
-      setFeedback(error?.message || 'Erro ao salvar modelo. Rode o SQL V9.8 se o problema continuar.');
+      setFeedback(error?.message || 'Não foi possível salvar o modelo. Tente novamente.');
     } finally {
       setSavingId(null);
     }
@@ -174,7 +174,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
             <h2 className="text-sm font-black text-slate-950">Variáveis e atalhos</h2>
             <p className="mt-1 text-xs text-slate-500">Digite o atalho na conversa, como <b>/cobranca</b>, ou apenas <b>/</b> para listar todos os modelos.</p>
           </div>
-          {feedback && <div className="inline-flex max-w-xl items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800"><CheckCircle2 size={14} /> {feedback}</div>}
+          {feedback && <div className="inline-flex max-w-xl items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 break-safe"><CheckCircle2 size={14} /> {feedback}</div>}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {variables.map((v) => (
@@ -197,7 +197,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
             </button>
           </div>
         </div>
-        <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_160px_160px_110px_190px_120px]">
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_140px_150px_100px_170px_100px]">
           <input className="input compact-input" value={draft.name} onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value, shortcut: d.shortcut && d.shortcut !== '/' ? d.shortcut : shortcutHint('', event.target.value) }))} placeholder="Nome do modelo" />
           <input className="input compact-input" value={draft.shortcut || ''} onChange={(event) => setDraft((d) => ({ ...d, shortcut: event.target.value }))} placeholder="/cobranca" />
           <select className="input compact-input" value={draft.category || 'geral'} onChange={(event) => setDraft((d) => ({ ...d, category: event.target.value }))}>
@@ -209,7 +209,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
           </select>
           <input className="input compact-input" value={draft.meta_template_name || ''} onChange={(event) => setDraft((d) => ({ ...d, meta_template_name: event.target.value }))} placeholder="Template Meta oficial" />
           <input className="input compact-input" value={draft.meta_template_language || 'pt_BR'} onChange={(event) => setDraft((d) => ({ ...d, meta_template_language: event.target.value }))} placeholder="pt_BR" />
-          <textarea className="input min-h-[130px] lg:col-span-6" value={draft.body} onChange={(event) => setDraft((d) => ({ ...d, body: event.target.value }))} placeholder="Digite a mensagem pronta..." />
+          <textarea className="input min-h-[130px] md:col-span-2 xl:col-span-6" value={draft.body} onChange={(event) => setDraft((d) => ({ ...d, body: event.target.value }))} placeholder="Digite a mensagem pronta..." />
         </div>
       </section>
 
@@ -218,7 +218,7 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-black text-slate-950">Modelos salvos</h2>
-              <p className="text-xs text-slate-500">{filtered.length} de {templates.length} modelo(s).</p>
+              <p className="text-xs text-slate-500">{filtered.length} de {templates.length} {templates.length === 1 ? 'modelo' : 'modelos'}.</p>
             </div>
             <div className="grid w-full gap-2 md:w-auto md:grid-cols-[240px_180px]">
               <div className="relative">

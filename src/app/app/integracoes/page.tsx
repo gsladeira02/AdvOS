@@ -54,12 +54,12 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
       <div className="grid gap-4 xl:grid-cols-3">
         <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="label">Assinatura digital</p>
               <h2 className="mt-2 text-xl font-black">ZapSign</h2>
               <p className="mt-2 text-sm text-slate-600">Use para enviar procurações, contratos de honorários, acordos e documentos para assinatura.</p>
             </div>
-            <span className={`badge ${zapStatus.cls}`}>{zapStatus.label}</span>
+            <span className={`badge shrink-0 ${zapStatus.cls}`}>{zapStatus.label}</span>
           </div>
 
           <form action="/api/integrations" method="post" className="mt-4 space-y-3">
@@ -103,12 +103,12 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
         <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="label">Cobranças</p>
               <h2 className="mt-2 text-xl font-black">Asaas</h2>
               <p className="mt-2 text-sm text-slate-600">Gere cobranças de honorários, parcelas, Pix e boleto a partir da pasta do cliente ou do financeiro.</p>
             </div>
-            <span className={`badge ${asaasStatus.cls}`}>{asaasStatus.label}</span>
+            <span className={`badge shrink-0 ${asaasStatus.cls}`}>{asaasStatus.label}</span>
           </div>
 
           <form action="/api/integrations" method="post" className="mt-4 space-y-3">
@@ -161,7 +161,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <input className="input mt-1 bg-slate-50" readOnly value={`${appUrl}/api/webhooks/asaas`} />
             </div>
 
-            {asaas?.notes && <p className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {asaas.notes}</p>}
+            {asaas?.notes && <p className="break-safe rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {asaas.notes}</p>}
 
             <button className="btn btn-primary">Salvar Asaas</button>
           </form>
@@ -175,12 +175,12 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
         <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="label">Atendimento</p>
               <h2 className="mt-2 text-xl font-black">WhatsApp API</h2>
               <p className="mt-2 text-sm text-slate-600">Conecte a Cloud API oficial para enviar mensagens pelo AdvOS e receber respostas no sistema.</p>
             </div>
-            <span className={`badge ${whatsappStatus.cls}`}>{whatsappStatus.label}</span>
+            <span className={`badge shrink-0 ${whatsappStatus.cls}`}>{whatsappStatus.label}</span>
           </div>
 
           <form action="/api/integrations" method="post" className="mt-4 space-y-3">
@@ -257,7 +257,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <p className="mt-2 text-xs text-slate-500">Use esta URL no Meta Developers e assine o campo messages.</p>
             </div>
 
-            {whatsapp?.notes && <p className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {whatsapp.notes}</p>}
+            {whatsapp?.notes && <p className="break-safe rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {whatsapp.notes}</p>}
 
             <button className="btn btn-primary">Salvar WhatsApp</button>
           </form>

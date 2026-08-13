@@ -19,8 +19,8 @@ export default async function Servicos({ searchParams }: { searchParams?: Promis
     <PageHeader title="Serviços" subtitle="Cadastre os serviços jurídicos prestados pelo escritório para vincular cada cliente ao serviço contratado."/>
 
     {query?.salvo && <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">Serviço salvo com sucesso.</section>}
-    {query?.erro && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao salvar/listar serviços: {decodeURIComponent(query.erro)}</section>}
-    {error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao carregar serviços: {error.message}. Confira se o SQL <b>v8_migration.sql</b> foi rodado no Supabase.</section>}
+    {query?.erro && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível salvar o serviço. Revise os dados e tente novamente.</section>}
+    {error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível carregar os serviços. Atualize a página ou contate o administrador.</section>}
 
     <section className="card mb-6 p-5">
       <form action="/api/services" method="post" className="grid gap-4 md:grid-cols-4">
@@ -35,15 +35,17 @@ export default async function Servicos({ searchParams }: { searchParams?: Promis
       </form>
     </section>
 
-    <table className="table">
+    <div className="table-responsive">
+    <table className="table min-w-[680px]">
       <thead><tr><th>Serviço</th><th>Descrição padrão</th><th>Valor padrão</th><th>Status</th></tr></thead>
       <tbody>{(data||[]).map((s:any)=><tr key={s.id}>
         <td><b>{s.name}</b></td>
         <td>{s.description || '-'}</td>
         <td>{money(s.default_amount || 0)}</td>
-        <td><span className={`badge ${s.active ? 'badge-ok' : 'badge-warn'}`}>{s.active ? 'ativo' : 'inativo'}</span></td>
+        <td><span className={`badge ${s.active ? 'badge-ok' : 'badge-warn'}`}>{s.active ? 'Ativo' : 'Inativo'}</span></td>
       </tr>)}</tbody>
     </table>
+    </div>
     {!data?.length && !error && <p className="mt-4 text-sm text-slate-500">Nenhum serviço cadastrado ainda.</p>}
   </div>
 }

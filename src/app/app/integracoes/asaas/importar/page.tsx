@@ -10,6 +10,11 @@ function qs(v?: string) {
   return decodeURIComponent(v || '').replace(/\+/g, ' ');
 }
 
+function importTypeLabel(value?: string) {
+  const labels: Record<string, string> = { auto: 'Clientes e cobranças', clients: 'Somente clientes', payments: 'Somente cobranças' };
+  return labels[String(value || '')] || value || '-';
+}
+
 export default async function ImportarAsaas({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
   const { profile } = await getCurrentProfile();
@@ -129,8 +134,8 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
           <Link href="/app/integracoes" className="btn btn-secondary py-2 text-sm">Voltar para Integrações</Link>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="table">
+        <div className="table-responsive mt-4">
+          <table className="table min-w-[900px]">
             <thead>
               <tr>
                 <th>Data</th>
@@ -146,12 +151,12 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
               {(batchesRes.data || []).map((b: any) => (
                 <tr key={b.id}>
                   <td>{dateBR(String(b.created_at || '').slice(0, 10))}</td>
-                  <td>{b.file_name}</td>
-                  <td>{b.import_type}</td>
+                  <td><span className="break-safe">{b.file_name || '-'}</span></td>
+                  <td>{importTypeLabel(b.import_type)}</td>
                   <td>{Number(b.inserted_clients || 0)} criados / {Number(b.updated_clients || 0)} atualizados</td>
                   <td>{Number(b.inserted_payments || 0)} criadas / {Number(b.updated_payments || 0)} atualizadas</td>
                   <td>{Number(b.skipped_rows || 0)}</td>
-                  <td>{Array.isArray(b.errors) && b.errors.length ? `${b.errors.length} ocorrência(s)` : '-'}</td>
+                  <td>{Array.isArray(b.errors) && b.errors.length ? `${b.errors.length} ${b.errors.length === 1 ? 'ocorrência' : 'ocorrências'}` : '-'}</td>
                 </tr>
               ))}
               {!batchesRes.data?.length && <tr><td colSpan={7} className="text-slate-500">Nenhuma importação registrada.</td></tr>}

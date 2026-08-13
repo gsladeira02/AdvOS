@@ -96,3 +96,37 @@ button:disabled{cursor:not-allowed}
   .table,.spreadsheet{max-width:100%;min-width:0;white-space:normal!important}
   .table-wrapper,.spreadsheet-wrapper{max-width:100%;overflow-x:auto}
 }
+
+/* V9.24 — consistência visual, responsividade e prevenção de sobreposição */
+.card,.panel,.page-header{min-width:0}
+.input,.sheet-input,select,textarea{min-width:0;max-width:100%}
+img,video{max-width:100%;height:auto}
+.break-safe{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.table-responsive{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px}
+.table-responsive .table{margin:0;min-width:680px}
+.table td,.spreadsheet td{overflow-wrap:anywhere}
+.page-header-action>.btn{max-width:100%}
+
+@media(max-width:760px){
+  .btn{max-width:100%;white-space:normal;text-align:center}
+  .page-header{padding:9px 11px!important;overflow:visible!important}
+  .page-header>div{flex-direction:row;align-items:center;gap:8px}
+  .page-header h1{min-width:0;flex:1;font-size:1rem!important;line-height:1.2!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+  .page-header-action{margin-left:auto;max-width:48%;flex-shrink:1}
+  .page-header-action .btn{min-height:32px;padding:.42rem .55rem;font-size:.68rem;line-height:1.15}
+  .table-responsive{border-radius:14px}
+  .table-responsive .table{display:table;min-width:660px;white-space:normal!important}
+  .whatsapp-central{height:calc(100dvh - 176px)!important;min-height:360px!important}
+  .whatsapp-panel,.whatsapp-thread{height:100%!important;min-height:0!important}
+  .whatsapp-list-scroll{max-height:none!important;min-height:0!important;flex:1 1 0%!important}
+  .whatsapp-emoji-picker{width:min(310px,calc(100vw - 72px))!important;grid-template-columns:repeat(8,minmax(0,1fr))!important}
+  .whatsapp-emoji-picker button{width:100%!important;min-width:0!important}
+  .whatsapp-sticker-picker{width:min(310px,calc(100vw - 72px))!important}
+  .whatsapp-message-body{overflow-wrap:anywhere;word-break:break-word}
+}
+
+@media(max-width:380px){
+  .mobile-bottom-nav-item{font-size:7px}
+  .whatsapp-central{height:calc(100dvh - 170px)!important}
+  .whatsapp-emoji-picker{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+}

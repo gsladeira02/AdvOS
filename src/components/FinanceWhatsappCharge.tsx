@@ -160,53 +160,60 @@ export function FinanceWhatsappCharge(props: {
       </button>
 
       {open && (
-        <div className="mt-2 w-[360px] max-w-[78vw] rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-left shadow-lg">
-          <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">Modelo de cobrança</label>
-          <select className="input mt-2 !rounded-lg !px-3 !py-2 text-xs" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
-            ))}
-          </select>
+        <div className="fixed inset-0 z-[80] flex items-end justify-center p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Cobrança pelo WhatsApp">
+          <button type="button" className="absolute inset-0 bg-slate-950/35 backdrop-blur-[1px]" aria-label="Fechar cobrança" onClick={() => setOpen(false)} />
+          <div className="relative z-10 max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-left shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Cobrança por WhatsApp</p>
+                <h3 className="mt-1 break-safe text-sm font-black text-slate-950">{props.clientName || 'Cliente'}</h3>
+              </div>
+              <button type="button" className="btn btn-ghost !min-h-0 !rounded-lg !px-2.5 !py-1.5 text-xs" onClick={() => setOpen(false)}>Fechar</button>
+            </div>
 
-          <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-[#eee4d4] bg-white p-3 text-[11px] leading-relaxed text-slate-600 whitespace-pre-wrap">
-            {message || 'Selecione um modelo para visualizar a mensagem.'}
-          </div>
+            <label className="mt-4 block text-[10px] font-black uppercase tracking-wide text-slate-500">Modelo de cobrança</label>
+            <select className="input mt-2 !rounded-lg !px-3 !py-2 text-xs" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+            </select>
 
-          {!props.phone && (
-            <p className="mt-2 text-[11px] font-bold text-amber-700">
-              Cliente sem WhatsApp/telefone. O envio pela API exige telefone; o WhatsApp Web abrirá sem destinatário.
-            </p>
-          )}
+            <div className="break-safe mt-3 max-h-44 overflow-auto whitespace-pre-wrap rounded-xl border border-[#eee4d4] bg-white p-3 text-[11px] leading-relaxed text-slate-600">
+              {message || 'Selecione um modelo para visualizar a mensagem.'}
+            </div>
 
-          {feedback && <p className="mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
-
-          <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
-            <b>Regra da Meta:</b> o botão principal agora abre a conversa com o texto pronto. Se a janela de 24h estiver fechada, envie um template oficial aprovado.
-            {metaTemplateName ? <span> Este modelo está ligado ao template Meta <b>{metaTemplateName}</b>.</span> : <span> Cadastre o campo <b>Template Meta</b> em Modelos de mensagem para cobranças fora da janela.</span>}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {props.clientId && props.phone ? (
-              <Link href={conversationHref} className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={explainConversationDraft}>
-                Abrir conversa com texto
-              </Link>
-            ) : (
-              <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" disabled>
-                Cliente sem conversa
-              </button>
-            )}
-            {metaTemplateName && (
-              <button type="button" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs" onClick={sendOfficialTemplate} disabled={sending || !props.phone}>
-                Template oficial
-              </button>
+            {!props.phone && (
+              <p className="break-safe mt-2 text-[11px] font-bold text-amber-700">
+                Cliente sem WhatsApp ou telefone cadastrado. O envio pela integração exige um número válido.
+              </p>
             )}
 
-            <a href={whatsappHref} target="_blank" rel="noreferrer" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs">
-              Abrir Web
-            </a>
-            <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={() => setOpen(false)}>
-              Fechar
-            </button>
+            {feedback && <p className="break-safe mt-2 rounded-lg border border-[#eee4d4] bg-white p-2 text-[11px] font-bold text-slate-700">{feedback}</p>}
+
+            <div className="break-safe mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
+              <b>Envio fora da janela de atendimento:</b> a Meta pode exigir um modelo oficial aprovado.
+              {metaTemplateName ? <span> Este modelo está vinculado ao template <b>{metaTemplateName}</b>.</span> : <span> Configure o campo <b>Template Meta</b> em Modelos de mensagem quando necessário.</span>}
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {props.clientId && props.phone ? (
+                <Link href={conversationHref} className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" onClick={explainConversationDraft}>
+                  Abrir conversa
+                </Link>
+              ) : (
+                <button type="button" className="btn btn-primary !rounded-lg !px-3 !py-2 text-xs" disabled>
+                  Cliente sem conversa
+                </button>
+              )}
+              {metaTemplateName && (
+                <button type="button" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs" onClick={sendOfficialTemplate} disabled={sending || !props.phone}>
+                  Enviar modelo oficial
+                </button>
+              )}
+              <a href={whatsappHref} target="_blank" rel="noreferrer" className={`btn btn-secondary !rounded-lg !px-3 !py-2 text-xs ${metaTemplateName ? 'sm:col-span-2' : ''}`}>
+                Abrir no WhatsApp Web
+              </a>
+            </div>
           </div>
         </div>
       )}

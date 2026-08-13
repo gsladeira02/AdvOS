@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { Briefcase, CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
+import { CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
 
 const items = [
   ['/app/dashboard', 'Início', Home],
@@ -12,11 +12,11 @@ const items = [
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
   ['/app/tarefas', 'Tarefas', CheckSquare],
-  ['/app/usuarios', 'Usuários', Briefcase],
+  ['/app/usuarios', 'Usuários', UserCog],
   ['/app/integracoes', 'Integrações', Plug],
-  ['/app/integracoes/asaas/importar', 'Importar', UploadCloud],
+  ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
   ['/app/modelos-mensagens', 'Modelos', MessageSquare],
-  ['/app/configuracoes', 'Config.', Settings],
+  ['/app/configuracoes', 'Configurações', Settings],
 ] as const;
 
 const mobileItems = [
@@ -58,7 +58,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="page-shell">
-      <div className="desktop-grid grid min-h-[100dvh] md:grid-cols-[138px_1fr]">
+      <div className="desktop-grid grid min-h-[100dvh] md:grid-cols-[172px_1fr]">
         <aside className="sidebar sticky top-0 hidden h-screen flex-col border-r border-[#e6dccb] bg-white/95 px-2 py-3 shadow-sm backdrop-blur md:flex">
           <Link href="/app/dashboard" title={`AdvOS — ${firmName}`} className="mb-3 flex h-10 items-center gap-2 rounded-2xl bg-ink px-2 text-xs font-black text-white shadow-sm">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/15 text-sm">A</span>
@@ -88,13 +88,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <header className="mobile-pwa-top md:hidden">
-          <Link href="/app/whatsapp" className="flex items-center gap-2 font-black text-white">
+          <Link href="/app/dashboard" className="flex items-center gap-2 font-black text-white">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15">A</span>
             <span className="leading-none">AdvOS</span>
           </Link>
           <div className="min-w-0 text-right">
             <p className="truncate text-[11px] font-black text-white">{firmName}</p>
-            <p className="truncate text-[9px] font-bold text-white/65">PWA ativo</p>
+            <p className="truncate text-[9px] font-bold text-white/65">{userName}</p>
           </div>
         </header>
 

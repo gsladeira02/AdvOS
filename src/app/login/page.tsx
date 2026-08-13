@@ -55,8 +55,8 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center px-6">
-      <div className="card w-full max-w-md p-8">
+    <main className="grid min-h-[100dvh] place-items-center px-4 py-6 sm:px-6">
+      <div className="card w-full max-w-md p-6 sm:p-8">
         <Link href="/" className="mb-8 flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-ink text-xl font-black text-white">A</div>
           <div>
@@ -65,7 +65,7 @@ export default function Login() {
           </div>
         </Link>
         <h1 className="text-3xl font-black">Entrar</h1>
-        <p className="mt-2 text-slate-600">Use o usuário criado no Supabase ou dentro do painel.</p>
+        <p className="mt-2 text-slate-600">Use seu e-mail e a senha cadastrados no AdvOS.</p>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
             <label className="label">E-mail</label>
@@ -80,7 +80,7 @@ export default function Login() {
             {checkingSession ? 'Verificando sessão...' : loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">No PWA, sua sessão fica salva enquanto você não clicar em sair.</p>
+        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">Sua sessão permanece ativa neste dispositivo até você sair da conta.</p>
       </div>
     </main>
   );

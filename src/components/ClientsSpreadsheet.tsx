@@ -126,11 +126,11 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
             <p className="text-xs text-slate-500">Busque, filtre e ordene os clientes como uma planilha.</p>
           </div>
           <div className="text-xs font-bold text-slate-600">
-            {filteredClients.length} de {clients.length} cliente(s)
+            {filteredClients.length} de {clients.length} {clients.length === 1 ? 'cliente' : 'clientes'}
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-8">
+        <div className="mt-3 grid gap-2 md:grid-cols-4 xl:grid-cols-8">
           <input
             className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2"
             value={searchText}

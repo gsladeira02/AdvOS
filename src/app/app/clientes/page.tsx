@@ -26,11 +26,11 @@ export default async function Clientes({ searchParams }: { searchParams?: Promis
   const clients = clientsRes.data || [];
 
   return <div>
-    <PageHeader title="Clientes" subtitle="Cadastro central do escritório. A lista agora funciona como planilha: busca, filtros e ordenação instantânea."/>
+    <PageHeader title="Clientes" subtitle="Cadastre, pesquise, filtre e organize os clientes do escritório em um só lugar."/>
     {query?.salvo && <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">Cliente salvo com sucesso.</section>}
-    {query?.erro && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao salvar cliente: {decodeURIComponent(query.erro)}</section>}
-    {servicesRes.error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao carregar serviços: {servicesRes.error.message}. Confira se o SQL <b>v8_migration.sql</b> foi rodado no Supabase.</section>}
-    {clientsRes.error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Erro ao carregar clientes: {clientsRes.error.message}.</section>}
+    {query?.erro && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível salvar o cliente. Revise os dados e tente novamente.</section>}
+    {servicesRes.error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível carregar os serviços. Atualize a página ou contate o administrador.</section>}
+    {clientsRes.error && <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">Não foi possível carregar os clientes. Atualize a página ou contate o administrador.</section>}
 
     <section className="card mb-6 p-5">
       <form action="/api/clients" method="post" className="grid gap-4 md:grid-cols-3">

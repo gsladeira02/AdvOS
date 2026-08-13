@@ -237,19 +237,19 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
         <div>
           <h3 className="mb-3 text-lg font-black">Honorários e cobranças Asaas</h3>
-          <div className="grid gap-4 md:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             <input className="input" name="total_amount" type="number" step="0.01" placeholder="Valor total" defaultValue={selectedService?.default_amount || ''} />
             <input className="input" name="entry_amount" type="number" step="0.01" placeholder="Entrada" />
             <input className="input" name="entry_date" type="date" placeholder="Data da entrada" />
             <input className="input" name="installment_count" type="number" placeholder="Nº parcelas" />
             <input className="input" name="installment_amount" type="number" step="0.01" placeholder="Valor parcela" />
-            <input className="input md:col-span-6" name="payment_notes" placeholder="Observações do pagamento" />
+            <input className="input md:col-span-3 xl:col-span-6" name="payment_notes" placeholder="Observações do pagamento" />
           </div>
           <p className="mt-2 text-xs text-slate-500">Ao gerar, a entrada e as parcelas serão cadastradas no financeiro e enviadas ao Asaas se a integração estiver configurada.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button className="btn btn-primary">Gerar PDF + ZapSign + Asaas</button>
+          <button className="btn btn-primary">Gerar documentos e cobranças</button>
           <span className="text-sm text-slate-500">O documento e as cobranças aparecerão no histórico desta pasta.</span>
         </div>
       </form>
@@ -265,8 +265,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
     <section className="card mb-6 p-5">
       <h2 className="text-xl font-black">Documentos da pasta</h2>
-      <div className="mt-4 overflow-x-auto">
-        <table className="table">
+      <div className="table-responsive mt-4">
+        <table className="table min-w-[820px]">
           <thead><tr><th>Documento</th><th>Processo</th><th>Assinatura</th><th>Arquivo</th><th>Criado em</th><th>Ações</th></tr></thead>
           <tbody>{docs.map((d:any)=><tr key={d.id}>
             <td>
@@ -305,19 +305,19 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           const wa = whatsappUrl(client.whatsapp || client.phone || g.phone, message);
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <b>{docLabel(g.document_type)}</b>
-                <p className="text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
+              <div className="min-w-0 flex-1">
+                <b className="break-safe">{docLabel(g.document_type)}</b>
+                <p className="break-safe text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
               {wa ? <Link className="btn btn-primary" href={wa} target="_blank">Enviar links no WhatsApp</Link> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
               <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
-              <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} link(s) de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
+              <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} ${asaasLinks.length === 1 ? 'link' : 'links'} de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
               <p><b>Data:</b> {dateBR(g.contract_date)}</p>
             </div>
-            {charges.length ? <div className="mt-4 overflow-x-auto rounded-2xl border border-[#eee4d4]">
-              <table className="table">
+            {charges.length ? <div className="table-responsive mt-4 rounded-2xl border border-[#eee4d4]">
+              <table className="table min-w-[760px]">
                 <thead><tr><th>Cobrança</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Link</th><th>Ação</th></tr></thead>
                 <tbody>{charges.map((i:any, idx:number)=>{
                   const url = linkFromInstallment(i);
@@ -351,8 +351,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
     <section className="card p-5">
       <h2 className="text-xl font-black">Processos vinculados</h2>
-      <div className="mt-4 overflow-x-auto">
-        <table className="table"><thead><tr><th>Número</th><th>Área</th><th>Ação</th><th>Status</th></tr></thead><tbody>{(casesRes.data || []).map((c:any)=><tr key={c.id}><td>{c.case_number || '-'}</td><td>{c.area || '-'}</td><td>{c.action_type || '-'}</td><td>{c.status || '-'}</td></tr>)}</tbody></table>
+      <div className="table-responsive mt-4">
+        <table className="table min-w-[620px]"><thead><tr><th>Número</th><th>Área</th><th>Ação</th><th>Status</th></tr></thead><tbody>{(casesRes.data || []).map((c:any)=><tr key={c.id}><td>{c.case_number || '-'}</td><td>{c.area || '-'}</td><td>{c.action_type || '-'}</td><td>{c.status || '-'}</td></tr>)}</tbody></table>
         {!casesRes.data?.length && <p className="mt-3 text-sm text-slate-500">Nenhum processo vinculado.</p>}
       </div>
     </section>

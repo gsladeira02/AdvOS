@@ -6,12 +6,13 @@ export default async function Configuracoes(){
   const {supabase,profile}=await getCurrentProfile();
   const {data:firm}=await supabase.from('law_firms').select('*').eq('id',profile.law_firm_id).maybeSingle();
   const {data:sub}=await supabase.from('subscriptions').select('*').eq('law_firm_id',profile.law_firm_id).maybeSingle();
+  const needsSetup = !firm?.name || !firm?.email || !firm?.phone;
 
   return <div>
-    <PageHeader title="Configurações" subtitle="Dados do escritório, acesso e usuário logado. As abas funcionam mesmo antes de completar estes dados." />
-    <section className="card mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-      O AdvOS cria um escritório interno provisório no primeiro acesso. Você pode usar clientes, contratos, documentos e financeiro normalmente; depois complete os dados do escritório aqui.
-    </section>
+    <PageHeader title="Configurações" subtitle="Atualize os dados do escritório, do seu usuário e do acesso ao sistema." />
+    {needsSetup && <section className="card mb-6 border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+      Complete os dados principais do escritório para manter cadastros, documentos e comunicações corretamente identificados.
+    </section>}
     <div className="grid gap-6 lg:grid-cols-2">
       <form action="/api/settings" method="post" className="card p-6">
         <input type="hidden" name="section" value="firm" />
