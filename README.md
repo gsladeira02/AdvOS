@@ -1,3 +1,7 @@
+# AdvOS v9.37
+
+Responsáveis, notas internas, filtros operacionais e autoria das mensagens no WhatsApp.
+
 # AdvOS V9.36
 
 ## V9.36 — WhatsApp Encerrados
