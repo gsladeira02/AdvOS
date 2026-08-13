@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
-import { CalendarDays, CheckSquare, Home, LogOut, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
+import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
+import { LogoutButton } from '@/components/LogoutButton';
 
 const items = [
   ['/app/dashboard', 'Início', Home],
@@ -80,12 +81,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <p className="truncate text-[9px] font-bold text-slate-500">{firmName}</p>
           </div>
 
-          <form action="/auth/signout" method="post">
-            <button title="Sair" aria-label="Sair" className="flex h-8 w-full items-center gap-2 rounded-xl px-2 text-[11px] font-black text-slate-600 transition hover:bg-red-50 hover:text-red-700">
-              <LogOut size={14} className="shrink-0" />
-              <span>Sair</span>
-            </button>
-          </form>
+          <LogoutButton />
         </aside>
 
         <header className="mobile-pwa-top md:hidden">
@@ -93,9 +89,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15">A</span>
             <span className="leading-none">AdvOS</span>
           </Link>
-          <div className="min-w-0 text-right">
-            <p className="truncate text-[11px] font-black text-white">{firmName}</p>
-            <p className="truncate text-[9px] font-bold text-white/65">{userName}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 text-right">
+              <p className="truncate text-[11px] font-black text-white">{firmName}</p>
+              <p className="truncate text-[9px] font-bold text-white/65">{userName}</p>
+            </div>
+            <LogoutButton mobile />
           </div>
         </header>
 

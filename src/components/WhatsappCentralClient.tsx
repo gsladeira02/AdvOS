@@ -84,10 +84,12 @@ export function WhatsappCentralClient({
   const [mobileListOpen, setMobileListOpen] = useState(!initialSelectedId);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting');
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const selectedIdRef = useRef(initialSelectedId || initialConversations?.[0]?.id || '');
   const queryRef = useRef('');
   const loadingRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { queryRef.current = query; }, [query]);
@@ -112,20 +114,30 @@ export function WhatsappCentralClient({
   const isSearching = Boolean(query.trim());
 
   const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
-    if (loadingRef.current && silent) return;
+    if (loadingRef.current) {
+      // Eventos do Realtime podem chegar enquanto a API ainda está respondendo.
+      // Em vez de perder o evento, fazemos mais uma leitura assim que a atual terminar.
+      refreshQueuedRef.current = true;
+      return;
+    }
+
     const effectiveTargetId = typeof targetId === 'string' ? targetId : selectedIdRef.current;
     const effectiveSearch = typeof searchTerm === 'string' ? searchTerm : queryRef.current;
     if (!silent) setLoading(true);
     loadingRef.current = true;
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+
     try {
       const params = new URLSearchParams();
       if (effectiveTargetId) params.set('conversationId', effectiveTargetId);
-      // A busca é aplicada no cliente para manter a conversa atual aberta.
-      // A API sempre devolve conversas reais e contatos separados.
-      const cleanSearch = String(effectiveSearch || '').trim();
       params.set('_', String(Date.now()));
+
       const response = await fetch(`/api/whatsapp/conversations?${params.toString()}`, {
         cache: 'no-store',
+        credentials: 'same-origin',
+        signal: controller.signal,
         headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
       });
       const result = await response.json().catch(() => ({}));
@@ -143,48 +155,125 @@ export function WhatsappCentralClient({
         return String(message.conversation_id) === String(nextSelectedId);
       }));
 
+      // Se um contato virtual acabou de receber/enviar a primeira mensagem,
+      // a API devolve o ID da conversa real e a interface migra automaticamente.
       if (nextSelectedId && nextSelectedId !== selectedIdRef.current) {
         selectedIdRef.current = nextSelectedId;
         setSelectedId(nextSelectedId);
+        setActiveTab('conversas');
+        window.history.replaceState(null, '', `/app/whatsapp?conversa=${encodeURIComponent(nextSelectedId)}`);
       }
+
       setLastUpdate(result.fetchedAt || new Date().toISOString());
       setError(null);
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível atualizar as conversas.');
+      if (err?.name !== 'AbortError') {
+        setError(err?.message || 'Não foi possível atualizar as conversas.');
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       loadingRef.current = false;
       if (!silent) setLoading(false);
+
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event('advos:whatsapp-refresh'));
+        }, 60);
+      }
     }
   }, []);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('advos-whatsapp-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages' }, () => load())
-      .subscribe();
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const refreshFromRealtime = () => {
+      void load(selectedIdRef.current, true, queryRef.current);
+    };
+
+    const connectRealtime = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!active) return;
+
+        // Depois do hardening, as tabelas do WhatsApp usam RLS para authenticated.
+        // O Realtime precisa receber explicitamente o JWT antes de avaliar essas policies.
+        if (session?.access_token) {
+          await supabase.realtime.setAuth(session.access_token);
+        } else {
+          setRealtimeStatus('fallback');
+        }
+
+        channel = supabase
+          .channel('advos-whatsapp-live')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, refreshFromRealtime)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages' }, refreshFromRealtime)
+          .subscribe((status) => {
+            if (!active) return;
+            if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('live');
+              refreshFromRealtime();
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+              // O polling abaixo continua mantendo a tela atualizada mesmo se o WebSocket cair.
+              setRealtimeStatus('fallback');
+            }
+          });
+      } catch {
+        if (active) setRealtimeStatus('fallback');
+      }
+    };
+
+    void connectRealtime();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (session?.access_token) {
+        void supabase.realtime.setAuth(session.access_token);
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      active = false;
+      authListener.subscription.unsubscribe();
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [supabase, load]);
 
   useEffect(() => {
-    load(selectedIdRef.current, true, queryRef.current);
-    const id = window.setInterval(() => load(selectedIdRef.current, true, queryRef.current), 1300);
-    const onFocus = () => load(selectedIdRef.current, true, queryRef.current);
-    const onVisibility = () => {
-      if (!document.hidden) load(selectedIdRef.current, true, queryRef.current);
+    let cancelled = false;
+    let timerId: number | null = null;
+
+    const schedule = (delay: number) => {
+      if (cancelled) return;
+      if (timerId) window.clearTimeout(timerId);
+      timerId = window.setTimeout(() => { void poll(); }, delay);
     };
-    const onForcedRefresh = () => load(selectedIdRef.current, true, queryRef.current);
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('advos:whatsapp-refresh', onForcedRefresh);
-    document.addEventListener('visibilitychange', onVisibility);
+
+    const poll = async () => {
+      if (cancelled) return;
+      await load(selectedIdRef.current, true, queryRef.current);
+      // Realtime é o caminho rápido; polling é a rede de segurança.
+      // Em primeiro plano, no máximo ~2 s para refletir uma mensagem recebida.
+      schedule(document.hidden ? 8000 : 2000);
+    };
+
+    const refreshNow = () => {
+      if (timerId) window.clearTimeout(timerId);
+      void poll();
+    };
+
+    void poll();
+    window.addEventListener('focus', refreshNow);
+    window.addEventListener('advos:whatsapp-refresh', refreshNow);
+    document.addEventListener('visibilitychange', refreshNow);
+
     return () => {
-      window.clearInterval(id);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('advos:whatsapp-refresh', onForcedRefresh);
-      document.removeEventListener('visibilitychange', onVisibility);
+      cancelled = true;
+      if (timerId) window.clearTimeout(timerId);
+      window.removeEventListener('focus', refreshNow);
+      window.removeEventListener('advos:whatsapp-refresh', refreshNow);
+      document.removeEventListener('visibilitychange', refreshNow);
     };
   }, [load]);
 
@@ -331,13 +420,13 @@ export function WhatsappCentralClient({
         </div>
 
         <div className="shrink-0 border-t border-[#d6ddd6] bg-[#f0f2f5] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
-          {error ? error : lastUpdate ? `Atualizado: ${shortTime(lastUpdate)}` : 'Aguardando atualização.'}
+          {error ? error : lastUpdate ? `${realtimeStatus === 'live' ? 'Ao vivo' : 'Atualização automática'} · ${shortTime(lastUpdate)}` : 'Conectando atualização automática...' }
         </div>
       </section>
 
       {selected ? (
         <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
-          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
+          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
         </div>
       ) : (
         <section className="whatsapp-panel min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
