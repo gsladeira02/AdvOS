@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { clientIdFromVirtualConversationId, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
+import { clientIdFromVirtualConversationId, enrichMessagesWithSenderProfiles, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
       ok: true,
       conversationId: conversation.id,
       conversation,
-      messages: messages || [],
+      messages: await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, messages || []),
       fetchedAt: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {

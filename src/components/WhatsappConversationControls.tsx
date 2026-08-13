@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Archive, Check, ChevronDown, RotateCcw, Tag, UserPlus, X } from 'lucide-react';
+import { WhatsappOperationsPanel } from '@/components/WhatsappOperationsPanel';
 
 const colorClasses: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700', sky: 'bg-sky-100 text-sky-700', emerald: 'bg-emerald-100 text-emerald-700', violet: 'bg-violet-100 text-violet-700', amber: 'bg-amber-100 text-amber-800', rose: 'bg-rose-100 text-rose-700', red: 'bg-red-100 text-red-700', green: 'bg-green-100 text-green-700', indigo: 'bg-indigo-100 text-indigo-700',
@@ -22,12 +23,18 @@ export function WhatsappConversationControls({
   availableTags = [],
   leadStages = [],
   leadLabel = 'Lead',
+  teamUsers = [],
+  currentUserId = '',
+  canConfigure = false,
   onChanged,
 }: {
   conversation: any;
   availableTags?: any[];
   leadStages?: any[];
   leadLabel?: string;
+  teamUsers?: any[];
+  currentUserId?: string;
+  canConfigure?: boolean;
   onChanged?: (change?: any) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -150,6 +157,8 @@ export function WhatsappConversationControls({
             </details>
           </div>
         )}
+
+        <WhatsappOperationsPanel conversation={conversation} teamUsers={teamUsers} currentUserId={currentUserId} canConfigure={canConfigure} onChanged={onChanged} />
 
         {isClosed && <p className="mt-1.5 text-[9px] font-bold text-slate-500">Encerrada em {closedAtLabel(conversation?.closed_at) || 'data não informada'}. O histórico permanece disponível.</p>}
         {isLead && <p className="mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'} · só vira cliente após confirmação manual.</p>}

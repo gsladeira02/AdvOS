@@ -8,14 +8,14 @@ function startOfDayIso(daysBack = 0) {
 }
 
 export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
-  const [{ data: leads, error: leadsError }, { data: conversations, error: conversationsError }, { data: stages, error: stagesError }, { data: tagLinks, error: tagLinksError }] = await Promise.all([
+  const [{ data: leads, error: leadsError }, { data: conversations, error: conversationsError }, { data: stages, error: stagesError }, { data: tagLinks, error: tagLinksError }, { data: profiles, error: profilesError }] = await Promise.all([
     admin
       .from('whatsapp_leads')
       .select('id,stage,created_at,updated_at,converted_at,last_contact_at')
       .eq('law_firm_id', lawFirmId),
     admin
       .from('whatsapp_conversations')
-      .select('id,department,unread_count,last_message_at,closed_at')
+      .select('id,department,unread_count,last_message_at,closed_at,assigned_to')
       .eq('law_firm_id', lawFirmId),
     admin
       .from('whatsapp_lead_stages')
@@ -26,12 +26,17 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
       .from('whatsapp_conversation_tags')
       .select('tag_id, whatsapp_tags(id,name,color,active)')
       .eq('law_firm_id', lawFirmId),
+    admin
+      .from('profiles')
+      .select('auth_user_id,full_name,email,status')
+      .eq('law_firm_id', lawFirmId),
   ]);
 
   if (leadsError) throw new Error(leadsError.message);
   if (conversationsError) throw new Error(conversationsError.message);
   if (stagesError) throw new Error(stagesError.message);
   if (tagLinksError) throw new Error(tagLinksError.message);
+  if (profilesError) throw new Error(profilesError.message);
 
   const leadRows = leads || [];
   const stageRows = stages || [];
@@ -61,6 +66,16 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
   const closedConversationRows = conversationRows.filter((conversation: any) => Boolean(conversation.closed_at));
   const unreadConversations = activeConversationRows.filter((conversation: any) => Number(conversation.unread_count || 0) > 0);
   const decisionBase = wonLeads.length + lostLeads.length;
+  const profileById = new Map((profiles || []).filter((profile: any) => profile?.auth_user_id).map((profile: any) => [String(profile.auth_user_id), profile]));
+  const responsibleCounts = new Map<string, any>();
+  for (const conversation of activeConversationRows) {
+    const id = String(conversation?.assigned_to || 'unassigned');
+    const user: any = id === 'unassigned' ? null : profileById.get(id);
+    const current = responsibleCounts.get(id) || { id, name: user?.full_name || user?.email || 'Sem responsável', count: 0, unread: 0 };
+    current.count += 1;
+    current.unread += Number(conversation?.unread_count || 0);
+    responsibleCounts.set(id, current);
+  }
 
   const tagCounts = new Map<string, { id: string; name: string; color: string; count: number }>();
   for (const link of tagLinks || []) {
@@ -95,5 +110,6 @@ export async function loadWhatsappDashboard(admin: any, lawFirmId: string) {
       unreadMessages: unreadConversations.reduce((sum: number, conversation: any) => sum + Number(conversation.unread_count || 0), 0),
     },
     tags: Array.from(tagCounts.values()).sort((a, b) => b.count - a.count).slice(0, 8),
+    responsibles: Array.from(responsibleCounts.values()).sort((a: any, b: any) => b.count - a.count || String(a.name).localeCompare(String(b.name), 'pt-BR')),
   };
 }

@@ -159,7 +159,11 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
     rows.push(...(data || []));
   }
 
-  const [{ data: leadRows, error: leadError }, { data: tagLinks, error: tagLinksError }] = await Promise.all([
+  const [
+    { data: leadRows, error: leadError },
+    { data: tagLinks, error: tagLinksError },
+    { data: profileRows, error: profileError },
+  ] = await Promise.all([
     admin
       .from('whatsapp_leads')
       .select('*')
@@ -170,10 +174,16 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
       .select('conversation_id,tag_id, whatsapp_tags(id,name,color,active,sort_order)')
       .eq('law_firm_id', lawFirmId)
       .in('conversation_id', activeIds),
+    admin
+      .from('profiles')
+      .select('auth_user_id,full_name,email,role,status')
+      .eq('law_firm_id', lawFirmId),
   ]);
   if (leadError) throw new Error(leadError.message);
   if (tagLinksError) throw new Error(tagLinksError.message);
+  if (profileError) throw new Error(profileError.message);
   const leadByConversation = new Map((leadRows || []).map((lead: any) => [String(lead.conversation_id), lead]));
+  const profileByAuthUser = new Map((profileRows || []).filter((profile: any) => profile?.auth_user_id).map((profile: any) => [String(profile.auth_user_id), profile]));
   const tagsByConversation = new Map<string, any[]>();
   for (const link of tagLinks || []) {
     const conversationId = String((link as any)?.conversation_id || '');
@@ -201,6 +211,7 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
         tag_ids: (tagsByConversation.get(String(conversation.id)) || []).map((tag: any) => tag.id),
         tag_meta: tagsByConversation.get(String(conversation.id)) || [],
         lead: leadByConversation.get(String(conversation.id)) || null,
+        assigned_user: conversation?.assigned_to ? (profileByAuthUser.get(String(conversation.assigned_to)) || null) : null,
         has_messages: true,
         message_count: 1,
         last_message_at: latest?.created_at || conversation.last_message_at || null,
@@ -217,4 +228,29 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
       const bTime = new Date(b.last_message_at || 0).getTime();
       return bTime - aTime;
     });
+}
+
+
+export async function enrichMessagesWithSenderProfiles(admin: any, lawFirmId: string, messages: any[] = []) {
+  const senderIds = Array.from(new Set((messages || []).map((message: any) => String(message?.sent_by || '')).filter(Boolean)));
+  if (!senderIds.length) {
+    return (messages || []).map((message: any) => ({ ...message, sent_by_profile: null, sent_by_name: null }));
+  }
+
+  const { data: profiles, error } = await admin
+    .from('profiles')
+    .select('auth_user_id,full_name,email,role,status')
+    .eq('law_firm_id', lawFirmId)
+    .in('auth_user_id', senderIds);
+  if (error) throw new Error(error.message);
+
+  const byId = new Map((profiles || []).map((profile: any) => [String(profile.auth_user_id), profile]));
+  return (messages || []).map((message: any) => {
+    const profile: any = message?.sent_by ? byId.get(String(message.sent_by)) : null;
+    return {
+      ...message,
+      sent_by_profile: profile || null,
+      sent_by_name: profile?.full_name || null,
+    };
+  });
 }

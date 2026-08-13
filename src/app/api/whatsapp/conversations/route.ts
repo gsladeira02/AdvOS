@@ -7,6 +7,7 @@ import {
   isVirtualConversationId,
   virtualContactFromClient,
   loadVisibleConversations,
+  enrichMessagesWithSenderProfiles,
 } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
@@ -120,7 +121,7 @@ export async function GET(req: Request) {
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);
-      messages = data || [];
+      messages = await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, data || []);
 
       if (Number(selected.unread_count || 0) > 0) {
         await admin

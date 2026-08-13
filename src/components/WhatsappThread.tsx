@@ -347,6 +347,10 @@ export function WhatsappThread({
   availableTags = [],
   leadStages = [],
   leadLabel = 'Lead',
+  teamUsers = [],
+  currentUserId = '',
+  currentUserName = '',
+  canConfigure = false,
   live = true,
   initialDraft = '',
   onDraftApplied,
@@ -360,6 +364,10 @@ export function WhatsappThread({
   availableTags?: any[];
   leadStages?: any[];
   leadLabel?: string;
+  teamUsers?: any[];
+  currentUserId?: string;
+  currentUserName?: string;
+  canConfigure?: boolean;
   live?: boolean;
   initialDraft?: string;
   onDraftApplied?: () => void;
@@ -399,6 +407,17 @@ export function WhatsappThread({
 
   const visibleItems = items || [];
   const isClosed = Boolean(conversation?.closed_at);
+  const teamUserById = useMemo(() => new Map((teamUsers || []).filter((user: any) => user?.auth_user_id).map((user: any) => [String(user.auth_user_id), user])), [teamUsers]);
+
+  function senderNameForMessage(message: any) {
+    if (message?.direction !== 'outbound') return '';
+    if (message?.sent_by_name) return String(message.sent_by_name);
+    const sentBy = String(message?.sent_by || '');
+    const user: any = sentBy ? teamUserById.get(sentBy) : null;
+    if (user?.full_name) return String(user.full_name);
+    if (sentBy && sentBy === String(currentUserId || '') && currentUserName) return currentUserName;
+    return sentBy ? 'Usuário do escritório' : 'Escritório · histórico';
+  }
 
   function clearRecordedAudio() {
     setRecordedAudio((current) => {
@@ -761,6 +780,8 @@ export function WhatsappThread({
       mime_type: selectedFile.type,
       media_url: null,
       storage_path: null,
+      sent_by: currentUserId || null,
+      sent_by_name: currentUserName || null,
       optimistic: true,
     };
   }
@@ -913,6 +934,8 @@ export function WhatsappThread({
           body: message,
           status: result.message?.status || 'sent',
           created_at: result.message?.created_at || new Date().toISOString(),
+          sent_by: result.message?.sent_by || currentUserId || null,
+          sent_by_name: result.message?.sent_by_name || currentUserName || null,
           optimistic: !result.message?.id,
         };
       }
@@ -1107,6 +1130,9 @@ export function WhatsappThread({
         availableTags={availableTags}
         leadStages={leadStages}
         leadLabel={leadLabel}
+        teamUsers={teamUsers}
+        currentUserId={currentUserId}
+        canConfigure={canConfigure}
         onChanged={onConversationChanged}
       />
 
@@ -1135,6 +1161,7 @@ export function WhatsappThread({
                         ))}
                       </div>
                     )}
+                    {outbound && <div className="mb-1 max-w-full truncate text-[9px] font-black text-[#075e54]" title={senderNameForMessage(message)}>{senderNameForMessage(message)}</div>}
                     {renderMessageBody(message)}
                     <div className="mt-1 flex items-center justify-end gap-1 text-[9px] font-bold text-slate-500">
                       {message.optimistic && <span>sincronizando</span>}

@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { WhatsappCentralClient } from '@/components/WhatsappCentralClient';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { buildClientContacts, clientIdFromVirtualConversationId, isVirtualConversationId, loadVisibleConversations, virtualConversationId } from '@/lib/whatsappConversations';
+import { buildClientContacts, clientIdFromVirtualConversationId, enrichMessagesWithSenderProfiles, isVirtualConversationId, loadVisibleConversations, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
 import { loadWhatsappSettings } from '@/lib/whatsappSettings';
@@ -67,7 +67,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const requestedView = String(query?.view || '').trim();
   const initialSettingsSection = String(query?.section || 'tags').trim();
 
-  const [{ data: integration }, { data: clients }, { data: templates }] = await Promise.all([
+  const [{ data: integration }, { data: clients }, { data: templates }, { data: teamProfiles }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
     admin
       .from('clients')
@@ -80,6 +80,11 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       .select('id,name,slug,shortcut,body,category,active,meta_template_name,meta_template_language')
       .eq('law_firm_id', profile.law_firm_id)
       .order('name'),
+    admin
+      .from('profiles')
+      .select('auth_user_id,full_name,email,role,status')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('full_name'),
   ]);
 
   const [whatsappSettings, initialDashboard] = await Promise.all([
@@ -110,7 +115,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         ? 'financeiro_juridico'
         : 'atendimento';
 
-  const { data: messages } = selected && !selected.virtual
+  const { data: rawMessages } = selected && !selected.virtual
     ? await admin
         .from('whatsapp_messages')
         .select('*')
@@ -119,6 +124,9 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         .is('deleted_at', null)
         .order('created_at', { ascending: true })
     : { data: [] as any[] };
+  const messages = selected && !selected.virtual
+    ? await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, rawMessages || [])
+    : [];
 
   const active = Boolean(integration?.enabled && integration?.token_last4 && integration?.raw_settings?.phone_number_id);
 
@@ -139,6 +147,9 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       <WhatsappCentralClient
         initialConversations={conversations || []}
         initialMessages={messages || []}
+        teamUsers={teamProfiles || []}
+        currentUserId={String(profile.auth_user_id || '')}
+        currentUserName={String(profile.full_name || '')}
         initialSelectedId={selected?.id || ''}
         initialContacts={contacts || []}
         initialDraft={initialDraft}

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { attachConversationMediaToClientFolder } from '@/lib/whatsappCRM';
+import { recordWhatsappEvent } from '@/lib/whatsappOperations';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -96,7 +97,7 @@ async function setConversationTags(admin: any, lawFirmId: string, conversationId
 
 export async function POST(req: Request) {
   try {
-    const { profile } = await getCurrentProfile();
+    const { session, profile } = await getCurrentProfile();
     const admin = createAdminSupabase();
     const body = await req.json().catch(() => ({}));
     const action = text(body?.action, 50);
@@ -104,6 +105,84 @@ export async function POST(req: Request) {
     if (!conversationId) return NextResponse.json({ ok: false, error: 'Conversa inválida.' }, { status: 400 });
 
     const conversation = await loadConversation(admin, profile.law_firm_id, conversationId);
+
+    if (action === 'set_assignee') {
+      if (conversation?.virtual) return NextResponse.json({ ok: false, error: 'Inicie uma conversa real antes de definir responsável.' }, { status: 400 });
+      const requestedAssignee = text(body?.assigneeId, 80) || null;
+      let assignedUser: any = null;
+      if (requestedAssignee) {
+        const { data, error } = await admin
+          .from('profiles')
+          .select('auth_user_id,full_name,email,role,status')
+          .eq('law_firm_id', profile.law_firm_id)
+          .eq('auth_user_id', requestedAssignee)
+          .eq('status', 'ativo')
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!data?.auth_user_id) return NextResponse.json({ ok: false, error: 'Usuário responsável inválido ou inativo.' }, { status: 400 });
+        assignedUser = data;
+      }
+      const now = new Date().toISOString();
+      const { error } = await admin
+        .from('whatsapp_conversations')
+        .update({
+          assigned_to: requestedAssignee,
+          assigned_at: requestedAssignee ? now : null,
+          assigned_by: requestedAssignee ? session.user.id : null,
+          updated_at: now,
+        })
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', conversationId);
+      if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, {
+        lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id,
+        eventType: requestedAssignee ? 'assignee_changed' : 'assignee_cleared',
+        description: requestedAssignee ? `Responsável definido: ${assignedUser?.full_name || 'usuário'}.` : 'Responsável removido da conversa.',
+        metadata: { previous_assignee: conversation?.assigned_to || null, assignee_id: requestedAssignee },
+      });
+      return NextResponse.json({ ok: true, assignedTo: requestedAssignee, assignedUser });
+    }
+
+    if (action === 'add_internal_note') {
+      if (conversation?.virtual) return NextResponse.json({ ok: false, error: 'Inicie uma conversa real antes de criar nota interna.' }, { status: 400 });
+      const noteBody = text(body?.note, 5000);
+      if (!noteBody) return NextResponse.json({ ok: false, error: 'Escreva a nota interna.' }, { status: 400 });
+      const { data: note, error } = await admin
+        .from('whatsapp_internal_notes')
+        .insert({ law_firm_id: profile.law_firm_id, conversation_id: conversationId, author_id: session.user.id, body: noteBody })
+        .select('id,conversation_id,author_id,body,created_at,updated_at')
+        .single();
+      if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, {
+        lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id,
+        eventType: 'internal_note_added', description: 'Adicionou uma nota interna.', metadata: { note_id: note.id },
+      });
+      return NextResponse.json({ ok: true, note: { ...note, author: { auth_user_id: session.user.id, full_name: profile.full_name, email: profile.email } } });
+    }
+
+    if (action === 'delete_internal_note') {
+      const noteId = text(body?.noteId, 80);
+      if (!noteId) return NextResponse.json({ ok: false, error: 'Nota inválida.' }, { status: 400 });
+      const { data: note, error: noteError } = await admin
+        .from('whatsapp_internal_notes')
+        .select('id,author_id')
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('conversation_id', conversationId)
+        .eq('id', noteId)
+        .maybeSingle();
+      if (noteError) throw new Error(noteError.message);
+      if (!note?.id) return NextResponse.json({ ok: false, error: 'Nota não encontrada.' }, { status: 404 });
+      if (String(note.author_id || '') !== String(session.user.id) && !isAdminRole(profile.role)) {
+        return NextResponse.json({ ok: false, error: 'Você só pode excluir suas próprias notas internas.' }, { status: 403 });
+      }
+      const { error } = await admin.from('whatsapp_internal_notes').delete().eq('law_firm_id', profile.law_firm_id).eq('id', noteId);
+      if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, {
+        lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id,
+        eventType: 'internal_note_deleted', description: 'Excluiu uma nota interna.', metadata: { note_id: noteId },
+      });
+      return NextResponse.json({ ok: true, deletedNoteId: noteId });
+    }
 
     if (action === 'close_conversation') {
       if (conversation?.closed_at) {
@@ -122,6 +201,7 @@ export async function POST(req: Request) {
         .eq('law_firm_id', profile.law_firm_id)
         .eq('id', conversationId);
       if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'conversation_closed', description: 'Atendimento encerrado.', metadata: { department } });
       return NextResponse.json({ ok: true, closed: true, closedAt, department });
     }
 
@@ -143,6 +223,7 @@ export async function POST(req: Request) {
         .eq('law_firm_id', profile.law_firm_id)
         .eq('id', conversationId);
       if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'conversation_reopened', description: `Atendimento reaberto em ${department === 'financeiro_juridico' ? 'Financeiro/Jurídico' : 'Atendimento'}.`, metadata: { department } });
       return NextResponse.json({ ok: true, reopened: true, department });
     }
 
@@ -156,11 +237,13 @@ export async function POST(req: Request) {
         .eq('law_firm_id', profile.law_firm_id)
         .eq('id', conversationId);
       if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'department_changed', description: `Conversa transferida para ${department === 'financeiro_juridico' ? 'Financeiro/Jurídico' : 'Atendimento'}.`, metadata: { previous_department: conversation?.department || null, department } });
       return NextResponse.json({ ok: true, department });
     }
 
     if (action === 'set_tags') {
       const tags = await setConversationTags(admin, profile.law_firm_id, conversationId, body?.tagIds);
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'tags_changed', description: tags.length ? `Tags atualizadas: ${tags.map((tag: any) => tag.name).join(', ')}.` : 'Todas as tags foram removidas.', metadata: { tag_ids: tags.map((tag: any) => tag.id) } });
       return NextResponse.json({ ok: true, tags });
     }
 
@@ -191,6 +274,7 @@ export async function POST(req: Request) {
         .select('*')
         .single();
       if (error) throw new Error(error.message);
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'lead_updated', description: `Lead atualizado para a etapa ${stage}.`, metadata: { stage } });
       if (updates.name) {
         await admin
           .from('whatsapp_conversations')
@@ -271,6 +355,7 @@ export async function POST(req: Request) {
         clientId: client.id,
       });
 
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'lead_converted', description: created ? `Lead convertido e cliente ${client.name || name} cadastrado.` : `Conversa vinculada ao cliente ${client.name || name}.`, metadata: { client_id: client.id, created } });
       return NextResponse.json({ ok: true, clientId: client.id, created, attachedMedia });
     }
 

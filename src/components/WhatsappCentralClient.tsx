@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, BarChart3, Check, CheckCheck, MessageCircle, RefreshCw, Search, Settings2, Users } from 'lucide-react';
+import { Archive, BarChart3, Check, CheckCheck, Filter, MessageCircle, RefreshCw, Search, Settings2, UserCheck, Users, X } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 import { WhatsappDashboard } from '@/components/WhatsappDashboard';
@@ -91,7 +91,7 @@ function matchesSearch(item: any, query: string) {
   if (!term) return true;
   const tags = Array.isArray(item?.tags) ? item.tags.join(' ') : '';
   const lead = item?.lead || {};
-  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''} ${tags} ${lead?.stage || ''} ${lead?.service_interest || ''}`);
+  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''} ${tags} ${lead?.stage || ''} ${lead?.service_interest || ''} ${item?.assigned_user?.full_name || ''}`);
   return haystack.includes(term);
 }
 
@@ -128,6 +128,9 @@ export function WhatsappCentralClient({
   initialView = 'atendimento',
   initialSettingsSection = 'tags',
   canConfigure = false,
+  teamUsers = [],
+  currentUserId = '',
+  currentUserName = '',
 }: {
   initialConversations: any[];
   initialMessages: any[];
@@ -142,12 +145,20 @@ export function WhatsappCentralClient({
   initialView?: WhatsappWorkspaceView;
   initialSettingsSection?: string;
   canConfigure?: boolean;
+  teamUsers?: any[];
+  currentUserId?: string;
+  currentUserName?: string;
 }) {
   const [conversations, setConversations] = useState(dedupeById(initialConversations || []));
   const [contacts, setContacts] = useState(dedupeById(initialContacts || []));
   const [messages, setMessages] = useState(initialMessages || []);
   const [selectedId, setSelectedId] = useState(initialSelectedId || '');
   const [query, setQuery] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'mine' | 'unassigned' | string>('all');
+  const [tagFilter, setTagFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WhatsappWorkspaceView>(initialView || 'atendimento');
   const [tagCatalog, setTagCatalog] = useState<any[]>(initialTags || []);
   const [leadStages, setLeadStages] = useState<any[]>(initialLeadStages || []);
@@ -220,14 +231,26 @@ export function WhatsappCentralClient({
     return activeConversations.filter((conversation: any) => (conversation?.department || 'atendimento') === activeDepartment);
   }, [activeConversations, closedConversations, activeDepartment, workspaceView]);
 
+  const activeTeamUsers = useMemo(() => (teamUsers || []).filter((user: any) => user?.status === 'ativo' && user?.auth_user_id), [teamUsers]);
+
+  const matchesOperationalFilters = useCallback((conversation: any) => {
+    if (assigneeFilter === 'mine' && String(conversation?.assigned_to || '') !== String(currentUserId || '')) return false;
+    if (assigneeFilter === 'unassigned' && conversation?.assigned_to) return false;
+    if (assigneeFilter !== 'all' && assigneeFilter !== 'mine' && assigneeFilter !== 'unassigned' && String(conversation?.assigned_to || '') !== String(assigneeFilter)) return false;
+    if (tagFilter && !(Array.isArray(conversation?.tag_ids) && conversation.tag_ids.map(String).includes(String(tagFilter)))) return false;
+    if (stageFilter && String(conversation?.lead?.stage || '') !== String(stageFilter)) return false;
+    if (unreadOnly && Number(conversation?.unread_count || 0) <= 0) return false;
+    return true;
+  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, unreadOnly]);
+
   const filteredConversations = useMemo(() => {
-    return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query));
-  }, [departmentConversations, query]);
+    return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
+  }, [departmentConversations, query, matchesOperationalFilters]);
 
   const filteredLeads = useMemo(() => {
     const outcomeByStage = new Map((leadStages || []).map((stage: any) => [String(stage.stage_key), String(stage.outcome || 'open')]));
-    return departmentConversations.filter((conversation: any) => !conversation?.client_id && conversation?.lead && outcomeByStage.get(String(conversation?.lead?.stage || '')) !== 'won' && matchesSearch(conversation, query));
-  }, [departmentConversations, query, leadStages]);
+    return departmentConversations.filter((conversation: any) => !conversation?.client_id && conversation?.lead && outcomeByStage.get(String(conversation?.lead?.stage || '')) !== 'won' && matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
+  }, [departmentConversations, query, leadStages, matchesOperationalFilters]);
 
   const filteredContacts = useMemo(() => {
     if (activeDepartment !== 'atendimento') return [];
@@ -241,6 +264,14 @@ export function WhatsappCentralClient({
   const isSearching = Boolean(query.trim());
   const leadSingular = String(preferences?.lead_label_singular || 'Lead');
   const leadPlural = String(preferences?.lead_label_plural || 'Leads');
+  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (stageFilter ? 1 : 0) + (unreadOnly ? 1 : 0);
+
+  function clearOperationalFilters() {
+    setAssigneeFilter('all');
+    setTagFilter('');
+    setStageFilter('');
+    setUnreadOnly(false);
+  }
 
   const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
     if (loadingRef.current) {
@@ -565,6 +596,10 @@ export function WhatsappCentralClient({
                   </span>
                 )}
               </div>
+              <div className="mt-1 flex min-w-0 items-center gap-1 text-[8px] font-bold text-slate-400">
+                <UserCheck size={9} className="shrink-0" />
+                <span className={`truncate ${item?.assigned_user?.full_name ? 'text-slate-500' : 'text-amber-600'}`}>{item?.assigned_user?.full_name || 'Sem responsável'}</span>
+              </div>
               {itemTags.length > 0 && (
                 <div className="mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {itemTags.map((tag: string) => <span key={tag} className="max-w-[88px] truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[7px] font-bold text-slate-600">#{tag}</span>)}
@@ -660,16 +695,44 @@ export function WhatsappCentralClient({
             <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Conversas transferidas para acompanhamento jurídico ou financeiro.</div>
           )}
 
-          <div className="field-with-icon mt-2">
-            <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
-            <input
-              className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={workspaceView === 'encerrados' ? 'Pesquisar conversa encerrada ou tag' : activeTab === 'leads' ? `Pesquisar ${leadSingular.toLowerCase()} ou tag` : 'Pesquisar conversa, contato ou tag'}
-              aria-label="Pesquisar no WhatsApp"
-            />
+          <div className="mt-2 flex items-center gap-1.5">
+            <div className="field-with-icon min-w-0 flex-1">
+              <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
+              <input
+                className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={workspaceView === 'encerrados' ? 'Pesquisar conversa encerrada ou tag' : activeTab === 'leads' ? `Pesquisar ${leadSingular.toLowerCase()} ou tag` : 'Pesquisar conversa, contato ou tag'}
+                aria-label="Pesquisar no WhatsApp"
+              />
+            </div>
+            {activeTab !== 'contatos' && (
+              <button type="button" onClick={() => setFilterOpen((value) => !value)} className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-sm ${filterOpen || activeFilterCount ? 'border-[#075e54] bg-[#e7f3ef] text-[#075e54]' : 'border-transparent bg-white text-slate-500'}`} title="Filtrar conversas" aria-label="Filtrar conversas">
+                <Filter size={13} />
+                {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#075e54] px-1 text-[8px] font-black text-white">{activeFilterCount}</span>}
+              </button>
+            )}
           </div>
+
+          {filterOpen && activeTab !== 'contatos' && (
+            <div className="mt-2 rounded-xl border border-[#d6ddd6] bg-white p-2 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2"><b className="text-[9px] uppercase tracking-wide text-slate-500">Filtros</b>{activeFilterCount > 0 && <button type="button" onClick={clearOperationalFilters} className="inline-flex items-center gap-1 text-[9px] font-black text-red-600 hover:text-red-700"><X size={9}/>Limpar</button>}</div>
+              <div className="grid gap-1.5">
+                <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por responsável">
+                  <option value="all">Todos os responsáveis</option>
+                  <option value="mine">Minhas conversas</option>
+                  <option value="unassigned">Sem responsável</option>
+                  {activeTeamUsers.map((user: any) => <option key={user.auth_user_id} value={user.auth_user_id}>{user.full_name || user.email}</option>)}
+                </select>
+                <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por tag">
+                  <option value="">Todas as tags</option>
+                  {(tagCatalog || []).filter((tag: any) => tag.active !== false).map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                </select>
+                {activeTab === 'leads' && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[10px] font-bold text-slate-600"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} /> Somente não lidas</label>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="whatsapp-list-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -683,7 +746,7 @@ export function WhatsappCentralClient({
 
       {selected ? (
         <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
-          <WhatsappThread conversation={selected} messages={messages || []} templates={templateOptions.filter((template: any) => template.active !== false)} availableTags={tagCatalog} leadStages={leadStages} leadLabel={leadSingular} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={handleConversationChanged} />
+          <WhatsappThread conversation={selected} messages={messages || []} templates={templateOptions.filter((template: any) => template.active !== false)} availableTags={tagCatalog} leadStages={leadStages} leadLabel={leadSingular} teamUsers={teamUsers} currentUserId={currentUserId} currentUserName={currentUserName} canConfigure={canConfigure} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={handleConversationChanged} />
         </div>
       ) : (
         <section className="whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">

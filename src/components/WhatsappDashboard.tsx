@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, BarChart3, CheckCircle2, Clock3, Inbox, MessageCircle, RefreshCw, TrendingUp, Users, XCircle } from 'lucide-react';
+import { Archive, BarChart3, CheckCircle2, Clock3, Inbox, MessageCircle, RefreshCw, TrendingUp, UserCheck, Users, XCircle } from 'lucide-react';
 
 const toneMap: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700',
@@ -120,7 +120,7 @@ export function WhatsappDashboard({ initialDashboard, leadPlural = 'Leads' }: { 
         </section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <section className="panel p-4">
           <div className="flex items-center gap-2"><Clock3 size={15} className="text-[#075e54]" /><h3 className="text-sm font-black text-slate-950">Resumo do funil</h3></div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -136,6 +136,14 @@ export function WhatsappDashboard({ initialDashboard, leadPlural = 'Leads' }: { 
           <div className="mt-3 flex flex-wrap gap-2">
             {(dashboard.tags || []).map((tag: any) => <span key={tag.id} className={`rounded-full px-2.5 py-1.5 text-[10px] font-black ${tone(tag.color)}`}>{tag.name} · {tag.count}</span>)}
             {!(dashboard.tags || []).length && <p className="text-xs font-bold text-slate-500">As tags usadas nas conversas aparecerão aqui.</p>}
+          </div>
+        </section>
+
+        <section className="panel p-4">
+          <div className="flex items-center gap-2"><UserCheck size={15} className="text-[#075e54]" /><h3 className="text-sm font-black text-slate-950">Conversas por responsável</h3></div>
+          <div className="mt-3 space-y-2">
+            {(dashboard.responsibles || []).map((item: any) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2"><div className="min-w-0"><b className={`block truncate text-[10px] ${item.id === 'unassigned' ? 'text-amber-700' : 'text-slate-800'}`}>{item.name}</b>{Number(item.unread || 0) > 0 && <span className="text-[8px] font-bold text-[#1fa855]">{item.unread} não lida(s)</span>}</div><span className="grid h-7 min-w-7 place-items-center rounded-full bg-white px-2 text-[10px] font-black text-slate-700 shadow-sm">{item.count}</span></div>)}
+            {!(dashboard.responsibles || []).length && <p className="text-xs font-bold text-slate-500">As atribuições de atendimento aparecerão aqui.</p>}
           </div>
         </section>
       </div>
