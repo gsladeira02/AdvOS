@@ -111,7 +111,7 @@ export async function syncClientContactsToConversations(admin: any, lawFirmId: s
 export async function getVisibleConversationActivity(admin: any, lawFirmId: string) {
   const { data, error } = await admin
     .from('whatsapp_messages')
-    .select('conversation_id,created_at')
+    .select('conversation_id,created_at,body,message_type,direction,status,file_name,mime_type')
     .eq('law_firm_id', lawFirmId)
     .is('deleted_at', null)
     .not('conversation_id', 'is', null)
@@ -120,11 +120,22 @@ export async function getVisibleConversationActivity(admin: any, lawFirmId: stri
 
   if (error) throw new Error(error.message);
 
-  const activity = new Map<string, string>();
+  // Como a consulta vem da mensagem mais nova para a mais antiga, a primeira
+  // ocorrência de cada conversation_id é também a prévia que deve aparecer
+  // na lista, como no WhatsApp.
+  const activity = new Map<string, any>();
   for (const row of data || []) {
     const conversationId = String(row?.conversation_id || '');
     if (!conversationId || activity.has(conversationId)) continue;
-    activity.set(conversationId, String(row?.created_at || ''));
+    activity.set(conversationId, {
+      created_at: String(row?.created_at || ''),
+      body: String(row?.body || ''),
+      message_type: String(row?.message_type || 'text'),
+      direction: String(row?.direction || ''),
+      status: String(row?.status || ''),
+      file_name: row?.file_name || null,
+      mime_type: row?.mime_type || null,
+    });
   }
   return activity;
 }
@@ -149,12 +160,21 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
   }
 
   return rows
-    .map((conversation: any) => ({
-      ...conversation,
-      has_messages: true,
-      message_count: 1,
-      last_message_at: activity.get(String(conversation.id)) || conversation.last_message_at || null,
-    }))
+    .map((conversation: any) => {
+      const latest = activity.get(String(conversation.id));
+      return {
+        ...conversation,
+        has_messages: true,
+        message_count: 1,
+        last_message_at: latest?.created_at || conversation.last_message_at || null,
+        last_message_body: latest?.body || '',
+        last_message_type: latest?.message_type || 'text',
+        last_message_direction: latest?.direction || '',
+        last_message_status: latest?.status || '',
+        last_message_file_name: latest?.file_name || null,
+        last_message_mime_type: latest?.mime_type || null,
+      };
+    })
     .sort((a: any, b: any) => {
       const aTime = new Date(a.last_message_at || 0).getTime();
       const bTime = new Date(b.last_message_at || 0).getTime();

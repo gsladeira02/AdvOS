@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, RefreshCw, Search, Users } from 'lucide-react';
+import { Check, CheckCheck, MessageCircle, RefreshCw, Search, Users } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
@@ -28,6 +28,49 @@ function shortTime(value?: string) {
   }
 }
 
+function conversationListTime(value?: string) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startMessageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((startToday.getTime() - startMessageDay.getTime()) / 86400000);
+
+    if (diffDays === 0) return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 1) return 'Ontem';
+    if (diffDays > 1 && diffDays < 7) {
+      const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+      return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    }
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: date.getFullYear() === now.getFullYear() ? undefined : '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function messagePreview(item: any) {
+  const type = String(item?.last_message_type || 'text').toLowerCase();
+  const rawBody = String(item?.last_message_body || '').trim();
+  const fileName = String(item?.last_message_file_name || '').trim();
+
+  if (type === 'image') {
+    const caption = rawBody && !/^\[?imagem (recebida|enviada)?\]?$/i.test(rawBody) && rawBody.toLowerCase() !== 'imagem' ? rawBody : '';
+    return caption ? `📷 ${caption}` : '📷 Foto';
+  }
+  if (type === 'audio') return '🎤 Áudio';
+  if (type === 'video') {
+    const caption = rawBody && !/^\[?vídeo (recebido|enviado)?\]?$/i.test(rawBody) ? rawBody : '';
+    return caption ? `🎥 ${caption}` : '🎥 Vídeo';
+  }
+  if (type === 'document') return `📄 ${fileName || rawBody || 'Documento'}`;
+  if (type === 'sticker') return '🖼️ Figurinha';
+  if (type === 'reaction') return rawBody ? `Reação ${rawBody}` : 'Reação';
+  if (type === 'interactive' || type === 'button') return rawBody || 'Mensagem interativa';
+  if (type === 'template') return rawBody || 'Mensagem de modelo';
+  return rawBody || 'Mensagem';
+}
+
 function normalizeSearch(value: string) {
   return String(value || '')
     .toLowerCase()
@@ -39,7 +82,7 @@ function normalizeSearch(value: string) {
 function matchesSearch(item: any, query: string) {
   const term = normalizeSearch(query);
   if (!term) return true;
-  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''}`);
+  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''}`);
   return haystack.includes(term);
 }
 
@@ -347,22 +390,39 @@ export function WhatsappCentralClient({
           {isContact ? <Users size={14} /> : initials(title)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <b className="truncate text-[11px] text-slate-950">{title}</b>
-            {!isContact && item.unread_count > 0 && <span className="badge badge-info px-1.5 py-0.5 text-[9px]">{item.unread_count}</span>}
-          </div>
-          <div className="mt-0.5 flex items-center justify-between gap-2">
-            <p className="truncate text-[10px] font-bold text-slate-500">{item.phone}</p>
-            {isContact ? (
-              <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">contato</span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500">conversa</span>
-            )}
-          </div>
           {isContact ? (
-            <p className="mt-0.5 text-[9px] text-emerald-700">{item.has_conversation ? 'Abrir conversa existente' : 'Contato cadastrado. Clique para iniciar.'}</p>
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <b className="truncate text-[11px] text-slate-950">{title}</b>
+                <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">contato</span>
+              </div>
+              <p className="mt-0.5 truncate text-[10px] font-bold text-slate-500">{item.phone}</p>
+              <p className="mt-0.5 truncate text-[9px] text-emerald-700">{item.has_conversation ? 'Abrir conversa existente' : 'Contato cadastrado. Clique para iniciar.'}</p>
+            </>
           ) : (
-            <p className="mt-0.5 text-[9px] text-slate-400">{shortTime(item.last_message_at)}</p>
+            <>
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <b className="min-w-0 flex-1 truncate text-[11px] text-slate-950">{title}</b>
+                <span className={`shrink-0 text-[9px] font-bold ${Number(item.unread_count || 0) > 0 ? 'text-[#1fa855]' : 'text-slate-400'}`}>
+                  {conversationListTime(item.last_message_at)}
+                </span>
+              </div>
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <div className={`flex min-w-0 flex-1 items-center gap-1 ${Number(item.unread_count || 0) > 0 ? 'font-bold text-slate-700' : 'text-slate-500'}`}>
+                  {item.last_message_direction === 'outbound' && (
+                    item.last_message_status === 'read' || item.last_message_status === 'delivered'
+                      ? <CheckCheck size={12} className={`shrink-0 ${item.last_message_status === 'read' ? 'text-sky-500' : 'text-slate-400'}`} aria-hidden="true" />
+                      : <Check size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+                  )}
+                  <p className="min-w-0 flex-1 truncate text-[10px]" title={messagePreview(item)}>{messagePreview(item)}</p>
+                </div>
+                {Number(item.unread_count || 0) > 0 && (
+                  <span className="grid min-h-4 min-w-4 shrink-0 place-items-center rounded-full bg-[#25D366] px-1 text-[8px] font-black leading-none text-white">
+                    {Number(item.unread_count) > 99 ? '99+' : item.unread_count}
+                  </span>
+                )}
+              </div>
+            </>
           )}
         </div>
       </button>
