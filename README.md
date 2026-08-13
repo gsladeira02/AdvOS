@@ -1,4 +1,23 @@
-# AdvOS V9.35
+# AdvOS V9.36
+
+## V9.36 — WhatsApp Encerrados
+
+- Nova área **Encerrados** dentro do WhatsApp.
+- Conversas podem ser encerradas manualmente sem apagar histórico, tags, lead, cliente ou mídias.
+- Conversas encerradas saem de Atendimento e Financeiro/Jurídico e ficam centralizadas em Encerrados.
+- É possível **reabrir** uma conversa, retornando ao setor de origem.
+- Nova mensagem recebida do cliente reabre automaticamente a conversa no setor em que ela estava antes.
+- Conversas encerradas ficam ordenadas pela data de encerramento.
+- O compositor de mensagens e chamadas fica bloqueado enquanto a conversa estiver encerrada; é preciso reabrir antes de responder.
+- O Dashboard passa a mostrar a quantidade de conversas encerradas separadamente das conversas ativas.
+
+## Migração obrigatória
+
+Antes do deploy da v9.36, rode no Supabase:
+
+`supabase/v9_36_whatsapp_encerrados.sql`
+
+A migração é aditiva e pode ser executada com a v9.35 ainda publicada.
 
 ## V9.35 — Ativar, desativar e excluir tags
 
