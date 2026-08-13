@@ -221,9 +221,9 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
               <p className="text-xs text-slate-500">{filtered.length} de {templates.length} {templates.length === 1 ? 'modelo' : 'modelos'}.</p>
             </div>
             <div className="grid w-full gap-2 md:w-auto md:grid-cols-[240px_180px]">
-              <div className="relative">
-                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input className="input compact-input pl-8" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo" />
+              <div className="field-with-icon">
+                <Search size={14} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
+                <input className="input compact-input field-with-icon__input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo" aria-label="Buscar modelo" />
               </div>
               <select className="input compact-input" value={category} onChange={(event) => setCategory(event.target.value)}>
                 <option value="todos">Todas as categorias</option>

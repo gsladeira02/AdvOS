@@ -130,3 +130,39 @@ img,video{max-width:100%;height:auto}
   .whatsapp-central{height:calc(100dvh - 170px)!important}
   .whatsapp-emoji-picker{grid-template-columns:repeat(7,minmax(0,1fr))!important}
 }
+
+
+/* V9.25 — pente-fino final de layout e campos com ícones */
+.field-with-icon{position:relative;min-width:0;width:100%}
+.field-with-icon__icon{pointer-events:none;position:absolute;left:.75rem;top:50%;z-index:2;transform:translateY(-50%);flex:none}
+.field-with-icon .field-with-icon__input{padding-left:2.25rem!important;padding-right:.75rem!important}
+.btn svg{flex:0 0 auto}
+.card,.panel{overflow-wrap:anywhere}
+.mobile-bottom-nav-item span{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input[type="file"]{max-width:100%}
+
+@media(max-width:639px){
+  .page-header>div{flex-direction:column!important;align-items:stretch!important;gap:7px!important}
+  .page-header-action{margin-left:0!important;width:100%!important;max-width:100%!important;justify-content:flex-start!important}
+  .page-header-action>.btn{width:100%!important}
+}
+
+@media(min-width:640px) and (max-width:760px){
+  .page-header>div{align-items:center!important}
+  .page-header-action{max-width:44%!important}
+}
+
+@media(max-width:760px){
+  .field-with-icon .field-with-icon__input{padding-left:2.35rem!important;padding-right:.8rem!important}
+  .whatsapp-emoji-picker,.whatsapp-sticker-picker{left:auto!important;right:0!important;width:min(300px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px)!important}
+  .whatsapp-thread .relative.flex.items-end .relative.flex-1{min-width:0!important}
+  .whatsapp-thread .relative.flex.items-end textarea{width:100%!important}
+  .whatsapp-thread .absolute.bottom-4.right-5{right:10px!important;max-width:calc(100% - 20px)!important;white-space:normal!important}
+}
+
+@media(max-width:380px){
+  .whatsapp-thread .relative.flex.items-end{gap:3px!important}
+  .whatsapp-thread .relative.flex.items-end>button{height:31px!important;width:31px!important;min-width:31px!important}
+  .whatsapp-thread .relative.flex.items-end svg{width:15px!important;height:15px!important}
+  .whatsapp-emoji-picker{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+}

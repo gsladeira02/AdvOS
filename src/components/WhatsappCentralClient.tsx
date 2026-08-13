@@ -314,13 +314,14 @@ export function WhatsappCentralClient({
             </button>
           </div>
 
-          <div className="relative mt-2">
-            <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="field-with-icon mt-2">
+            <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
             <input
-              className="input rounded-[20px] border-transparent bg-white py-2 pl-8 pr-2 text-[11px] shadow-sm"
+              className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Pesquisar conversa ou contato"
+              aria-label="Pesquisar conversa ou contato"
             />
           </div>
         </div>
