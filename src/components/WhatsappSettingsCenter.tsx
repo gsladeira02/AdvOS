@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
 import { MessageTemplatesManager, type MessageTemplateRow } from '@/components/MessageTemplatesManager';
 
 const COLORS = [
@@ -12,7 +12,51 @@ const colorClasses: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700', sky: 'bg-sky-100 text-sky-700', emerald: 'bg-emerald-100 text-emerald-700', violet: 'bg-violet-100 text-violet-700', amber: 'bg-amber-100 text-amber-800', rose: 'bg-rose-100 text-rose-700', red: 'bg-red-100 text-red-700', green: 'bg-green-100 text-green-700', indigo: 'bg-indigo-100 text-indigo-700',
 };
 
+const swatchClasses: Record<string, string> = {
+  slate: 'bg-slate-500', sky: 'bg-sky-500', emerald: 'bg-emerald-500', violet: 'bg-violet-500', amber: 'bg-amber-400', rose: 'bg-rose-500', red: 'bg-red-500', green: 'bg-green-600', indigo: 'bg-indigo-500',
+};
+
 function colorClass(value?: string) { return colorClasses[String(value || '')] || colorClasses.slate; }
+
+function ColorPalette({ value, onChange, compact = false }: { value?: string; onChange: (value: string) => void; compact?: boolean }) {
+  return (
+    <div className={`flex flex-wrap items-center ${compact ? 'gap-1.5' : 'gap-2'}`} role="radiogroup" aria-label="Cor">
+      {COLORS.map(([color, label]) => {
+        const selected = String(value || 'slate') === color;
+        return (
+          <button
+            key={color}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={label}
+            title={label}
+            onClick={() => onChange(color)}
+            className={`${compact ? 'h-7 w-7' : 'h-8 w-8'} grid shrink-0 place-items-center rounded-full border-2 transition ${swatchClasses[color]} ${selected ? 'border-slate-950 ring-2 ring-slate-300 ring-offset-2' : 'border-white shadow-sm hover:scale-105'}`}
+          >
+            {selected && <Check size={compact ? 12 : 14} strokeWidth={3} className="text-white drop-shadow" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TagPreview({ name, color }: { name?: string; color?: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-[9px] font-black uppercase tracking-wide text-slate-400">Prévia</span>
+      <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${colorClass(color)}`}>
+        <Tag size={10} className="shrink-0" />
+        <span className="truncate">{String(name || '').trim() || 'Nome da tag'}</span>
+      </span>
+    </div>
+  );
+}
+
+function StagePreview({ name, color }: { name?: string; color?: string }) {
+  return <span className={`inline-flex max-w-full rounded-full px-2 py-1 text-[9px] font-black ${colorClass(color)}`}>{String(name || '').trim() || 'Nome da etapa'}</span>;
+}
 
 export function WhatsappSettingsCenter({
   tags,
@@ -102,22 +146,26 @@ export function WhatsappSettingsCenter({
           <section className="panel p-4">
             <h3 className="text-sm font-black text-slate-950">Cadastrar tag</h3>
             <p className="mt-1 text-xs text-slate-500">Depois do cadastro, a conversa terá apenas um seletor de tags.</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-              <input className="input" value={tagDraft.name} onChange={(e) => setTagDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Ex.: Urgente, Trabalhista, Cobrança" maxLength={48} />
-              <select className="input" value={tagDraft.color} onChange={(e) => setTagDraft((d) => ({ ...d, color: e.target.value }))}>{COLORS.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto] lg:items-end">
+              <label className="min-w-0"><span className="label">Nome da tag</span><input className="input mt-1" value={tagDraft.name} onChange={(e) => setTagDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Ex.: Urgente, Trabalhista, Cobrança" maxLength={48} /></label>
+              <div className="min-w-0"><span className="label">Cor</span><div className="mt-2"><ColorPalette value={tagDraft.color} onChange={(color) => setTagDraft((d) => ({ ...d, color }))} /></div></div>
               <button type="button" disabled={busy || !tagDraft.name.trim()} onClick={() => saveTag({ ...tagDraft, active: true, sort_order: localTags.length * 10 + 10 }, true)} className="btn"><Plus size={14}/>Cadastrar tag</button>
             </div>
+            <div className="mt-3 rounded-xl border border-[#e6dccb] bg-[#fbf7ef] px-3 py-2"><TagPreview name={tagDraft.name} color={tagDraft.color} /></div>
           </section>
 
           <section className="panel overflow-hidden">
             <div className="border-b border-[#e6dccb] bg-[#fbf7ef] px-4 py-3"><h3 className="text-sm font-black text-slate-950">Tags cadastradas</h3></div>
             <div className="divide-y divide-[#eee7dc]">
               {localTags.map((tag: any) => (
-                <div key={tag.id} className="grid gap-2 p-3 md:grid-cols-[minmax(0,1fr)_170px_120px_auto] md:items-center">
-                  <input className="input compact-input" value={tag.name || ''} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, name: e.target.value } : row))} />
-                  <select className="input compact-input" value={tag.color || 'slate'} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, color: e.target.value } : row))}>{COLORS.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
-                  <select className="input compact-input" value={tag.active === false ? 'false' : 'true'} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, active: e.target.value === 'true' } : row))}><option value="true">Ativa</option><option value="false">Desativada</option></select>
-                  <div className="flex items-center gap-1.5 md:justify-end"><span className={`rounded-full px-2 py-1 text-[9px] font-black ${colorClass(tag.color)}`}>{tag.name || 'Tag'}</span><button type="button" disabled={busy} onClick={() => saveTag(tag)} className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-white" title="Salvar"><Save size={13}/></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Excluir a tag \"${tag.name}\"?`)) void api({ action:'delete_tag', id: tag.id }); }} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700" title="Excluir"><Trash2 size={13}/></button></div>
+                <div key={tag.id} className="p-3">
+                  <div className="grid gap-3 xl:grid-cols-[minmax(190px,1fr)_auto_120px_minmax(150px,auto)_auto] xl:items-center">
+                    <input className="input compact-input" value={tag.name || ''} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, name: e.target.value } : row))} aria-label="Nome da tag" />
+                    <ColorPalette compact value={tag.color || 'slate'} onChange={(color) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, color } : row))} />
+                    <select className="input compact-input" value={tag.active === false ? 'false' : 'true'} onChange={(e) => setLocalTags((rows) => rows.map((row) => row.id === tag.id ? { ...row, active: e.target.value === 'true' } : row))}><option value="true">Ativa</option><option value="false">Desativada</option></select>
+                    <TagPreview name={tag.name} color={tag.color} />
+                    <div className="flex items-center gap-1.5 xl:justify-end"><button type="button" disabled={busy} onClick={() => saveTag(tag)} className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-white" title="Salvar"><Save size={13}/></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Excluir a tag \"${tag.name}\"?`)) void api({ action:'delete_tag', id: tag.id }); }} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700" title="Excluir"><Trash2 size={13}/></button></div>
+                  </div>
                 </div>
               ))}
               {!localTags.length && <p className="p-4 text-xs font-bold text-slate-500">Nenhuma tag cadastrada.</p>}
@@ -130,25 +178,27 @@ export function WhatsappSettingsCenter({
         <div className="space-y-4">
           <section className="panel p-4">
             <h3 className="text-sm font-black text-slate-950">Nova etapa do funil</h3>
-            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_170px_auto]">
-              <input className="input" value={stageDraft.name} onChange={(e) => setStageDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Ex.: Aguardando documentos" maxLength={60} />
-              <select className="input" value={stageDraft.color} onChange={(e) => setStageDraft((d) => ({ ...d, color: e.target.value }))}>{COLORS.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select className="input" value={stageDraft.outcome} onChange={(e) => setStageDraft((d) => ({ ...d, outcome: e.target.value }))}><option value="open">Em andamento</option><option value="won">Convertido</option><option value="lost">Perdido</option></select>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_170px_auto] lg:items-end">
+              <label className="min-w-0"><span className="label">Nome da etapa</span><input className="input mt-1" value={stageDraft.name} onChange={(e) => setStageDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Ex.: Aguardando documentos" maxLength={60} /></label>
+              <div><span className="label">Cor</span><div className="mt-2"><ColorPalette value={stageDraft.color} onChange={(color) => setStageDraft((d) => ({ ...d, color }))} /></div></div>
+              <label><span className="label">Resultado</span><select className="input mt-1" value={stageDraft.outcome} onChange={(e) => setStageDraft((d) => ({ ...d, outcome: e.target.value }))}><option value="open">Em andamento</option><option value="won">Convertido</option><option value="lost">Perdido</option></select></label>
               <button type="button" disabled={busy || !stageDraft.name.trim()} onClick={() => saveStage({ ...stageDraft, active: true, sort_order: localStages.length * 10 + 10 }, true)} className="btn"><Plus size={14}/>Adicionar</button>
             </div>
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e6dccb] bg-[#fbf7ef] px-3 py-2"><span className="text-[9px] font-black uppercase tracking-wide text-slate-400">Prévia</span><StagePreview name={stageDraft.name} color={stageDraft.color} /></div>
           </section>
 
           <section className="panel overflow-hidden">
             <div className="border-b border-[#e6dccb] bg-[#fbf7ef] px-4 py-3"><h3 className="text-sm font-black text-slate-950">Etapas e nomes do funil</h3><p className="text-xs text-slate-500">Renomeie, ordene, desative ou crie novas etapas.</p></div>
             <div className="divide-y divide-[#eee7dc]">
               {localStages.map((stage: any, index: number) => (
-                <div key={stage.id} className="grid gap-2 p-3 lg:grid-cols-[76px_minmax(0,1fr)_150px_150px_115px_auto] lg:items-center">
+                <div key={stage.id} className="grid gap-3 p-3 xl:grid-cols-[76px_minmax(180px,1fr)_auto_145px_110px_minmax(140px,auto)_auto] xl:items-center">
                   <div className="flex items-center gap-1"><button type="button" onClick={() => { void moveStage(index,-1); }} disabled={index===0} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-30"><ChevronUp size={13}/></button><button type="button" onClick={() => { void moveStage(index,1); }} disabled={index===localStages.length-1} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 disabled:opacity-30"><ChevronDown size={13}/></button></div>
                   <input className="input compact-input" value={stage.name || ''} onChange={(e) => setLocalStages((rows) => rows.map((row) => row.id === stage.id ? { ...row, name: e.target.value } : row))} />
-                  <select className="input compact-input" value={stage.color || 'slate'} onChange={(e) => setLocalStages((rows) => rows.map((row) => row.id === stage.id ? { ...row, color: e.target.value } : row))}>{COLORS.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
+                  <ColorPalette compact value={stage.color || 'slate'} onChange={(color) => setLocalStages((rows) => rows.map((row) => row.id === stage.id ? { ...row, color } : row))} />
                   <select className="input compact-input" value={stage.outcome || 'open'} onChange={(e) => setLocalStages((rows) => rows.map((row) => row.id === stage.id ? { ...row, outcome: e.target.value } : row))}><option value="open">Em andamento</option><option value="won">Convertido</option><option value="lost">Perdido</option></select>
                   <select className="input compact-input" value={stage.active === false ? 'false' : 'true'} onChange={(e) => setLocalStages((rows) => rows.map((row) => row.id === stage.id ? { ...row, active: e.target.value === 'true' } : row))}><option value="true">Ativa</option><option value="false">Inativa</option></select>
-                  <div className="flex items-center gap-1.5 lg:justify-end"><button type="button" disabled={busy} onClick={() => saveStage(stage)} className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-white" title="Salvar"><Save size={13}/></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Excluir a etapa \"${stage.name}\"?`)) void api({ action:'delete_stage', id: stage.id }); }} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700" title="Excluir"><Trash2 size={13}/></button></div>
+                  <div className="min-w-0"><StagePreview name={stage.name} color={stage.color} /></div>
+                  <div className="flex items-center gap-1.5 xl:justify-end"><button type="button" disabled={busy} onClick={() => saveStage(stage)} className="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-white" title="Salvar"><Save size={13}/></button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`Excluir a etapa \"${stage.name}\"?`)) void api({ action:'delete_stage', id: stage.id }); }} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700" title="Excluir"><Trash2 size={13}/></button></div>
                 </div>
               ))}
             </div>
