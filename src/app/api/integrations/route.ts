@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     phone_number_id: str(f.get('phone_number_id')),
     waba_id: str(f.get('waba_id')),
     business_phone: str(f.get('business_phone')),
-    graph_version: str(f.get('graph_version')) || 'v22.0',
+    graph_version: str(f.get('graph_version')) || 'v26.0',
     profile_display_name: str(f.get('profile_display_name')),
     profile_picture_note: str(f.get('profile_picture_note')),
   } : existing.data?.raw_settings || null;

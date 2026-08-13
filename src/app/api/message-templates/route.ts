@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { assertContentLength, readJsonBody, SecurityError } from '@/lib/security';
 
@@ -75,6 +75,10 @@ export async function POST(req: Request) {
   const jsonMode = wantsJson(req);
   try {
     const { profile } = await getCurrentProfile();
+    if (!isAdminRole(profile.role)) {
+      if (jsonMode) return NextResponse.json({ ok: false, error: 'Apenas administradores podem alterar modelos de mensagem.' }, { status: 403 });
+      return redirect(req, '/app/whatsapp?view=atendimento');
+    }
     const admin = createAdminSupabase();
     const form = await parseBody(req);
     const intent = String(form.intent || 'save');
@@ -84,7 +88,7 @@ export async function POST(req: Request) {
       const { error } = await admin.from('message_templates').delete().eq('id', id).eq('law_firm_id', profile.law_firm_id);
       if (error) throw new Error(error.message);
       if (jsonMode) return NextResponse.json({ ok: true, deleted: id });
-      return redirect(req, '/app/modelos-mensagens?ok=apagado');
+      return redirect(req, '/app/whatsapp?view=configuracoes&section=modelos&ok=apagado');
     }
 
     const name = String(form.name || '').trim();
@@ -142,11 +146,11 @@ export async function POST(req: Request) {
     }
 
     if (jsonMode) return NextResponse.json({ ok: true, template: saved });
-    return redirect(req, '/app/modelos-mensagens?ok=salvo');
+    return redirect(req, '/app/whatsapp?view=configuracoes&section=modelos&ok=salvo');
   } catch (error: any) {
     const message = error?.message || 'Erro ao salvar modelo.';
     const status = error instanceof SecurityError ? error.status : 400;
     if (jsonMode) return NextResponse.json({ ok: false, error: message }, { status });
-    return redirect(req, `/app/modelos-mensagens?erro=${encodeURIComponent(message)}`);
+    return redirect(req, `/app/whatsapp?view=configuracoes&section=modelos&erro=${encodeURIComponent(message)}`);
   }
 }

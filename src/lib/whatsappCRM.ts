@@ -1,4 +1,5 @@
 import 'server-only';
+import { defaultWhatsappLeadStage } from '@/lib/whatsappSettings';
 
 function safeTitle(value?: string | null, fallback = 'Mídia recebida pelo WhatsApp') {
   const text = String(value || '').trim().replace(/[\r\n\t]+/g, ' ');
@@ -40,6 +41,7 @@ export async function ensureWhatsappLead(admin: any, input: {
     return data;
   }
 
+  const defaultStage = await defaultWhatsappLeadStage(admin, input.lawFirmId);
   const { data, error } = await admin
     .from('whatsapp_leads')
     .insert({
@@ -47,7 +49,7 @@ export async function ensureWhatsappLead(admin: any, input: {
       conversation_id: input.conversationId,
       name: input.name || null,
       phone: input.phone,
-      stage: 'novo',
+      stage: defaultStage,
       source: 'whatsapp',
       last_contact_at: input.contactedAt || now,
     })
@@ -62,6 +64,13 @@ export async function attachWhatsappMediaToClientFolder(admin: any, input: {
   clientId: string;
   message: any;
 }) {
+  const { data: preferences } = await admin
+    .from('whatsapp_preferences')
+    .select('auto_save_client_media')
+    .eq('law_firm_id', input.lawFirmId)
+    .maybeSingle();
+  if (preferences && preferences.auto_save_client_media === false) return null;
+
   const message = input.message || {};
   const storagePath = String(message.storage_path || '').trim();
   if (!storagePath) return null;
@@ -151,12 +160,12 @@ export async function attachConversationMediaToClientFolder(admin: any, input: {
   if (error) throw new Error(error.message);
   let attached = 0;
   for (const message of messages || []) {
-    await attachWhatsappMediaToClientFolder(admin, {
+    const result = await attachWhatsappMediaToClientFolder(admin, {
       lawFirmId: input.lawFirmId,
       clientId: input.clientId,
       message,
     });
-    attached += 1;
+    if (result) attached += 1;
   }
   return attached;
 }

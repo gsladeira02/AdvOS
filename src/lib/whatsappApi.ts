@@ -98,8 +98,8 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function defaultWhatsAppBaseUrl(version = 'v22.0') {
-  const cleanVersion = String(version || 'v22.0').trim().replace(/^\/+/, '') || 'v22.0';
+export function defaultWhatsAppBaseUrl(version = 'v26.0') {
+  const cleanVersion = String(version || 'v26.0').trim().replace(/^\/+/, '') || 'v26.0';
   return `https://graph.facebook.com/${cleanVersion}`;
 }
 
@@ -117,7 +117,7 @@ export async function getWhatsAppConfig(lawFirmId: string): Promise<WhatsAppConf
   const phoneNumberId = String(raw.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim().replace(/\D/g, '');
   const wabaId = String(raw.waba_id || process.env.WHATSAPP_WABA_ID || '').trim().replace(/\D/g, '');
   const businessPhone = raw.business_phone || process.env.WHATSAPP_BUSINESS_PHONE || '';
-  const version = raw.graph_version || process.env.WHATSAPP_GRAPH_VERSION || 'v22.0';
+  const version = raw.graph_version || process.env.WHATSAPP_GRAPH_VERSION || 'v26.0';
   const baseUrl = safeIntegrationBaseUrl('whatsapp', data?.environment || 'producao', data?.api_base_url || process.env.WHATSAPP_API_BASE_URL || defaultWhatsAppBaseUrl(version));
   const verifyToken = data?.webhook_secret || process.env.WHATSAPP_VERIFY_TOKEN || '';
 
@@ -637,6 +637,12 @@ export async function getOrCreateConversation(input: {
     return existing;
   }
 
+  const { data: preferences } = await admin
+    .from('whatsapp_preferences')
+    .select('default_department')
+    .eq('law_firm_id', input.lawFirmId)
+    .maybeSingle();
+
   const { data, error } = await admin
     .from('whatsapp_conversations')
     .insert({
@@ -645,6 +651,7 @@ export async function getOrCreateConversation(input: {
       phone,
       lead_name: input.leadName || null,
       status: 'aberta',
+      department: preferences?.default_department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento',
       last_message_at: new Date().toISOString(),
     })
     .select('*')

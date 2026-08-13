@@ -23,7 +23,7 @@ export function defaultBaseUrl(provider: Provider, environment?: string | null) 
   if (provider === 'asaas') {
     return environment === 'producao' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
   }
-  if (provider === 'whatsapp') return 'https://graph.facebook.com/v22.0';
+  if (provider === 'whatsapp') return 'https://graph.facebook.com/v26.0';
   return 'https://api.zapsign.com.br/api/v1';
 }
 

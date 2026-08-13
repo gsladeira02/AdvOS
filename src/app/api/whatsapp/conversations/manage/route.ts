@@ -7,19 +7,10 @@ import { attachConversationMediaToClientFolder } from '@/lib/whatsappCRM';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const LEAD_STAGES = new Set(['novo','em_atendimento','qualificado','proposta','aguardando','convertido','perdido']);
 const DEPARTMENTS = new Set(['atendimento','financeiro_juridico']);
 
 function text(value: any, max = 500) {
   return String(value ?? '').trim().slice(0, max);
-}
-
-function cleanTag(value: any) {
-  return text(value, 28)
-    .replace(/[\r\n\t]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/^[#\s]+/, '')
-    .trim();
 }
 
 async function loadConversation(admin: any, lawFirmId: string, conversationId: string) {
@@ -59,6 +50,50 @@ async function findClientByPhone(admin: any, lawFirmId: string, phone: string) {
   }) || null;
 }
 
+async function setConversationTags(admin: any, lawFirmId: string, conversationId: string, rawIds: any) {
+  const requestedIds = Array.from(new Set((Array.isArray(rawIds) ? rawIds : []).map((value: any) => text(value, 80)).filter(Boolean))).slice(0, 20);
+
+  let validTags: any[] = [];
+  if (requestedIds.length) {
+    const { data, error } = await admin
+      .from('whatsapp_tags')
+      .select('id,name,color,active,sort_order')
+      .eq('law_firm_id', lawFirmId)
+      .eq('active', true)
+      .in('id', requestedIds);
+    if (error) throw new Error(error.message);
+    validTags = data || [];
+    if (validTags.length !== requestedIds.length) throw new Error('Uma ou mais tags selecionadas não estão disponíveis.');
+  }
+
+  const { error: deleteError } = await admin
+    .from('whatsapp_conversation_tags')
+    .delete()
+    .eq('law_firm_id', lawFirmId)
+    .eq('conversation_id', conversationId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (validTags.length) {
+    const { error: insertError } = await admin
+      .from('whatsapp_conversation_tags')
+      .insert(validTags.map((tag: any) => ({ law_firm_id: lawFirmId, conversation_id: conversationId, tag_id: tag.id })));
+    if (insertError) throw new Error(insertError.message);
+  }
+
+  // Mantém o array legado sincronizado para compatibilidade com versões anteriores e busca simples.
+  const legacyNames = validTags
+    .sort((a: any, b: any) => Number(a.sort_order || 0) - Number(b.sort_order || 0) || String(a.name).localeCompare(String(b.name), 'pt-BR'))
+    .map((tag: any) => String(tag.name));
+  const { error: legacyError } = await admin
+    .from('whatsapp_conversations')
+    .update({ tags: legacyNames, updated_at: new Date().toISOString() })
+    .eq('law_firm_id', lawFirmId)
+    .eq('id', conversationId);
+  if (legacyError) throw new Error(legacyError.message);
+
+  return validTags;
+}
+
 export async function POST(req: Request) {
   try {
     const { profile } = await getCurrentProfile();
@@ -82,29 +117,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, department });
     }
 
-    if (action === 'add_tag' || action === 'remove_tag') {
-      const tag = cleanTag(body?.tag);
-      if (!tag) return NextResponse.json({ ok: false, error: 'Informe uma tag.' }, { status: 400 });
-      const current = Array.isArray(conversation.tags) ? conversation.tags.map((item: any) => cleanTag(item)).filter(Boolean) : [];
-      let tags = current;
-      if (action === 'add_tag') {
-        if (!current.some((item: string) => item.toLocaleLowerCase('pt-BR') === tag.toLocaleLowerCase('pt-BR'))) tags = [...current, tag].slice(0, 12);
-      } else {
-        tags = current.filter((item: string) => item.toLocaleLowerCase('pt-BR') !== tag.toLocaleLowerCase('pt-BR'));
-      }
-      const { error } = await admin
-        .from('whatsapp_conversations')
-        .update({ tags, updated_at: new Date().toISOString() })
-        .eq('law_firm_id', profile.law_firm_id)
-        .eq('id', conversationId);
-      if (error) throw new Error(error.message);
+    if (action === 'set_tags') {
+      const tags = await setConversationTags(admin, profile.law_firm_id, conversationId, body?.tagIds);
       return NextResponse.json({ ok: true, tags });
     }
 
     if (action === 'update_lead') {
       if (conversation.client_id) return NextResponse.json({ ok: false, error: 'Essa conversa já pertence a um cliente.' }, { status: 400 });
-      const stage = text(body?.stage, 40);
-      if (!LEAD_STAGES.has(stage) || stage === 'convertido') return NextResponse.json({ ok: false, error: 'Etapa do lead inválida.' }, { status: 400 });
+      const stage = text(body?.stage, 48);
+      const { data: validStage } = await admin
+        .from('whatsapp_lead_stages')
+        .select('stage_key,outcome,active')
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('stage_key', stage)
+        .eq('active', true)
+        .maybeSingle();
+      if (!validStage?.stage_key || validStage.outcome === 'won') return NextResponse.json({ ok: false, error: 'Etapa do lead inválida.' }, { status: 400 });
+
       const lead = await loadLead(admin, profile.law_firm_id, conversationId);
       if (!lead) return NextResponse.json({ ok: false, error: 'Lead não encontrado.' }, { status: 404 });
       const updates: any = { stage, updated_at: new Date().toISOString() };
@@ -161,11 +190,7 @@ export async function POST(req: Request) {
       const now = new Date().toISOString();
       const { error: conversationError } = await admin
         .from('whatsapp_conversations')
-        .update({
-          client_id: client.id,
-          lead_name: client.name,
-          updated_at: now,
-        })
+        .update({ client_id: client.id, lead_name: client.name, updated_at: now })
         .eq('law_firm_id', profile.law_firm_id)
         .eq('id', conversationId);
       if (conversationError) throw new Error(conversationError.message);
@@ -177,10 +202,19 @@ export async function POST(req: Request) {
         .eq('conversation_id', conversationId);
 
       if (lead?.id) {
+        const { data: wonStage } = await admin
+          .from('whatsapp_lead_stages')
+          .select('stage_key')
+          .eq('law_firm_id', profile.law_firm_id)
+          .eq('outcome', 'won')
+          .eq('active', true)
+          .order('sort_order')
+          .limit(1)
+          .maybeSingle();
         await admin
           .from('whatsapp_leads')
           .update({
-            stage: 'convertido',
+            stage: wonStage?.stage_key || 'convertido',
             converted_client_id: client.id,
             converted_at: now,
             updated_at: now,

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
-import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageSquare, MessageCircle } from 'lucide-react';
+import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageCircle } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
 
 const items = [
@@ -17,7 +17,6 @@ const items = [
   ['/app/usuarios', 'Usuários', UserCog],
   ['/app/integracoes', 'Integrações', Plug],
   ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
-  ['/app/modelos-mensagens', 'Modelos', MessageSquare],
   ['/app/configuracoes', 'Configurações', Settings],
 ] as const;
 
@@ -26,7 +25,6 @@ const mobileItems = [
   ['/app/clientes', 'Clientes', Users],
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
-  ['/app/modelos-mensagens', 'Modelos', MessageSquare],
 ] as const;
 
 export async function AppShell({ children }: { children: React.ReactNode }) {

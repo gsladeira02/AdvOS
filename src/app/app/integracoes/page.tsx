@@ -237,7 +237,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               </div>
               <div>
                 <label className="label">Versão Graph API</label>
-                <input name="graph_version" className="input mt-1" defaultValue={whatsappRaw.graph_version || 'v22.0'} />
+                <input name="graph_version" className="input mt-1" defaultValue={whatsappRaw.graph_version || 'v26.0'} />
               </div>
             </div>
 
@@ -254,7 +254,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
             <div>
               <label className="label">Base URL</label>
-              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value={`https://graph.facebook.com/${whatsappRaw.graph_version || 'v22.0'}`} />
+              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value={`https://graph.facebook.com/${whatsappRaw.graph_version || 'v26.0'}`} />
             </div>
 
             <div>

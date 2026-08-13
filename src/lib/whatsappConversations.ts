@@ -159,13 +159,37 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
     rows.push(...(data || []));
   }
 
-  const { data: leadRows, error: leadError } = await admin
-    .from('whatsapp_leads')
-    .select('*')
-    .eq('law_firm_id', lawFirmId)
-    .in('conversation_id', activeIds);
+  const [{ data: leadRows, error: leadError }, { data: tagLinks, error: tagLinksError }] = await Promise.all([
+    admin
+      .from('whatsapp_leads')
+      .select('*')
+      .eq('law_firm_id', lawFirmId)
+      .in('conversation_id', activeIds),
+    admin
+      .from('whatsapp_conversation_tags')
+      .select('conversation_id,tag_id, whatsapp_tags(id,name,color,active,sort_order)')
+      .eq('law_firm_id', lawFirmId)
+      .in('conversation_id', activeIds),
+  ]);
   if (leadError) throw new Error(leadError.message);
+  if (tagLinksError) throw new Error(tagLinksError.message);
   const leadByConversation = new Map((leadRows || []).map((lead: any) => [String(lead.conversation_id), lead]));
+  const tagsByConversation = new Map<string, any[]>();
+  for (const link of tagLinks || []) {
+    const conversationId = String((link as any)?.conversation_id || '');
+    const rawTag: any = Array.isArray((link as any)?.whatsapp_tags) ? (link as any).whatsapp_tags[0] : (link as any)?.whatsapp_tags;
+    if (!conversationId || !rawTag?.id || rawTag.active === false) continue;
+    const current = tagsByConversation.get(conversationId) || [];
+    current.push({
+      id: String(rawTag.id),
+      name: String(rawTag.name || ''),
+      color: String(rawTag.color || 'slate'),
+      active: rawTag.active !== false,
+      sort_order: Number(rawTag.sort_order || 0),
+    });
+    tagsByConversation.set(conversationId, current);
+  }
+  for (const values of Array.from(tagsByConversation.values())) values.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'pt-BR'));
 
   return rows
     .map((conversation: any) => {
@@ -173,7 +197,9 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
       return {
         ...conversation,
         department: conversation.department || 'atendimento',
-        tags: Array.isArray(conversation.tags) ? conversation.tags : [],
+        tags: (tagsByConversation.get(String(conversation.id)) || []).map((tag: any) => tag.name),
+        tag_ids: (tagsByConversation.get(String(conversation.id)) || []).map((tag: any) => tag.id),
+        tag_meta: tagsByConversation.get(String(conversation.id)) || [],
         lead: leadByConversation.get(String(conversation.id)) || null,
         has_messages: true,
         message_count: 1,

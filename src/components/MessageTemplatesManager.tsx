@@ -72,7 +72,7 @@ function shortcutHint(value?: string, name?: string) {
   return `/${source || 'modelo'}`;
 }
 
-export function MessageTemplatesManager({ initialTemplates }: { initialTemplates: MessageTemplateRow[] }) {
+export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }: { initialTemplates: MessageTemplateRow[]; onTemplatesChange?: (templates: MessageTemplateRow[]) => void }) {
   const [templates, setTemplates] = useState<MessageTemplateRow[]>(initialTemplates || []);
   const [draft, setDraft] = useState<MessageTemplateRow>(emptyTemplate());
   const [search, setSearch] = useState('');
@@ -125,10 +125,18 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível salvar o modelo.');
       const saved = result.template as MessageTemplateRow;
       if (isDraft) {
-        setTemplates((current) => [saved, ...current]);
+        setTemplates((current) => {
+          const next = [saved, ...current];
+          onTemplatesChange?.(next);
+          return next;
+        });
         setDraft(emptyTemplate());
       } else {
-        setTemplates((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+        setTemplates((current) => {
+          const next = current.map((item) => (item.id === saved.id ? saved : item));
+          onTemplatesChange?.(next);
+          return next;
+        });
       }
       setFeedback(`Modelo salvo: ${saved.name}.`);
     } catch (error: any) {
@@ -152,7 +160,11 @@ export function MessageTemplatesManager({ initialTemplates }: { initialTemplates
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível apagar o modelo.');
-      setTemplates((current) => current.filter((item) => item.id !== template.id));
+      setTemplates((current) => {
+        const next = current.filter((item) => item.id !== template.id);
+        onTemplatesChange?.(next);
+        return next;
+      });
       setFeedback('Modelo apagado.');
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao apagar modelo.');

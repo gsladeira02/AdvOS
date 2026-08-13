@@ -37,6 +37,9 @@ export type WhatsappTemplateOption = {
   shortcut?: string;
   category?: string;
   body: string;
+  active?: boolean;
+  meta_template_name?: string | null;
+  meta_template_language?: string | null;
 };
 
 type NormalizedTemplate = WhatsappTemplateOption & { normalizedShortcut: string };
@@ -341,6 +344,9 @@ export function WhatsappThread({
   conversation,
   messages,
   templates = [],
+  availableTags = [],
+  leadStages = [],
+  leadLabel = 'Lead',
   live = true,
   initialDraft = '',
   onDraftApplied,
@@ -351,6 +357,9 @@ export function WhatsappThread({
   conversation: any;
   messages: any[];
   templates?: WhatsappTemplateOption[];
+  availableTags?: any[];
+  leadStages?: any[];
+  leadLabel?: string;
   live?: boolean;
   initialDraft?: string;
   onDraftApplied?: () => void;
@@ -1092,7 +1101,13 @@ export function WhatsappThread({
         </div>
       </div>
 
-      <WhatsappConversationControls key={String(conversation?.id || conversation?.phone || 'conversation')} conversation={conversation} onChanged={onConversationChanged} />
+      <WhatsappConversationControls
+        conversation={conversation}
+        availableTags={availableTags}
+        leadStages={leadStages}
+        leadLabel={leadLabel}
+        onChanged={onConversationChanged}
+      />
 
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleMessageScroll} className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2">

@@ -3,11 +3,13 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { PageHeader } from '@/components/PageHeader';
 import { WhatsappCentralClient } from '@/components/WhatsappCentralClient';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { buildClientContacts, clientIdFromVirtualConversationId, isVirtualConversationId, loadVisibleConversations, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
+import { loadWhatsappSettings } from '@/lib/whatsappSettings';
+import { loadWhatsappDashboard } from '@/lib/whatsappDashboard';
 
 
 async function ensureMessageTemplates(admin: any, lawFirmId: string) {
@@ -53,6 +55,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const query = await searchParams;
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
+  const canConfigure = isAdminRole(profile.role);
 
   await ensureMessageTemplates(admin, profile.law_firm_id);
 
@@ -61,6 +64,8 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     : await materializeSelectedConversation(admin, profile.law_firm_id, query?.conversa || '');
 
   const initialDraft = String(query?.draft || query?.mensagem || '').trim();
+  const requestedView = String(query?.view || '').trim();
+  const initialSettingsSection = String(query?.section || 'tags').trim();
 
   const [{ data: integration }, { data: clients }, { data: templates }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
@@ -72,12 +77,15 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       .order('name'),
     admin
       .from('message_templates')
-      .select('id,name,slug,shortcut,body,category,active')
+      .select('id,name,slug,shortcut,body,category,active,meta_template_name,meta_template_language')
       .eq('law_firm_id', profile.law_firm_id)
-      .eq('active', true)
       .order('name'),
   ]);
 
+  const [whatsappSettings, initialDashboard] = await Promise.all([
+    loadWhatsappSettings(admin, profile.law_firm_id),
+    loadWhatsappDashboard(admin, profile.law_firm_id),
+  ]);
 
   // Conversas reais ficam separadas dos contatos e são derivadas das
   // mensagens visíveis. Assim, uma mensagem recebida sempre promove a conversa.
@@ -91,6 +99,15 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       || (contacts || []).find((item: any) => item.id === selectedId || item.conversation_id === selectedId)
       || null)
     : null;
+  const requestedAllowedView = requestedView === 'dashboard' || requestedView === 'financeiro_juridico' || requestedView === 'atendimento' || (requestedView === 'configuracoes' && canConfigure)
+    ? requestedView
+    : '';
+  const initialView = requestedAllowedView
+    ? requestedAllowedView
+    : selected?.department === 'financeiro_juridico'
+      ? 'financeiro_juridico'
+      : 'atendimento';
+
   const { data: messages } = selected && !selected.virtual
     ? await admin
         .from('whatsapp_messages')
@@ -107,7 +124,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     <div>
       <PageHeader
         title="WhatsApp"
-        subtitle="Atendimento e Financeiro/Jurídico com leads, tags, clientes e histórico centralizado."
+        subtitle={`Atendimento e Financeiro/Jurídico com ${String(whatsappSettings.preferences?.lead_label_plural || 'Leads').toLowerCase()}, tags, clientes e histórico centralizado.`}
         action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar integração</Link>}
       />
 
@@ -130,7 +147,17 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
           shortcut: String(template.shortcut || ''),
           category: String(template.category || ''),
           body: String(template.body || ''),
-        }))}
+          active: template.active !== false,
+          meta_template_name: template.meta_template_name || '',
+          meta_template_language: template.meta_template_language || 'pt_BR',
+        })) as any}
+        initialTags={whatsappSettings.tags || []}
+        initialLeadStages={whatsappSettings.stages || []}
+        initialPreferences={whatsappSettings.preferences || {}}
+        initialDashboard={initialDashboard}
+        initialView={initialView as any}
+        initialSettingsSection={initialSettingsSection}
+        canConfigure={canConfigure}
       />
     </div>
   );
