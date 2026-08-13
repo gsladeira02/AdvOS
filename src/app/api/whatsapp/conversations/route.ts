@@ -6,6 +6,7 @@ import {
   clientIdFromVirtualConversationId,
   isVirtualConversationId,
   virtualContactFromClient,
+  loadVisibleConversations,
 } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
@@ -26,20 +27,6 @@ function matchesSearch(item: any, search: string) {
   const term = normalizeSearch(search);
   const haystack = normalizeSearch(`${item?.clients?.name || ''} ${item?.lead_name || ''} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''}`);
   return haystack.includes(term);
-}
-
-async function getConversationIdsWithVisibleMessages(admin: any, lawFirmId: string) {
-  const { data, error } = await admin
-    .from('whatsapp_messages')
-    .select('conversation_id')
-    .eq('law_firm_id', lawFirmId)
-    .is('deleted_at', null)
-    .not('conversation_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(10000);
-
-  if (error) throw new Error(error.message);
-  return new Set((data || []).map((row: any) => String(row.conversation_id)).filter(Boolean));
 }
 
 async function getClientsWithPhone(admin: any, lawFirmId: string) {
@@ -78,24 +65,11 @@ export async function GET(req: Request) {
     const search = String(url.searchParams.get('q') || '').trim();
     const requestedIsVirtual = isVirtualConversationId(requestedId);
 
-    const { data: existingConversations, error: conversationError } = await admin
-      .from('whatsapp_conversations')
-      .select('*, clients(id,name,whatsapp,phone)')
-      .eq('law_firm_id', profile.law_firm_id)
-      .order('last_message_at', { ascending: false })
-      .limit(500);
-
-    if (conversationError) throw new Error(conversationError.message);
-
     const clients = await getClientsWithPhone(admin, profile.law_firm_id);
-    const conversationIdsWithMessages = await getConversationIdsWithVisibleMessages(admin, profile.law_firm_id);
 
-    // Conversas = somente conversas que possuem pelo menos uma mensagem visível.
-    // Contatos = clientes cadastrados com telefone/WhatsApp, separados da aba Conversas.
-    // Isso também limpa a poluição causada por versões antigas que criavam conversas para todos os clientes.
-    let conversations = (existingConversations || [])
-      .filter((conversation: any) => conversationIdsWithMessages.has(String(conversation.id)))
-      .map((conversation: any) => ({ ...conversation, has_messages: true, message_count: 1 }));
+    // A fonte de verdade da aba Conversas são as mensagens visíveis.
+    // Não dependemos de last_message_at para decidir se uma conversa existe na lista.
+    let conversations = await loadVisibleConversations(admin, profile.law_firm_id, 500);
     let contacts = buildClientContacts(conversations || [], clients || []);
 
     if (search) {
@@ -107,7 +81,7 @@ export async function GET(req: Request) {
     if (!selected) selected = contacts.find((item: any) => item.id === requestedId || item.conversation_id === requestedId) || null;
 
     if (!selected && requestedIsVirtual) {
-      const virtual = await getClientForVirtual(admin, profile.law_firm_id, requestedId, existingConversations || []);
+      const virtual = await getClientForVirtual(admin, profile.law_firm_id, requestedId, conversations || []);
       if (virtual) {
         selected = virtual;
         if (!contacts.some((item: any) => item.id === virtual.id)) contacts = [virtual, ...contacts];
@@ -123,13 +97,16 @@ export async function GET(req: Request) {
         .maybeSingle();
       if (requestedConversation) {
         selected = requestedConversation;
-        if (conversationIdsWithMessages.has(String(requestedConversation.id)) && !conversations.some((item: any) => item.id === requestedConversation.id)) {
-          conversations = [{ ...requestedConversation, has_messages: true, message_count: 1 }, ...conversations];
+        if (!conversations.some((item: any) => item.id === requestedConversation.id)) {
+          const visibleForRequested = await loadVisibleConversations(admin, profile.law_firm_id, 500);
+          const activeRequested = visibleForRequested.find((item: any) => item.id === requestedConversation.id);
+          if (activeRequested) conversations = [activeRequested, ...conversations];
         }
       }
     }
 
-    if (!selected && !requestedId && !search) selected = conversations?.[0] || null;
+    // Sem conversationId explícito, nenhuma conversa é aberta automaticamente.
+    // Isso evita marcar mensagens como lidas sem o usuário realmente abrir a conversa.
 
     let messages: any[] = [];
 

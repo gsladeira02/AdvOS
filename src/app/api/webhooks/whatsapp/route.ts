@@ -250,6 +250,10 @@ export async function POST(req: Request) {
         const inboundMedia = message?.image || message?.document || message?.video || message?.audio || message?.sticker || null;
         const cachedMedia = inboundMedia ? await cacheInboundMedia(admin, lawFirmId, inboundMedia, message.type || 'media') : null;
 
+        const messageCreatedAt = message.timestamp
+          ? new Date(Number(message.timestamp) * 1000).toISOString()
+          : new Date().toISOString();
+
         await saveInboundMessage(admin, {
           law_firm_id: lawFirmId,
           conversation_id: conversation.id,
@@ -265,20 +269,22 @@ export async function POST(req: Request) {
           mime_type: cachedMedia?.mimeType || inboundMedia?.mime_type || null,
           media_url: cachedMedia?.mediaUrl || inboundMedia?.id || null,
           storage_path: cachedMedia?.storagePath || null,
-          created_at: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
+          created_at: messageCreatedAt,
         });
 
-        await admin
+        const { error: conversationUpdateError } = await admin
           .from('whatsapp_conversations')
           .update({
             client_id: client?.id || conversation.client_id || null,
             lead_name: client?.name || contact?.profile?.name || conversation.lead_name || null,
-            last_message_at: new Date().toISOString(),
+            last_message_at: messageCreatedAt,
             unread_count: Number(conversation.unread_count || 0) + 1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', conversation.id)
           .eq('law_firm_id', lawFirmId);
+
+        if (conversationUpdateError) throw new Error(conversationUpdateError.message);
       }
 
       for (const status of value?.statuses || []) {

@@ -73,7 +73,7 @@ export function WhatsappCentralClient({
   const [conversations, setConversations] = useState(dedupeById(initialConversations || []));
   const [contacts, setContacts] = useState(dedupeById(initialContacts || []));
   const [messages, setMessages] = useState(initialMessages || []);
-  const [selectedId, setSelectedId] = useState(initialSelectedId || initialConversations?.[0]?.id || '');
+  const [selectedId, setSelectedId] = useState(initialSelectedId || '');
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<WhatsappTab>(() => {
     const selected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
@@ -86,7 +86,7 @@ export function WhatsappCentralClient({
   const [error, setError] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'live' | 'fallback'>('connecting');
   const supabase = useMemo(() => createBrowserSupabase(), []);
-  const selectedIdRef = useRef(initialSelectedId || initialConversations?.[0]?.id || '');
+  const selectedIdRef = useRef(initialSelectedId || '');
   const queryRef = useRef('');
   const loadingRef = useRef(false);
   const refreshQueuedRef = useRef(false);
@@ -97,9 +97,9 @@ export function WhatsappCentralClient({
   const allTargets = useMemo(() => dedupeById([...(conversations || []), ...(contacts || [])]), [conversations, contacts]);
 
   const selected = useMemo(() => {
-    if (selectedId) return allTargets.find((item: any) => item.id === selectedId || item.conversation_id === selectedId) || null;
-    return conversations[0] || null;
-  }, [allTargets, conversations, selectedId]);
+    if (!selectedId) return null;
+    return allTargets.find((item: any) => item.id === selectedId || item.conversation_id === selectedId) || null;
+  }, [allTargets, selectedId]);
 
   const filteredConversations = useMemo(() => {
     return (conversations || []).filter((conversation: any) => matchesSearch(conversation, query));
@@ -145,19 +145,25 @@ export function WhatsappCentralClient({
 
       const nextConversations = dedupeById(result.conversations || []);
       const nextContacts = dedupeById(result.contacts || []);
-      const nextSelectedId = result.selectedId || effectiveTargetId || nextConversations?.[0]?.id || '';
+      const selectionUnchanged = selectedIdRef.current === effectiveTargetId;
+      const nextSelectedId = selectionUnchanged ? (result.selectedId || effectiveTargetId || '') : selectedIdRef.current;
 
       setConversations(nextConversations);
       setContacts(nextContacts);
-      setMessages((result.messages || []).filter((message: any) => {
-        if (!nextSelectedId) return true;
-        if (!message?.conversation_id) return true;
-        return String(message.conversation_id) === String(nextSelectedId);
-      }));
+
+      // Uma resposta antiga não pode reabrir uma conversa que o usuário fechou
+      // com Esc ou substituir uma conversa selecionada depois da requisição.
+      if (selectionUnchanged) {
+        setMessages((result.messages || []).filter((message: any) => {
+          if (!nextSelectedId) return false;
+          if (!message?.conversation_id) return true;
+          return String(message.conversation_id) === String(nextSelectedId);
+        }));
+      }
 
       // Se um contato virtual acabou de receber/enviar a primeira mensagem,
       // a API devolve o ID da conversa real e a interface migra automaticamente.
-      if (nextSelectedId && nextSelectedId !== selectedIdRef.current) {
+      if (selectionUnchanged && nextSelectedId && nextSelectedId !== selectedIdRef.current) {
         selectedIdRef.current = nextSelectedId;
         setSelectedId(nextSelectedId);
         setActiveTab('conversas');
@@ -281,6 +287,26 @@ export function WhatsappCentralClient({
     const id = window.setTimeout(() => load(selectedIdRef.current, true, query), 250);
     return () => window.clearTimeout(id);
   }, [query, load]);
+
+  const closeConversation = useCallback(() => {
+    selectedIdRef.current = '';
+    setSelectedId('');
+    setMessages([]);
+    setDraft('');
+    setMobileListOpen(true);
+    window.history.replaceState(null, '', '/app/whatsapp');
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !selectedIdRef.current) return;
+      event.preventDefault();
+      closeConversation();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [closeConversation]);
 
   function selectConversation(item: any) {
     const id = String(item?.id || '');
@@ -426,10 +452,10 @@ export function WhatsappCentralClient({
 
       {selected ? (
         <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
-          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
+          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} />
         </div>
       ) : (
-        <section className="whatsapp-panel min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
+        <section className="whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">
           <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
             <MessageCircle size={34} className="text-[#075e54]" />
             <p>Selecione uma conversa com mensagens ou abra a aba Contatos para iniciar com um cliente.</p>

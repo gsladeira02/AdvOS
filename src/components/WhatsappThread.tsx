@@ -994,8 +994,9 @@ export function WhatsappThread({
       <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
         <div className="flex min-w-0 items-center gap-2">
           {onBack && (
-            <button type="button" onClick={onBack} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 xl:hidden" title="Voltar para conversas">
-              <ArrowLeft size={17} />
+            <button type="button" onClick={onBack} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Fechar conversa (Esc)">
+              <ArrowLeft size={17} className="xl:hidden" />
+              <X size={17} className="hidden xl:block" />
             </button>
           )}
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">

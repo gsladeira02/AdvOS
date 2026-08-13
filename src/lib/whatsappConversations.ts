@@ -106,3 +106,58 @@ export async function syncClientContactsToConversations(admin: any, lawFirmId: s
     }
   }
 }
+
+
+export async function getVisibleConversationActivity(admin: any, lawFirmId: string) {
+  const { data, error } = await admin
+    .from('whatsapp_messages')
+    .select('conversation_id,created_at')
+    .eq('law_firm_id', lawFirmId)
+    .is('deleted_at', null)
+    .not('conversation_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(10000);
+
+  if (error) throw new Error(error.message);
+
+  const activity = new Map<string, string>();
+  for (const row of data || []) {
+    const conversationId = String(row?.conversation_id || '');
+    if (!conversationId || activity.has(conversationId)) continue;
+    activity.set(conversationId, String(row?.created_at || ''));
+  }
+  return activity;
+}
+
+export async function loadVisibleConversations(admin: any, lawFirmId: string, maxConversations = 500) {
+  const activity = await getVisibleConversationActivity(admin, lawFirmId);
+  const activeIds = Array.from(activity.keys()).slice(0, Math.max(1, maxConversations));
+  if (!activeIds.length) return [];
+
+  const rows: any[] = [];
+  const batchSize = 80;
+  for (let index = 0; index < activeIds.length; index += batchSize) {
+    const batch = activeIds.slice(index, index + batchSize);
+    const { data, error } = await admin
+      .from('whatsapp_conversations')
+      .select('*, clients(id,name,whatsapp,phone)')
+      .eq('law_firm_id', lawFirmId)
+      .in('id', batch);
+
+    if (error) throw new Error(error.message);
+    rows.push(...(data || []));
+  }
+
+  return rows
+    .map((conversation: any) => ({
+      ...conversation,
+      has_messages: true,
+      message_count: 1,
+      last_message_at: activity.get(String(conversation.id)) || conversation.last_message_at || null,
+    }))
+    .sort((a: any, b: any) => {
+      const aTime = new Date(a.last_message_at || 0).getTime();
+      const bTime = new Date(b.last_message_at || 0).getTime();
+      return bTime - aTime;
+    });
+}
