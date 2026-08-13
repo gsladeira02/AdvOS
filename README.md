@@ -1,32 +1,23 @@
-# AdvOS V9.31
+# AdvOS V9.32
 
-Base: V9.29 + recursos avançados de WhatsApp.
+Sistema jurídico interno com Next.js, Supabase e Vercel.
 
-## WhatsApp V9.30
-- Localização nativa (coordenadas atuais ou manuais).
-- Enquete por mensagem interativa oficial (2–3 opções).
-- Evento por mensagem interativa oficial (Confirmar / Talvez / Não posso).
-- Cartões desses recursos no histórico e prévias na lista de conversas.
-- Ligação e videochamada via WhatsApp Business Calling API quando habilitada para o número.
-- Solicitação de permissão de chamada ao cliente.
-- Fallback para ligação telefônica comum.
+## V9.32 — Central WhatsApp / CRM
 
-## Calling API
-Para voz/vídeo no navegador, a Meta precisa habilitar WhatsApp Business Calling para o número e o webhook do aplicativo deve estar inscrito no campo `calls`.
+- Central dividida em **Atendimento** e **Financeiro/Jurídico**.
+- Transferência de conversa entre setores.
+- Leads separados de clientes; nenhum lead vira cliente automaticamente.
+- Funil de leads e edição dos detalhes do lead.
+- Botão manual **Cadastrar como cliente**.
+- Tags nas conversas.
+- Mídias recebidas de clientes vinculadas automaticamente à Pasta do Cliente.
+- Mídias de um lead são vinculadas à Pasta do Cliente no momento da conversão.
+- Mantém chamadas, localização, enquetes, eventos, Realtime e correções anteriores.
 
-Em redes onde o navegador não consegue negociar ICE diretamente, configure opcionalmente:
+## Migração obrigatória
 
-`NEXT_PUBLIC_WEBRTC_STUN_URL=stun:seu-servidor-stun:3478`
+Antes de publicar a v9.32, rode no SQL Editor do Supabase:
 
-Use apenas um servidor STUN aprovado pelo escritório.
+`supabase/v9_32_whatsapp_atendimento_leads_tags.sql`
 
-## Banco
-Não existe SQL novo obrigatório para a V9.30.
-
-
-## V9.31 — correção de origem/Calling
-- Corrige o bloqueio `Origem inválida.` em contextos que enviam `Origin: null`.
-- Mantém bloqueio de requisições `cross-site`.
-- `Origin: null` só é aceito com `Sec-Fetch-Site: same-origin` ou `Referer` do próprio AdvOS.
-- Comparação de origem passa a considerar `x-forwarded-host` / `x-forwarded-proto` na Vercel.
-- Nenhum SQL novo.
+A migração é aditiva e pode ser executada com a v9.31 ainda publicada.
