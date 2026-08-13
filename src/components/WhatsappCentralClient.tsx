@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, RefreshCw, Search } from 'lucide-react';
+import { MessageCircle, RefreshCw, Search, Users } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
@@ -59,7 +59,8 @@ export function WhatsappCentralClient({
   useEffect(() => { queryRef.current = query; }, [query]);
 
   const selected = useMemo(() => {
-    return conversations.find((item: any) => item.id === selectedId) || conversations[0] || null;
+    if (selectedId) return conversations.find((item: any) => item.id === selectedId) || null;
+    return conversations[0] || null;
   }, [conversations, selectedId]);
 
   const filtered = useMemo(() => {
@@ -71,6 +72,9 @@ export function WhatsappCentralClient({
       return title.includes(term) || phone.includes(term);
     });
   }, [conversations, query]);
+
+  const conversationCount = useMemo(() => conversations.filter((item: any) => !item.virtual).length, [conversations]);
+  const contactCount = useMemo(() => conversations.filter((item: any) => item.virtual).length, [conversations]);
 
   const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
     if (loadingRef.current && silent) return;
@@ -90,7 +94,7 @@ export function WhatsappCentralClient({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Erro ao carregar mensagens.');
-      const nextSelectedId = result.selectedId || effectiveTargetId || result.conversations?.[0]?.id || '';
+      const nextSelectedId = result.selectedId || effectiveTargetId || (!cleanSearch ? result.conversations?.[0]?.id : '') || '';
       setConversations(result.conversations || []);
       setMessages((result.messages || []).filter((message: any) => {
         if (!nextSelectedId) return true;
@@ -169,13 +173,13 @@ export function WhatsappCentralClient({
   }
 
   return (
-    <div className="whatsapp-central grid h-[calc(100vh-116px)] min-h-[540px] gap-3 xl:grid-cols-[300px_1fr]">
+    <div className="whatsapp-central grid h-[calc(100dvh-116px)] min-h-[540px] min-w-0 gap-3 overflow-hidden xl:grid-cols-[300px_minmax(0,1fr)]">
       <section className={`whatsapp-panel overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm ${mobileListOpen ? 'block' : 'hidden xl:block'}`}>
         <div className="border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-black text-slate-950">Conversas</h2>
-              <p className="text-[10px] text-slate-500">Clientes cadastrados aparecem como contatos.</p>
+              <p className="text-[10px] text-slate-500">Conversas reais; pesquise para ver contatos.</p>
             </div>
             <button
               type="button"
@@ -194,13 +198,19 @@ export function WhatsappCentralClient({
               className="input rounded-[20px] border-transparent bg-white py-2 pl-8 pr-2 text-[11px] shadow-sm"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Pesquisar ou começar conversa"
+              placeholder="Pesquisar conversa ou contato"
             />
           </div>
         </div>
 
         <div className="whatsapp-list-scroll max-h-[calc(100vh-230px)] overflow-y-auto">
-          {!filtered.length && <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa encontrada.</p>}
+          {!filtered.length && <p className="p-3 text-xs font-bold text-slate-500">{query.trim() ? 'Nenhum contato ou conversa encontrada.' : 'Nenhuma conversa ainda. Pesquise um cliente para iniciar.'}</p>}
+          {query.trim() && (conversationCount > 0 || contactCount > 0) && (
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#eef1ef] bg-white/95 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-400 backdrop-blur">
+              <span>Conversas: {conversationCount}</span>
+              <span>Contatos: {contactCount}</span>
+            </div>
+          )}
           {filtered.map((conversation: any) => {
             const active = selected?.id === conversation.id;
             const title = titleFor(conversation);
@@ -211,8 +221,8 @@ export function WhatsappCentralClient({
                 onClick={() => selectConversation(conversation.id)}
                 className={`flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#f0f2f5]' : 'bg-white'}`}
               >
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#075e54] text-[10px] font-black text-white">
-                  {initials(title)}
+                <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black text-white ${conversation.virtual ? 'bg-[#25D366]' : 'bg-[#075e54]'}`}>
+                  {conversation.virtual ? <Users size={14} /> : initials(title)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -221,9 +231,10 @@ export function WhatsappCentralClient({
                   </div>
                   <div className="mt-0.5 flex items-center justify-between gap-2">
                     <p className="truncate text-[10px] font-bold text-slate-500">{conversation.phone}</p>
-                    {conversation.virtual && <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">contato</span>}
+                    {conversation.virtual ? <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">contato</span> : <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500">conversa</span>}
                   </div>
-                  <p className="mt-0.5 text-[9px] text-slate-400">{shortTime(conversation.last_message_at)}</p>
+                  {!conversation.virtual && <p className="mt-0.5 text-[9px] text-slate-400">{shortTime(conversation.last_message_at)}</p>}
+                  {conversation.virtual && <p className="mt-0.5 text-[9px] text-emerald-700">Abrir contato para iniciar conversa</p>}
                 </div>
               </button>
             );
@@ -240,7 +251,7 @@ export function WhatsappCentralClient({
           <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
         </div>
       ) : (
-        <section className="whatsapp-panel rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
+        <section className="whatsapp-panel min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
           <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
             <MessageCircle size={34} className="text-[#075e54]" />
             <p>Selecione uma conversa ou pesquise um cliente para iniciar pelo PWA.</p>

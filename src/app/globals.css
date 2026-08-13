@@ -4,8 +4,8 @@
 
 :root{--ink:#0f172a;--paper:#f6f2ea;--line:#e6dccb;--soft:#fbf7ef;--muted:#64748b;--whatsapp:#25D366;--whatsapp-dark:#075e54}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:linear-gradient(180deg,#f8f5ef 0%,#f3eee4 100%);color:#0f172a;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;text-rendering:optimizeLegibility}
+html{scroll-behavior:smooth;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
+body{margin:0;max-width:100%;overflow-x:hidden;background:linear-gradient(180deg,#f8f5ef 0%,#f3eee4 100%);color:#0f172a;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;text-rendering:optimizeLegibility}
 a{text-decoration:none;color:inherit}
 input,select,textarea,button{font:inherit}
 button{cursor:pointer}
@@ -68,3 +68,31 @@ button:disabled{cursor:not-allowed}
   .whatsapp-thread textarea{font-size:16px!important;max-height:110px}
 }
 @media(max-width:760px){.page-header{margin-bottom:8px!important;border-radius:14px!important;padding:9px 11px!important}.page-header h1{font-size:1rem!important}.page-header-subtitle{display:none!important}.page-header .btn{min-height:32px;padding:.42rem .55rem;font-size:.68rem}}
+
+
+/* V9.21: PWA sem zoom lateral, conversas/contatos encaixados na tela */
+#__next, .page-shell, .desktop-grid, .app-main{min-width:0;max-width:100vw}
+@media(max-width:760px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:auto}
+  input,select,textarea{font-size:16px!important}
+  .app-main{width:100%;max-width:100vw;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 70px)!important}
+  .mobile-pwa-top{padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px}
+  .mobile-bottom-nav{padding:5px 5px calc(env(safe-area-inset-bottom,0px) + 5px)}
+  .mobile-bottom-nav-item{border-radius:11px;padding:5px 2px;font-size:8px}
+  .whatsapp-central{display:block!important;width:100%!important;max-width:100%!important;height:calc(100dvh - 116px)!important;min-height:0!important;overflow:hidden!important}
+  .whatsapp-panel,.whatsapp-thread{width:100%!important;max-width:100%!important;min-width:0!important}
+  .whatsapp-list-scroll{max-height:calc(100dvh - 224px)!important;overflow-x:hidden!important}
+  .whatsapp-thread{height:calc(100dvh - 116px)!important}
+  .whatsapp-thread textarea{min-width:0!important;max-height:92px!important;resize:none!important}
+  .whatsapp-message-scroll{overflow-x:hidden!important}
+  .whatsapp-message-scroll img,.whatsapp-message-scroll video{max-width:100%!important;height:auto!important}
+  .whatsapp-thread .group > div{max-width:86%!important;word-break:break-word;overflow-wrap:anywhere}
+  .whatsapp-thread .relative.flex.items-end{gap:5px!important}
+  .whatsapp-thread .relative.flex.items-end > button{height:34px!important;width:34px!important;min-width:34px!important;margin-bottom:3px!important}
+  .whatsapp-thread .relative.flex.items-end svg{width:16px!important;height:16px!important}
+  .whatsapp-thread .relative.flex.items-end .relative.flex-1{min-width:0!important}
+  .whatsapp-thread .absolute.bottom-\[calc\(100\%\+8px\)\]{max-width:calc(100vw - 80px)!important}
+  .page-header{max-width:100%;overflow:hidden}
+  .table,.spreadsheet{max-width:100%;min-width:0;white-space:normal!important}
+  .table-wrapper,.spreadsheet-wrapper{max-width:100%;overflow-x:auto}
+}

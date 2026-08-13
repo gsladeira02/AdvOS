@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { getOrCreateConversation } from '@/lib/whatsappApi';
-import { clientIdFromVirtualConversationId, isVirtualConversationId } from '@/lib/whatsappConversations';
+import { clientIdFromVirtualConversationId, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -28,12 +27,20 @@ async function resolveConversation(admin: any, lawFirmId: string, requestedId: s
     const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
     if (!client?.id || !phone) return null;
 
-    return getOrCreateConversation({
-      lawFirmId,
-      clientId: client.id,
+    // Contato virtual: não criamos conversa real só por abrir/pesquisar o cliente.
+    // A conversa real só nasce quando uma mensagem é enviada ou recebida.
+    return {
+      id: virtualConversationId(client.id),
+      law_firm_id: lawFirmId,
+      client_id: client.id,
       phone,
-      leadName: client.name,
-    });
+      lead_name: client.name || phone,
+      status: 'contato',
+      last_message_at: null,
+      unread_count: 0,
+      virtual: true,
+      clients: { id: client.id, name: client.name, whatsapp: client.whatsapp, phone: client.phone },
+    };
   }
 
   const { data: conversation, error } = await admin
@@ -59,6 +66,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, conversationId: '', conversation: null, messages: [], fetchedAt: new Date().toISOString() }, {
         headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' },
       });
+    }
+
+    if (conversation.virtual) {
+      return NextResponse.json({
+        ok: true,
+        conversationId: conversation.id,
+        conversation,
+        messages: [],
+        fetchedAt: new Date().toISOString(),
+      }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
     }
 
     const { data: messages, error } = await admin

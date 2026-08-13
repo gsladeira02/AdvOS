@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { getOrCreateConversation } from '@/lib/whatsappApi';
-import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, syncClientContactsToConversations } from '@/lib/whatsappConversations';
+import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +22,28 @@ async function getClientForVirtual(admin: any, lawFirmId: string, virtualId: str
   return data;
 }
 
+function virtualContactFromClient(client: any) {
+  const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
+  if (!client?.id || !phone) return null;
+  return {
+    id: virtualConversationId(client.id),
+    law_firm_id: client.law_firm_id,
+    client_id: client.id,
+    phone,
+    lead_name: client.name || phone,
+    status: 'contato',
+    last_message_at: null,
+    unread_count: 0,
+    updated_at: client.created_at || null,
+    virtual: true,
+    clients: { id: client.id, name: client.name, whatsapp: client.whatsapp, phone: client.phone },
+  };
+}
+
+function hasRealMessageActivity(conversation: any) {
+  return Boolean(conversation?.last_message_at || Number(conversation?.unread_count || 0) > 0);
+}
+
 export async function GET(req: Request) {
   try {
     const { profile } = await getCurrentProfile();
@@ -31,33 +52,7 @@ export async function GET(req: Request) {
     const requestedId = url.searchParams.get('conversationId') || '';
     const search = String(url.searchParams.get('q') || '').trim();
 
-    let concreteRequestedId = requestedId;
-
-    if (isVirtualConversationId(requestedId)) {
-      const client = await getClientForVirtual(admin, profile.law_firm_id, requestedId);
-      const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
-      if (client?.id && phone) {
-        const created = await getOrCreateConversation({
-          lawFirmId: profile.law_firm_id,
-          clientId: client.id,
-          phone,
-          leadName: client.name,
-        });
-        concreteRequestedId = created.id;
-      }
-    }
-
-    const { data: rawClientContacts, error: clientsError } = await admin
-      .from('clients')
-      .select('id,law_firm_id,name,phone,whatsapp,created_at')
-      .eq('law_firm_id', profile.law_firm_id)
-      .order('name');
-
-    if (clientsError) throw new Error(clientsError.message);
-
-    const clientContacts = (rawClientContacts || []).filter((client: any) => normalizeBrazilPhone(client?.whatsapp || client?.phone || ''));
-
-    await syncClientContactsToConversations(admin, profile.law_firm_id, clientContacts || []);
+    const requestedIsVirtual = isVirtualConversationId(requestedId);
 
     const { data: existingConversations, error: conversationError } = await admin
       .from('whatsapp_conversations')
@@ -68,7 +63,28 @@ export async function GET(req: Request) {
 
     if (conversationError) throw new Error(conversationError.message);
 
-    let conversations = mergeClientContactsIntoConversations(existingConversations || [], clientContacts || []);
+    // A aba Conversas deve mostrar somente conversas reais, com mensagens.
+    // Clientes cadastrados entram como Contatos apenas quando o usuário pesquisa ou abre pelo botão do cliente.
+    let conversations = (existingConversations || []).filter(hasRealMessageActivity);
+
+    let clientContacts: any[] = [];
+    if (search) {
+      const { data: rawClientContacts, error: clientsError } = await admin
+        .from('clients')
+        .select('id,law_firm_id,name,phone,whatsapp,created_at')
+        .eq('law_firm_id', profile.law_firm_id)
+        .order('name');
+
+      if (clientsError) throw new Error(clientsError.message);
+      clientContacts = (rawClientContacts || []).filter((client: any) => normalizeBrazilPhone(client?.whatsapp || client?.phone || ''));
+      conversations = mergeClientContactsIntoConversations(conversations, clientContacts);
+    }
+
+    if (requestedIsVirtual && !conversations.some((item: any) => item.id === requestedId)) {
+      const client = await getClientForVirtual(admin, profile.law_firm_id, requestedId);
+      const virtual = virtualContactFromClient(client);
+      if (virtual) conversations = [virtual, ...conversations];
+    }
 
     if (search) {
       const term = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -81,7 +97,23 @@ export async function GET(req: Request) {
       });
     }
 
-    const selected = conversations.find((item: any) => item.id === concreteRequestedId) || conversations?.[0] || null;
+    let selected = conversations.find((item: any) => item.id === requestedId) || null;
+
+    if (!selected && requestedId && !requestedIsVirtual) {
+      const { data: requestedConversation } = await admin
+        .from('whatsapp_conversations')
+        .select('*, clients(id,name,whatsapp,phone)')
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', requestedId)
+        .maybeSingle();
+      selected = requestedConversation || null;
+      if (selected && !conversations.some((item: any) => item.id === selected.id) && hasRealMessageActivity(selected)) {
+        conversations = [selected, ...conversations];
+      }
+    }
+
+    if (!selected && !requestedId && !search) selected = conversations?.[0] || null;
+
     let messages: any[] = [];
 
     if (selected?.id && !selected.virtual) {
