@@ -1,4 +1,4 @@
-# AdvOS V9.30
+# AdvOS V9.31
 
 Base: V9.29 + recursos avançados de WhatsApp.
 
@@ -22,3 +22,11 @@ Use apenas um servidor STUN aprovado pelo escritório.
 
 ## Banco
 Não existe SQL novo obrigatório para a V9.30.
+
+
+## V9.31 — correção de origem/Calling
+- Corrige o bloqueio `Origem inválida.` em contextos que enviam `Origin: null`.
+- Mantém bloqueio de requisições `cross-site`.
+- `Origin: null` só é aceito com `Sec-Fetch-Site: same-origin` ou `Referer` do próprio AdvOS.
+- Comparação de origem passa a considerar `x-forwarded-host` / `x-forwarded-proto` na Vercel.
+- Nenhum SQL novo.
