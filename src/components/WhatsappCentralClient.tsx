@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Search } from 'lucide-react';
+import { MessageCircle, RefreshCw, Search } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
@@ -47,6 +47,7 @@ export function WhatsappCentralClient({
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState(initialDraft || '');
   const [loading, setLoading] = useState(false);
+  const [mobileListOpen, setMobileListOpen] = useState(!initialSelectedId);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -152,6 +153,7 @@ export function WhatsappCentralClient({
     setSelectedId(id);
     window.history.replaceState(null, '', `/app/whatsapp?conversa=${id}`);
     setDraft('');
+    setMobileListOpen(false);
     setMessages([]);
     load(id, false, queryRef.current);
   }
@@ -167,8 +169,8 @@ export function WhatsappCentralClient({
   }
 
   return (
-    <div className="grid h-[calc(100vh-116px)] min-h-[540px] gap-3 xl:grid-cols-[300px_1fr]">
-      <section className="overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm">
+    <div className="whatsapp-central grid h-[calc(100vh-116px)] min-h-[540px] gap-3 xl:grid-cols-[300px_1fr]">
+      <section className={`whatsapp-panel overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm ${mobileListOpen ? 'block' : 'hidden xl:block'}`}>
         <div className="border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -197,7 +199,7 @@ export function WhatsappCentralClient({
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-230px)] overflow-y-auto">
+        <div className="whatsapp-list-scroll max-h-[calc(100vh-230px)] overflow-y-auto">
           {!filtered.length && <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa encontrada.</p>}
           {filtered.map((conversation: any) => {
             const active = selected?.id === conversation.id;
@@ -234,10 +236,15 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} />
+        <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'}`}>
+          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={true} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={() => setMobileListOpen(true)} />
+        </div>
       ) : (
-        <section className="rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
-          Selecione uma conversa ou aguarde a primeira mensagem recebida via webhook.
+        <section className="whatsapp-panel rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm">
+          <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
+            <MessageCircle size={34} className="text-[#075e54]" />
+            <p>Selecione uma conversa ou pesquise um cliente para iniciar pelo PWA.</p>
+          </div>
         </section>
       )}
     </div>

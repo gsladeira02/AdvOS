@@ -19,6 +19,14 @@ const items = [
   ['/app/configuracoes', 'Config.', Settings],
 ] as const;
 
+const mobileItems = [
+  ['/app/dashboard', 'Início', Home],
+  ['/app/clientes', 'Clientes', Users],
+  ['/app/financeiro', 'Financeiro', Wallet],
+  ['/app/whatsapp', 'WhatsApp', MessageCircle],
+  ['/app/modelos-mensagens', 'Modelos', MessageSquare],
+] as const;
+
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabase();
   const { data: { session } } = await supabase.auth.getSession();
@@ -50,11 +58,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="page-shell">
-      <div className="mobile-readonly">
-        AdvOS mobile: visualização rápida. Para cadastros completos, use o computador.
-      </div>
-      <div className="desktop-grid grid min-h-screen grid-cols-[138px_1fr]">
-        <aside className="sidebar sticky top-0 flex h-screen flex-col border-r border-[#e6dccb] bg-white/95 px-2 py-3 shadow-sm backdrop-blur">
+      <div className="desktop-grid grid min-h-[100dvh] md:grid-cols-[138px_1fr]">
+        <aside className="sidebar sticky top-0 hidden h-screen flex-col border-r border-[#e6dccb] bg-white/95 px-2 py-3 shadow-sm backdrop-blur md:flex">
           <Link href="/app/dashboard" title={`AdvOS — ${firmName}`} className="mb-3 flex h-10 items-center gap-2 rounded-2xl bg-ink px-2 text-xs font-black text-white shadow-sm">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-white/15 text-sm">A</span>
             <span className="truncate">AdvOS</span>
@@ -81,7 +86,28 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </form>
         </aside>
+
+        <header className="mobile-pwa-top md:hidden">
+          <Link href="/app/whatsapp" className="flex items-center gap-2 font-black text-white">
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15">A</span>
+            <span className="leading-none">AdvOS</span>
+          </Link>
+          <div className="min-w-0 text-right">
+            <p className="truncate text-[11px] font-black text-white">{firmName}</p>
+            <p className="truncate text-[9px] font-bold text-white/65">PWA ativo</p>
+          </div>
+        </header>
+
         <main className="app-main min-w-0 p-3.5">{children}</main>
+
+        <nav className="mobile-bottom-nav md:hidden" aria-label="Navegação principal do PWA">
+          {mobileItems.map(([href, label, Icon]) => (
+            <Link key={href} href={href} className="mobile-bottom-nav-item">
+              <Icon size={18} />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </nav>
       </div>
     </div>
   );

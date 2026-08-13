@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   Check,
   CheckCheck,
   ChevronDown,
@@ -336,6 +337,7 @@ export function WhatsappThread({
   initialDraft = '',
   onDraftApplied,
   onSent,
+  onBack,
 }: {
   conversation: any;
   messages: any[];
@@ -344,6 +346,7 @@ export function WhatsappThread({
   initialDraft?: string;
   onDraftApplied?: () => void;
   onSent?: (conversationId?: string) => void;
+  onBack?: () => void;
 }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<MessageListItem[]>(messages || []);
@@ -984,9 +987,14 @@ export function WhatsappThread({
   }
 
   return (
-    <div className="flex h-[calc(100vh-116px)] min-h-[540px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
+    <div className="whatsapp-thread flex h-[calc(100vh-116px)] min-h-[540px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
         <div className="flex min-w-0 items-center gap-2">
+          {onBack && (
+            <button type="button" onClick={onBack} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 xl:hidden" title="Voltar para conversas">
+              <ArrowLeft size={17} />
+            </button>
+          )}
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">
             {title.split(' ').filter(Boolean).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || '?'}
           </div>
