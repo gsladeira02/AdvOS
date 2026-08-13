@@ -1,6 +1,12 @@
-# AdvOS V9.28
+# AdvOS V9.29
 
 Sistema jurídico interno do escritório, com acesso pela internet, Supabase, Next.js e Vercel.
+
+## Melhoria da V9.29
+
+A lista de **Conversas** do WhatsApp agora exibe uma prévia da última mensagem no estilo do WhatsApp: conteúdo em uma linha, horário à direita, contador verde de não lidas e indicador de envio/leitura para mensagens enviadas pelo escritório. Fotos, áudios, vídeos, documentos, figurinhas e reações recebem rótulos amigáveis.
+
+**Não existe SQL novo para a V9.29.**
 
 ## Correções da V9.28
 
