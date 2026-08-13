@@ -4,7 +4,6 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import {
   buildClientContacts,
   clientIdFromVirtualConversationId,
-  hasRealMessageActivity,
   isVirtualConversationId,
   virtualContactFromClient,
 } from '@/lib/whatsappConversations';
@@ -27,6 +26,20 @@ function matchesSearch(item: any, search: string) {
   const term = normalizeSearch(search);
   const haystack = normalizeSearch(`${item?.clients?.name || ''} ${item?.lead_name || ''} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''}`);
   return haystack.includes(term);
+}
+
+async function getConversationIdsWithVisibleMessages(admin: any, lawFirmId: string) {
+  const { data, error } = await admin
+    .from('whatsapp_messages')
+    .select('conversation_id')
+    .eq('law_firm_id', lawFirmId)
+    .is('deleted_at', null)
+    .not('conversation_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(10000);
+
+  if (error) throw new Error(error.message);
+  return new Set((data || []).map((row: any) => String(row.conversation_id)).filter(Boolean));
 }
 
 async function getClientsWithPhone(admin: any, lawFirmId: string) {
@@ -75,11 +88,15 @@ export async function GET(req: Request) {
     if (conversationError) throw new Error(conversationError.message);
 
     const clients = await getClientsWithPhone(admin, profile.law_firm_id);
+    const conversationIdsWithMessages = await getConversationIdsWithVisibleMessages(admin, profile.law_firm_id);
 
-    // Conversas = somente registros que já possuem mensagens/atividade real.
+    // Conversas = somente conversas que possuem pelo menos uma mensagem visível.
     // Contatos = clientes cadastrados com telefone/WhatsApp, separados da aba Conversas.
-    let conversations = (existingConversations || []).filter(hasRealMessageActivity);
-    let contacts = buildClientContacts(existingConversations || [], clients || []);
+    // Isso também limpa a poluição causada por versões antigas que criavam conversas para todos os clientes.
+    let conversations = (existingConversations || [])
+      .filter((conversation: any) => conversationIdsWithMessages.has(String(conversation.id)))
+      .map((conversation: any) => ({ ...conversation, has_messages: true, message_count: 1 }));
+    let contacts = buildClientContacts(conversations || [], clients || []);
 
     if (search) {
       conversations = conversations.filter((conversation: any) => matchesSearch(conversation, search));
@@ -106,8 +123,8 @@ export async function GET(req: Request) {
         .maybeSingle();
       if (requestedConversation) {
         selected = requestedConversation;
-        if (hasRealMessageActivity(requestedConversation) && !conversations.some((item: any) => item.id === requestedConversation.id)) {
-          conversations = [requestedConversation, ...conversations];
+        if (conversationIdsWithMessages.has(String(requestedConversation.id)) && !conversations.some((item: any) => item.id === requestedConversation.id)) {
+          conversations = [{ ...requestedConversation, has_messages: true, message_count: 1 }, ...conversations];
         }
       }
     }

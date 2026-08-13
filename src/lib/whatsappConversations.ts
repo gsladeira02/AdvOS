@@ -19,7 +19,14 @@ export function clientIdFromVirtualConversationId(value?: string | null) {
 }
 
 export function hasRealMessageActivity(conversation: any) {
-  return Boolean(conversation?.last_message_at || Number(conversation?.unread_count || 0) > 0);
+  // V9.23: a aba Conversas deve mostrar apenas conversas que possuem mensagens visíveis.
+  // last_message_at/unread_count podem ter sobrado de versões antigas que criavam conversas
+  // para todos os clientes, então não podem mais ser usados como critério.
+  return Boolean(
+    conversation?.has_messages ||
+    Number(conversation?.message_count || 0) > 0 ||
+    Number(conversation?.visible_message_count || 0) > 0
+  );
 }
 
 function conversationLookup(conversations: any[] = []) {

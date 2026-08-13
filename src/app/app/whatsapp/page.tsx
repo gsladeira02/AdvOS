@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { WhatsappCentralClient } from '@/components/WhatsappCentralClient';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { buildClientContacts, clientIdFromVirtualConversationId, hasRealMessageActivity, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
+import { buildClientContacts, clientIdFromVirtualConversationId, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
 
@@ -49,6 +49,20 @@ async function materializeSelectedConversation(admin: any, lawFirmId: string, se
   return await clientConversationTarget(admin, lawFirmId, clientId) || selectedId;
 }
 
+async function getConversationIdsWithVisibleMessages(admin: any, lawFirmId: string) {
+  const { data, error } = await admin
+    .from('whatsapp_messages')
+    .select('conversation_id')
+    .eq('law_firm_id', lawFirmId)
+    .is('deleted_at', null)
+    .not('conversation_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(10000);
+
+  if (error) throw new Error(error.message);
+  return new Set((data || []).map((row: any) => String(row.conversation_id)).filter(Boolean));
+}
+
 export default async function WhatsAppCentral({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
   const { profile } = await getCurrentProfile();
@@ -87,10 +101,14 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     .limit(160);
 
   // Conversas reais ficam separadas dos contatos.
-  // A aba Conversas mostra apenas conversas com mensagens/atividade real.
+  // A aba Conversas mostra apenas conversas com mensagens visíveis.
+  // Registros antigos sem mensagens ficam somente acessíveis via Contatos/busca.
   const allConversations = conversationsRaw || [];
-  let conversations = allConversations.filter((conversation: any) => hasRealMessageActivity(conversation));
-  const contacts = buildClientContacts(allConversations, clients || []);
+  const conversationIdsWithMessages = await getConversationIdsWithVisibleMessages(admin, profile.law_firm_id);
+  let conversations = allConversations
+    .filter((conversation: any) => conversationIdsWithMessages.has(String(conversation.id)))
+    .map((conversation: any) => ({ ...conversation, has_messages: true, message_count: 1 }));
+  const contacts = buildClientContacts(conversations, clients || []);
 
 
   const selectedId = requestedId || conversations?.[0]?.id || '';
