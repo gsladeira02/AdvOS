@@ -1,4 +1,13 @@
-# AdvOS V9.33
+# AdvOS V9.34
+
+## V9.34 — Cores visuais e prévia de tags
+
+- O seletor textual de cores foi substituído por uma paleta visual de cores.
+- Tags exibem uma prévia em tempo real exatamente como aparecem na conversa.
+- Tags já cadastradas também podem ter a cor alterada visualmente antes de salvar.
+- O Funil de Leads usa o mesmo padrão visual de cores e prévia.
+- Nenhuma migração SQL nova é necessária; esta versão usa a estrutura criada na v9.33.
+
 
 Sistema jurídico interno com Next.js, Supabase e Vercel.
 
