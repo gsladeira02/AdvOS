@@ -142,3 +142,27 @@ Correções do WhatsApp:
 - Modelos de mensagem agora podem guardar o nome do template oficial Meta e o idioma.
 
 Após atualizar, rode `supabase/v9_10_whatsapp_audio_realtime_templates.sql` no Supabase.
+
+## V9.19 - PWA do WhatsApp
+
+Esta versão adiciona suporte completo a PWA:
+
+- Manifest em `/manifest.json` com start URL em `/app/whatsapp`.
+- Service Worker em `/sw.js`.
+- Ícones `192x192`, `512x512` e Apple Touch Icon.
+- Cabeçalho e barra inferior mobile para uso instalado no celular.
+- Central do WhatsApp ajustada para tela de celular/PWA.
+- A lista de conversas e a conversa funcionam como telas separadas no mobile.
+- O cache do Service Worker ignora `/api/whatsapp/*` e `/app/whatsapp` para não travar mensagens antigas.
+
+Para instalar no iPhone:
+
+1. Abrir `https://adv-os.vercel.app` no Safari.
+2. Tocar em Compartilhar.
+3. Tocar em Adicionar à Tela de Início.
+
+Para instalar no Android:
+
+1. Abrir `https://adv-os.vercel.app` no Chrome.
+2. Tocar no menu de três pontos.
+3. Tocar em Instalar app ou Adicionar à tela inicial.
