@@ -151,7 +151,7 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
     const batch = activeIds.slice(index, index + batchSize);
     const { data, error } = await admin
       .from('whatsapp_conversations')
-      .select('*, clients(id,name,whatsapp,phone)')
+      .select('*, clients(id,name,whatsapp,phone,email,doc)')
       .eq('law_firm_id', lawFirmId)
       .in('id', batch);
 
@@ -159,11 +159,22 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
     rows.push(...(data || []));
   }
 
+  const { data: leadRows, error: leadError } = await admin
+    .from('whatsapp_leads')
+    .select('*')
+    .eq('law_firm_id', lawFirmId)
+    .in('conversation_id', activeIds);
+  if (leadError) throw new Error(leadError.message);
+  const leadByConversation = new Map((leadRows || []).map((lead: any) => [String(lead.conversation_id), lead]));
+
   return rows
     .map((conversation: any) => {
       const latest = activity.get(String(conversation.id));
       return {
         ...conversation,
+        department: conversation.department || 'atendimento',
+        tags: Array.isArray(conversation.tags) ? conversation.tags : [],
+        lead: leadByConversation.get(String(conversation.id)) || null,
         has_messages: true,
         message_count: 1,
         last_message_at: latest?.created_at || conversation.last_message_at || null,

@@ -6,7 +6,7 @@ import { WhatsappThread, type WhatsappTemplateOption } from '@/components/Whatsa
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
 function titleFor(conversation: any) {
-  return conversation?.clients?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
+  return conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
 }
 
 function initials(name: string) {
@@ -87,11 +87,27 @@ function normalizeSearch(value: string) {
 function matchesSearch(item: any, query: string) {
   const term = normalizeSearch(query);
   if (!term) return true;
-  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''}`);
+  const tags = Array.isArray(item?.tags) ? item.tags.join(' ') : '';
+  const lead = item?.lead || {};
+  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''} ${tags} ${lead?.stage || ''} ${lead?.service_interest || ''}`);
   return haystack.includes(term);
 }
 
-type WhatsappTab = 'conversas' | 'contatos';
+function leadStageLabel(value?: string | null) {
+  const labels: Record<string, string> = {
+    novo: 'Novo',
+    em_atendimento: 'Em atendimento',
+    qualificado: 'Qualificado',
+    proposta: 'Proposta',
+    aguardando: 'Aguardando',
+    convertido: 'Convertido',
+    perdido: 'Perdido',
+  };
+  return labels[String(value || '')] || 'Novo';
+}
+
+type WhatsappTab = 'conversas' | 'leads' | 'contatos';
+type WhatsappDepartment = 'atendimento' | 'financeiro_juridico';
 
 function dedupeById(items: any[]) {
   const seen = new Set<string>();
@@ -123,9 +139,12 @@ export function WhatsappCentralClient({
   const [messages, setMessages] = useState(initialMessages || []);
   const [selectedId, setSelectedId] = useState(initialSelectedId || '');
   const [query, setQuery] = useState('');
+  const initialSelected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
+  const [activeDepartment, setActiveDepartment] = useState<WhatsappDepartment>(() => initialSelected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento');
   const [activeTab, setActiveTab] = useState<WhatsappTab>(() => {
-    const selected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
-    return selected?.contact || selected?.virtual ? 'contatos' : 'conversas';
+    if (initialSelected?.contact || initialSelected?.virtual) return 'contatos';
+    if (initialSelected?.lead && !initialSelected?.client_id) return 'leads';
+    return 'conversas';
   });
   const [draft, setDraft] = useState(initialDraft || '');
   const [loading, setLoading] = useState(false);
@@ -149,16 +168,40 @@ export function WhatsappCentralClient({
     return allTargets.find((item: any) => item.id === selectedId || item.conversation_id === selectedId) || null;
   }, [allTargets, selectedId]);
 
+  useEffect(() => {
+    if (!selected || selected?.virtual || selected?.contact) return;
+    const nextDepartment: WhatsappDepartment = selected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento';
+    if (nextDepartment !== activeDepartment) setActiveDepartment(nextDepartment);
+  }, [selected, activeDepartment]);
+
+  useEffect(() => {
+    if (activeDepartment === 'financeiro_juridico' && activeTab !== 'conversas') {
+      setActiveTab('conversas');
+      return;
+    }
+    if (selected?.client_id && activeTab === 'leads') setActiveTab('conversas');
+  }, [activeDepartment, activeTab, selected?.client_id]);
+
+  const departmentConversations = useMemo(() => {
+    return (conversations || []).filter((conversation: any) => (conversation?.department || 'atendimento') === activeDepartment);
+  }, [conversations, activeDepartment]);
+
   const filteredConversations = useMemo(() => {
-    return (conversations || []).filter((conversation: any) => matchesSearch(conversation, query));
-  }, [conversations, query]);
+    return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query));
+  }, [departmentConversations, query]);
+
+  const filteredLeads = useMemo(() => {
+    return departmentConversations.filter((conversation: any) => !conversation?.client_id && conversation?.lead && conversation?.lead?.stage !== 'convertido' && matchesSearch(conversation, query));
+  }, [departmentConversations, query]);
 
   const filteredContacts = useMemo(() => {
+    if (activeDepartment !== 'atendimento') return [];
     return (contacts || []).filter((contact: any) => matchesSearch(contact, query));
-  }, [contacts, query]);
+  }, [contacts, query, activeDepartment]);
 
-  const conversationCount = conversations.length;
-  const contactCount = contacts.length;
+  const conversationCount = departmentConversations.length;
+  const leadCount = departmentConversations.filter((conversation: any) => !conversation?.client_id && conversation?.lead && conversation?.lead?.stage !== 'convertido').length;
+  const contactCount = activeDepartment === 'atendimento' ? contacts.length : 0;
   const isSearching = Boolean(query.trim());
 
   const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
@@ -356,17 +399,31 @@ export function WhatsappCentralClient({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [closeConversation]);
 
-  function selectConversation(item: any) {
+  function selectConversation(item: any, kind?: WhatsappTab) {
     const id = String(item?.id || '');
     if (!id) return;
     selectedIdRef.current = id;
     setSelectedId(id);
-    setActiveTab(item?.contact || item?.virtual ? 'contatos' : 'conversas');
+    if (item?.contact || item?.virtual) {
+      setActiveDepartment('atendimento');
+      setActiveTab('contatos');
+    } else {
+      setActiveDepartment(item?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento');
+      setActiveTab(kind || (item?.lead && !item?.client_id ? 'leads' : 'conversas'));
+    }
     window.history.replaceState(null, '', `/app/whatsapp?conversa=${encodeURIComponent(id)}`);
     setDraft('');
     setMobileListOpen(false);
     setMessages([]);
     load(id, false, queryRef.current);
+  }
+
+  function switchDepartment(department: WhatsappDepartment) {
+    if (department === activeDepartment) return;
+    closeConversation();
+    setActiveDepartment(department);
+    setActiveTab('conversas');
+    setQuery('');
   }
 
   function handleThreadSent(nextConversationId?: string) {
@@ -384,14 +441,16 @@ export function WhatsappCentralClient({
     const active = selected?.id === item.id || selected?.conversation_id === item.id;
     const title = titleFor(item);
     const isContact = kind === 'contatos' || item.contact || item.virtual;
+    const isLead = kind === 'leads' || Boolean(!item?.client_id && item?.lead);
+    const itemTags = Array.isArray(item?.tags) ? item.tags.filter(Boolean).slice(0, 2) : [];
     return (
       <button
         type="button"
         key={`${kind}-${item.id}`}
-        onClick={() => selectConversation(item)}
+        onClick={() => selectConversation(item, kind)}
         className={`flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#e7f3ef]' : 'bg-white'}`}
       >
-        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black text-white ${isContact ? 'bg-[#25D366]' : 'bg-[#075e54]'}`}>
+        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black text-white ${isContact ? 'bg-[#25D366]' : isLead ? 'bg-[#d97706]' : 'bg-[#075e54]'}`}>
           {isContact ? <Users size={14} /> : initials(title)}
         </div>
         <div className="min-w-0 flex-1">
@@ -407,7 +466,10 @@ export function WhatsappCentralClient({
           ) : (
             <>
               <div className="flex min-w-0 items-center justify-between gap-2">
-                <b className="min-w-0 flex-1 truncate text-[11px] text-slate-950">{title}</b>
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  <b className="min-w-0 flex-1 truncate text-[11px] text-slate-950">{title}</b>
+                  {isLead && <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[7px] font-black uppercase text-amber-700">{leadStageLabel(item?.lead?.stage)}</span>}
+                </div>
                 <span className={`shrink-0 text-[9px] font-bold ${Number(item.unread_count || 0) > 0 ? 'text-[#1fa855]' : 'text-slate-400'}`}>
                   {conversationListTime(item.last_message_at)}
                 </span>
@@ -427,6 +489,12 @@ export function WhatsappCentralClient({
                   </span>
                 )}
               </div>
+              {itemTags.length > 0 && (
+                <div className="mt-1 flex min-w-0 gap-1 overflow-hidden">
+                  {itemTags.map((tag: string) => <span key={tag} className="max-w-[88px] truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[7px] font-bold text-slate-600">#{tag}</span>)}
+                  {Array.isArray(item?.tags) && item.tags.length > itemTags.length && <span className="text-[7px] font-bold text-slate-400">+{item.tags.length - itemTags.length}</span>}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -436,16 +504,14 @@ export function WhatsappCentralClient({
 
   function renderList() {
     if (isSearching) {
-      const hasAny = filteredConversations.length || filteredContacts.length;
-      if (!hasAny) return <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa ou contato encontrado.</p>;
-      return (
-        <>
-          <div className="sticky top-0 z-10 border-b border-[#eef1ef] bg-[#f8faf9] px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">Conversas com mensagens</div>
-          {filteredConversations.length ? filteredConversations.map((item: any) => renderListItem(item, 'conversas')) : <p className="px-3 py-2 text-[11px] font-bold text-slate-400">Nenhuma conversa com esse nome.</p>}
-          <div className="sticky top-0 z-10 border-b border-[#eef1ef] bg-[#f8faf9] px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wide text-slate-500">Contatos dos clientes</div>
-          {filteredContacts.length ? filteredContacts.map((item: any) => renderListItem(item, 'contatos')) : <p className="px-3 py-2 text-[11px] font-bold text-slate-400">Nenhum cliente cadastrado com esse nome.</p>}
-        </>
-      );
+      const result = activeTab === 'leads' ? filteredLeads : activeTab === 'contatos' ? filteredContacts : filteredConversations;
+      if (!result.length) return <p className="p-3 text-xs font-bold text-slate-500">Nenhum resultado encontrado neste setor.</p>;
+      return result.map((item: any) => renderListItem(item, activeTab));
+    }
+
+    if (activeTab === 'leads') {
+      if (!filteredLeads.length) return <p className="p-3 text-xs font-bold text-slate-500">Nenhum lead neste setor. Números desconhecidos que enviarem mensagem entram aqui automaticamente.</p>;
+      return filteredLeads.map((item: any) => renderListItem(item, 'leads'));
     }
 
     if (activeTab === 'contatos') {
@@ -453,7 +519,7 @@ export function WhatsappCentralClient({
       return filteredContacts.map((item: any) => renderListItem(item, 'contatos'));
     }
 
-    if (!filteredConversations.length) return <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa ainda. Use a aba Contatos ou a busca para iniciar com um cliente.</p>;
+    if (!filteredConversations.length) return <p className="p-3 text-xs font-bold text-slate-500">Nenhuma conversa neste setor ainda.</p>;
     return filteredConversations.map((item: any) => renderListItem(item, 'conversas'));
   }
 
@@ -464,7 +530,7 @@ export function WhatsappCentralClient({
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <h2 className="truncate text-sm font-black text-slate-950">WhatsApp</h2>
-              <p className="truncate text-[10px] text-slate-500">Conversas e contatos separados.</p>
+              <p className="truncate text-[10px] text-slate-500">Atendimento, leads e relacionamento jurídico.</p>
             </div>
             <button
               type="button"
@@ -477,22 +543,26 @@ export function WhatsappCentralClient({
             </button>
           </div>
 
-          <div className="mt-2 grid grid-cols-2 rounded-full bg-[#e2e8e5] p-1 text-[10px] font-black text-slate-600">
-            <button
-              type="button"
-              onClick={() => setActiveTab('conversas')}
-              className={`inline-flex items-center justify-center gap-1 rounded-full px-2 py-1.5 transition ${activeTab === 'conversas' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}
-            >
-              <MessageCircle size={12} /> Conversas <span className="text-[9px] opacity-70">{conversationCount}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('contatos')}
-              className={`inline-flex items-center justify-center gap-1 rounded-full px-2 py-1.5 transition ${activeTab === 'contatos' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}
-            >
-              <Users size={12} /> Contatos <span className="text-[9px] opacity-70">{contactCount}</span>
-            </button>
+          <div className="mt-2 grid grid-cols-2 rounded-xl bg-[#dfe6e3] p-1 text-[10px] font-black text-slate-600">
+            <button type="button" onClick={() => switchDepartment('atendimento')} className={`rounded-lg px-2 py-2 transition ${activeDepartment === 'atendimento' ? 'bg-[#075e54] text-white shadow-sm' : 'hover:bg-white/60'}`}>Atendimento</button>
+            <button type="button" onClick={() => switchDepartment('financeiro_juridico')} className={`rounded-lg px-2 py-2 transition ${activeDepartment === 'financeiro_juridico' ? 'bg-[#075e54] text-white shadow-sm' : 'hover:bg-white/60'}`}>Financeiro/Jurídico</button>
           </div>
+
+          {activeDepartment === 'atendimento' ? (
+            <div className="mt-2 grid grid-cols-3 rounded-full bg-[#e2e8e5] p-1 text-[9px] font-black text-slate-600">
+              <button type="button" onClick={() => setActiveTab('conversas')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'conversas' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}>
+                <MessageCircle size={11} /> Conversas <span className="text-[8px] opacity-70">{conversationCount}</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('leads')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'leads' ? 'bg-white text-amber-700 shadow-sm' : 'hover:bg-white/50'}`}>
+                Leads <span className="text-[8px] opacity-70">{leadCount}</span>
+              </button>
+              <button type="button" onClick={() => setActiveTab('contatos')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'contatos' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}>
+                <Users size={11} /> Contatos <span className="text-[8px] opacity-70">{contactCount}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Conversas transferidas para acompanhamento jurídico ou financeiro.</div>
+          )}
 
           <div className="field-with-icon mt-2">
             <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
@@ -500,8 +570,8 @@ export function WhatsappCentralClient({
               className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Pesquisar conversa ou contato"
-              aria-label="Pesquisar conversa ou contato"
+              placeholder={activeTab === 'leads' ? 'Pesquisar lead ou tag' : 'Pesquisar conversa, contato ou tag'}
+              aria-label="Pesquisar no WhatsApp"
             />
           </div>
         </div>
@@ -517,13 +587,13 @@ export function WhatsappCentralClient({
 
       {selected ? (
         <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
-          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} />
+          <WhatsappThread conversation={selected} messages={messages || []} templates={templates} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={() => load(selectedIdRef.current, false, queryRef.current)} />
         </div>
       ) : (
         <section className="whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">
           <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
             <MessageCircle size={34} className="text-[#075e54]" />
-            <p>Selecione uma conversa com mensagens ou abra a aba Contatos para iniciar com um cliente.</p>
+            <p>Selecione uma conversa, lead ou contato. Nenhuma conversa é aberta automaticamente.</p>
           </div>
         </section>
       )}

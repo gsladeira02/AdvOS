@@ -28,6 +28,7 @@ import {
 import { renderMessageTemplate } from '@/lib/messageTemplates';
 import { WhatsappSpecialComposer, type WhatsappSpecialKind } from '@/components/WhatsappSpecialComposer';
 import { WhatsappCallPanel } from '@/components/WhatsappCallPanel';
+import { WhatsappConversationControls } from '@/components/WhatsappConversationControls';
 
 export type WhatsappTemplateOption = {
   id: string;
@@ -345,6 +346,7 @@ export function WhatsappThread({
   onDraftApplied,
   onSent,
   onBack,
+  onConversationChanged,
 }: {
   conversation: any;
   messages: any[];
@@ -354,6 +356,7 @@ export function WhatsappThread({
   onDraftApplied?: () => void;
   onSent?: (conversationId?: string) => void;
   onBack?: () => void;
+  onConversationChanged?: () => void;
 }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<MessageListItem[]>(messages || []);
@@ -559,7 +562,7 @@ export function WhatsappThread({
   }, [visibleItems.length]);
 
   const title = useMemo(() => {
-    return conversation?.clients?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
+    return conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
   }, [conversation]);
 
   const phoneHref = cleanPhone(conversation?.phone);
@@ -574,7 +577,7 @@ export function WhatsappThread({
   }, [templates]);
 
   function renderTemplate(template: WhatsappTemplateOption) {
-    const clientName = conversation?.clients?.name || conversation?.lead_name || '';
+    const clientName = conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || '';
     return renderMessageTemplate(template.body, {
       cliente: clientName,
       primeiro_nome: firstName(clientName),
@@ -1088,6 +1091,8 @@ export function WhatsappThread({
           </button>
         </div>
       </div>
+
+      <WhatsappConversationControls key={String(conversation?.id || conversation?.phone || 'conversation')} conversation={conversation} onChanged={onConversationChanged} />
 
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleMessageScroll} className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2">

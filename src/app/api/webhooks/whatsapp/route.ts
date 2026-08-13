@@ -3,6 +3,7 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { firstTextFromInboundMessage, getOrCreateConversation, getWhatsAppConfig } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { readRawBody, verifyMetaWebhookSignature, SecurityError } from '@/lib/security';
+import { attachWhatsappMediaToClientFolder, ensureWhatsappLead } from '@/lib/whatsappCRM';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -254,7 +255,7 @@ export async function POST(req: Request) {
           ? new Date(Number(message.timestamp) * 1000).toISOString()
           : new Date().toISOString();
 
-        await saveInboundMessage(admin, {
+        const savedInboundMessage = await saveInboundMessage(admin, {
           law_firm_id: lawFirmId,
           conversation_id: conversation.id,
           client_id: client?.id || null,
@@ -271,6 +272,28 @@ export async function POST(req: Request) {
           storage_path: cachedMedia?.storagePath || null,
           created_at: messageCreatedAt,
         });
+
+        // Contato desconhecido vira lead, nunca cliente automaticamente.
+        if (!client?.id) {
+          await ensureWhatsappLead(admin, {
+            lawFirmId,
+            conversationId: conversation.id,
+            phone,
+            name: contact?.profile?.name || conversation.lead_name || null,
+            contactedAt: messageCreatedAt,
+          });
+        }
+
+        // Quando a conversa já pertence a um cliente, qualquer mídia recebida
+        // entra automaticamente na Pasta do Cliente. O arquivo continua visível
+        // também no histórico do WhatsApp, sem duplicar o objeto no Storage.
+        if (client?.id && savedInboundMessage?.storage_path) {
+          await attachWhatsappMediaToClientFolder(admin, {
+            lawFirmId,
+            clientId: client.id,
+            message: savedInboundMessage,
+          });
+        }
 
         const { error: conversationUpdateError } = await admin
           .from('whatsapp_conversations')

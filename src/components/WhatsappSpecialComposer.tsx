@@ -79,7 +79,7 @@ export function WhatsappSpecialComposer({ kind, conversation, onClose, onSent }:
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e7f7ef] text-[#075e54]"><Icon size={17} /></div>
-            <div><h3 className="text-sm font-black text-slate-950">{title}</h3><p className="text-[10px] font-semibold text-slate-500">{conversation?.clients?.name || conversation?.lead_name || conversation?.phone}</p></div>
+            <div><h3 className="text-sm font-black text-slate-950">{title}</h3><p className="text-[10px] font-semibold text-slate-500">{conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || conversation?.phone}</p></div>
           </div>
           <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100"><X size={15}/></button>
         </div>

@@ -41,7 +41,7 @@ export function WhatsappCallPanel({ conversation, mode, onClose }: { conversatio
 
   const phone = String(conversation?.phone || '');
   const phoneDigits = phone.replace(/\D/g, '');
-  const name = conversation?.clients?.name || conversation?.lead_name || phone || 'Contato';
+  const name = conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || phone || 'Contato';
 
   function cleanupMedia() {
     if (pollingRef.current) window.clearInterval(pollingRef.current);
