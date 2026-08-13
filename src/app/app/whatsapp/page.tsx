@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { WhatsappCentralClient } from '@/components/WhatsappCentralClient';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { clientIdFromVirtualConversationId, isVirtualConversationId, mergeClientContactsIntoConversations, virtualConversationId } from '@/lib/whatsappConversations';
+import { buildClientContacts, clientIdFromVirtualConversationId, hasRealMessageActivity, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
 
@@ -86,20 +86,18 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     .order('last_message_at', { ascending: false })
     .limit(160);
 
-  // No carregamento inicial, mostrar apenas conversas reais com mensagens.
-  // Clientes aparecem como contatos só quando pesquisados ou abertos pela aba Clientes.
-  let conversations = (conversationsRaw || []).filter((conversation: any) => Boolean(conversation?.last_message_at || Number(conversation?.unread_count || 0) > 0));
+  // Conversas reais ficam separadas dos contatos.
+  // A aba Conversas mostra apenas conversas com mensagens/atividade real.
+  const allConversations = conversationsRaw || [];
+  let conversations = allConversations.filter((conversation: any) => hasRealMessageActivity(conversation));
+  const contacts = buildClientContacts(allConversations, clients || []);
 
-  if (requestedId && isVirtualConversationId(requestedId)) {
-    const requestedClientId = clientIdFromVirtualConversationId(requestedId);
-    conversations = mergeClientContactsIntoConversations(
-      conversations,
-      (clients || []).filter((client: any) => String(client.id) === requestedClientId)
-    );
-  }
 
   const selectedId = requestedId || conversations?.[0]?.id || '';
-  const selected = (conversations || []).find((item: any) => item.id === selectedId) || conversations?.[0] || null;
+  const selected = (conversations || []).find((item: any) => item.id === selectedId)
+    || (contacts || []).find((item: any) => item.id === selectedId || item.conversation_id === selectedId)
+    || conversations?.[0]
+    || null;
   const { data: messages } = selected && !selected.virtual
     ? await admin
         .from('whatsapp_messages')
@@ -130,6 +128,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialConversations={conversations || []}
         initialMessages={messages || []}
         initialSelectedId={selected?.id || ''}
+        initialContacts={contacts || []}
         initialDraft={initialDraft}
         templates={((templates && templates.length ? templates : DEFAULT_MESSAGE_TEMPLATES) || []).map((template: any) => ({
           id: String(template.id || template.slug || template.name),

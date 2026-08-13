@@ -18,42 +18,74 @@ export function clientIdFromVirtualConversationId(value?: string | null) {
   return text.startsWith('client:') ? text.slice('client:'.length) : '';
 }
 
-export function mergeClientContactsIntoConversations(conversations: any[] = [], clients: any[] = []) {
-  const byClient = new Set<string>();
-  const byPhone = new Set<string>();
+export function hasRealMessageActivity(conversation: any) {
+  return Boolean(conversation?.last_message_at || Number(conversation?.unread_count || 0) > 0);
+}
+
+function conversationLookup(conversations: any[] = []) {
+  const byClient = new Map<string, any>();
+  const byPhone = new Map<string, any>();
 
   for (const conversation of conversations || []) {
-    if (conversation.client_id) byClient.add(String(conversation.client_id));
-    const phone = normalizeBrazilPhone(conversation.phone);
-    if (phone) byPhone.add(phone);
+    if (conversation?.client_id && !byClient.has(String(conversation.client_id))) {
+      byClient.set(String(conversation.client_id), conversation);
+    }
+    const phone = normalizeBrazilPhone(conversation?.phone);
+    if (phone && !byPhone.has(phone)) byPhone.set(phone, conversation);
   }
 
-  const virtuals = (clients || [])
-    .map((client) => {
-      const phone = normalizeBrazilPhone(client.whatsapp || client.phone || '');
-      if (!phone || byClient.has(String(client.id)) || byPhone.has(phone)) return null;
-      return {
-        id: virtualConversationId(client.id),
-        law_firm_id: client.law_firm_id,
-        client_id: client.id,
-        phone,
-        lead_name: titleForClient(client),
-        status: 'nova',
-        last_message_at: null,
-        unread_count: 0,
-        updated_at: client.updated_at || client.created_at || null,
-        virtual: true,
-        clients: {
-          id: client.id,
-          name: client.name,
-          whatsapp: client.whatsapp,
-          phone: client.phone,
-        },
-      };
-    })
-    .filter(Boolean);
+  return { byClient, byPhone };
+}
 
-  return [...(conversations || []), ...virtuals];
+export function virtualContactFromClient(client: any, conversations: any[] = []) {
+  const phone = normalizeBrazilPhone(client?.whatsapp || client?.phone || '');
+  if (!client?.id || !phone) return null;
+
+  const { byClient, byPhone } = conversationLookup(conversations || []);
+  const existing = byClient.get(String(client.id)) || byPhone.get(phone) || null;
+
+  return {
+    id: existing?.id || virtualConversationId(client.id),
+    contact_id: client.id,
+    law_firm_id: client.law_firm_id,
+    client_id: client.id,
+    phone,
+    lead_name: titleForClient(client),
+    status: existing?.status || 'contato',
+    last_message_at: existing?.last_message_at || null,
+    unread_count: existing?.unread_count || 0,
+    updated_at: existing?.updated_at || client.updated_at || client.created_at || null,
+    virtual: !existing?.id,
+    contact: true,
+    has_conversation: Boolean(existing?.id && hasRealMessageActivity(existing)),
+    conversation_id: existing?.id || null,
+    clients: {
+      id: client.id,
+      name: client.name,
+      whatsapp: client.whatsapp,
+      phone: client.phone,
+    },
+  };
+}
+
+export function buildClientContacts(conversations: any[] = [], clients: any[] = []) {
+  const seen = new Set<string>();
+  return (clients || [])
+    .map((client) => virtualContactFromClient(client, conversations))
+    .filter(Boolean)
+    .filter((contact: any) => {
+      const key = String(contact?.client_id || contact?.phone || contact?.id || '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a: any, b: any) => String(a?.clients?.name || a?.lead_name || '').localeCompare(String(b?.clients?.name || b?.lead_name || ''), 'pt-BR'));
+}
+
+export function mergeClientContactsIntoConversations(conversations: any[] = [], clients: any[] = []) {
+  const contacts = buildClientContacts(conversations, clients)
+    .filter((contact: any) => contact.virtual);
+  return [...(conversations || []), ...contacts];
 }
 
 export async function syncClientContactsToConversations(admin: any, lawFirmId: string, clients: any[] = []) {
