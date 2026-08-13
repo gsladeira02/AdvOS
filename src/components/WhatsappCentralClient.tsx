@@ -66,6 +66,11 @@ function messagePreview(item: any) {
   if (type === 'document') return `📄 ${fileName || rawBody || 'Documento'}`;
   if (type === 'sticker') return '🖼️ Figurinha';
   if (type === 'reaction') return rawBody ? `Reação ${rawBody}` : 'Reação';
+  if (type === 'location') return `📍 ${rawBody || 'Localização'}`;
+  if (type === 'poll') return `📊 ${rawBody || 'Enquete'}`;
+  if (type === 'event') return `📅 ${rawBody || 'Evento'}`;
+  if (type === 'call_permission') return '📞 Solicitação de chamada';
+  if (type === 'call_cta') return '📞 Ligar no WhatsApp';
   if (type === 'interactive' || type === 'button') return rawBody || 'Mensagem interativa';
   if (type === 'template') return rawBody || 'Mensagem de modelo';
   return rawBody || 'Mensagem';

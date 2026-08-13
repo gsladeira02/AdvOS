@@ -14,16 +14,20 @@ import {
   Mic,
   Paperclip,
   Phone,
+  Plus,
   Send,
   Square,
   Smile,
   Sparkles,
   Trash2,
+  Video,
   Wifi,
   WifiOff,
   X,
 } from 'lucide-react';
 import { renderMessageTemplate } from '@/lib/messageTemplates';
+import { WhatsappSpecialComposer, type WhatsappSpecialKind } from '@/components/WhatsappSpecialComposer';
+import { WhatsappCallPanel } from '@/components/WhatsappCallPanel';
 
 export type WhatsappTemplateOption = {
   id: string;
@@ -358,6 +362,9 @@ export function WhatsappThread({
   const [shortcutOpen, setShortcutOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [stickerOpen, setStickerOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [specialKind, setSpecialKind] = useState<WhatsappSpecialKind | null>(null);
+  const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [recordedAudio, setRecordedAudio] = useState<RecordedAudioState | null>(null);
@@ -446,6 +453,7 @@ export function WhatsappThread({
     setShortcutOpen(false);
     setEmojiOpen(false);
     setStickerOpen(false);
+    setAttachOpen(false);
     setFeedback('Mensagem carregada do Financeiro. Revise e envie pela conversa.');
     onDraftApplied?.();
     window.setTimeout(() => textareaRef.current?.focus(), 100);
@@ -913,6 +921,63 @@ export function WhatsappThread({
   }
 
   function renderMessageBody(message: any) {
+    const messageType = String(message?.message_type || '').toLowerCase();
+    const structured = message?.raw_payload?.advos || {};
+
+    if (messageType === 'location') {
+      const location = structured?.kind === 'location' ? structured : (message?.raw_payload?.location || {});
+      const latitude = Number(location?.latitude);
+      const longitude = Number(location?.longitude);
+      const validCoords = Number.isFinite(latitude) && Number.isFinite(longitude);
+      const mapHref = validCoords ? `https://www.google.com/maps?q=${latitude},${longitude}` : '';
+      return (
+        <div className="min-w-[220px] space-y-2">
+          <div className="rounded-xl bg-emerald-50 p-3">
+            <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">📍 Localização</div>
+            <div className="mt-1 text-xs font-black text-slate-900">{location?.name || 'Local compartilhado'}</div>
+            {location?.address && <div className="mt-0.5 text-[10px] font-semibold text-slate-600">{location.address}</div>}
+            {validCoords && <div className="mt-1 text-[9px] font-mono text-slate-500">{latitude.toFixed(6)}, {longitude.toFixed(6)}</div>}
+          </div>
+          {mapHref && <a href={mapHref} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black text-[#075e54] hover:underline">Abrir no mapa</a>}
+        </div>
+      );
+    }
+
+    if (messageType === 'poll') {
+      const options = Array.isArray(structured?.options) ? structured.options : [];
+      return (
+        <div className="min-w-[230px]">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-blue-700">📊 Enquete</div>
+          <div className="mb-2 text-xs font-black leading-relaxed">{structured?.question || message.body}</div>
+          <div className="space-y-1.5">{options.map((option: string, index: number) => <div key={`${option}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-900">{option}</div>)}</div>
+          <div className="mt-2 text-[9px] font-bold text-slate-500">O cliente responde pelos botões interativos do WhatsApp.</div>
+        </div>
+      );
+    }
+
+    if (messageType === 'event') {
+      return (
+        <div className="min-w-[240px] rounded-xl bg-amber-50 p-3">
+          <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">📅 Evento</div>
+          <div className="mt-1 text-xs font-black text-slate-900">{structured?.title || 'Evento'}</div>
+          <div className="mt-1 text-[10px] font-semibold text-slate-700">{structured?.date || ''}{structured?.time ? ` às ${structured.time}` : ''}</div>
+          {structured?.location && <div className="mt-1 text-[10px] font-semibold text-slate-600">📍 {structured.location}</div>}
+          {structured?.notes && <div className="mt-2 whitespace-pre-wrap text-[10px] leading-relaxed text-slate-600">{structured.notes}</div>}
+          <div className="mt-2 flex gap-1"><span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-700">Confirmar</span><span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-amber-700">Talvez</span><span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-red-700">Não posso</span></div>
+        </div>
+      );
+    }
+
+    if (messageType === 'call_permission' || messageType === 'call_cta') {
+      return <div className="min-w-[220px] rounded-xl bg-emerald-50 p-3"><div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">📞 Chamada no WhatsApp</div><div className="mt-1 whitespace-pre-wrap text-xs font-bold leading-relaxed text-slate-800">{message.body || 'Recurso de chamada enviado.'}</div></div>;
+    }
+
+    if (messageType === 'interactive' || messageType === 'button' || messageType === 'call_permission_reply') {
+      const interactive = message?.raw_payload?.interactive || {};
+      const replyTitle = interactive?.button_reply?.title || interactive?.list_reply?.title || message?.body || 'Resposta interativa';
+      return <div className="min-w-[180px]"><div className="text-[9px] font-black uppercase tracking-wide text-slate-500">Resposta</div><div className="mt-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-800">{replyTitle}</div></div>;
+    }
+
     const kind = mediaKind(message);
     const fileName = message.file_name || message.raw_payload?.document?.filename || message.body;
     const mediaUrl = mediaDisplayUrl(message);
@@ -990,7 +1055,7 @@ export function WhatsappThread({
   }
 
   return (
-    <div className="whatsapp-thread flex h-[calc(100vh-116px)] min-h-[540px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
+    <div className="whatsapp-thread relative flex h-[calc(100vh-116px)] min-h-[540px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
         <div className="flex min-w-0 items-center gap-2">
           {onBack && (
@@ -1012,11 +1077,12 @@ export function WhatsappThread({
             {live ? <Wifi size={12} /> : <WifiOff size={12} />}
             {live ? 'Ao vivo' : 'Offline'}
           </div>
-          {phoneHref && (
-            <a href={`tel:${phoneHref}`} className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Ligar pelo discador do dispositivo">
-              <Phone size={15} />
-            </a>
-          )}
+          <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Ligação pelo WhatsApp" onClick={() => setCallMode('voice')}>
+            <Phone size={15} />
+          </button>
+          <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Videochamada pelo WhatsApp" onClick={() => setCallMode('video')}>
+            <Video size={15} />
+          </button>
           <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" onClick={clearConversation} title="Limpar conversa no AdvOS" disabled={conversation?.virtual}>
             <Trash2 size={14} />
           </button>
@@ -1120,9 +1186,19 @@ export function WhatsappThread({
 
         <div className="relative flex items-end gap-2">
           <input ref={fileInputRef} type="file" className="hidden" onChange={(event) => { setFile(event.target.files?.[0] || null); clearRecordedAudio(); }} />
-          <button type="button" className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm hover:bg-[#fffaf2]" onClick={() => fileInputRef.current?.click()} title="Enviar documento, imagem, arquivo ou .webp como figurinha">
-            <Paperclip size={18} />
-          </button>
+          <div className="relative mb-1 shrink-0">
+            <button type="button" className={`grid h-10 w-10 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:bg-[#fffaf2] ${attachOpen ? 'rotate-45' : ''}`} onClick={() => { setAttachOpen((value) => !value); setEmojiOpen(false); setStickerOpen(false); setShortcutOpen(false); }} title="Anexar ou enviar recurso">
+              <Plus size={20} />
+            </button>
+            {attachOpen && (
+              <div className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-52 overflow-hidden rounded-2xl border border-[#d7ded4] bg-white p-1.5 shadow-xl">
+                <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-black text-slate-700 hover:bg-slate-50" onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }}><Paperclip size={16} className="text-violet-600"/> Documento ou mídia</button>
+                <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-black text-slate-700 hover:bg-slate-50" onClick={() => { setAttachOpen(false); setSpecialKind('location'); }}><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-100 text-[11px]">📍</span> Localização</button>
+                <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-black text-slate-700 hover:bg-slate-50" onClick={() => { setAttachOpen(false); setSpecialKind('poll'); }}><span className="grid h-5 w-5 place-items-center rounded-full bg-blue-100 text-[11px]">📊</span> Enquete</button>
+                <button type="button" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-black text-slate-700 hover:bg-slate-50" onClick={() => { setAttachOpen(false); setSpecialKind('event'); }}><span className="grid h-5 w-5 place-items-center rounded-full bg-amber-100 text-[11px]">📅</span> Evento</button>
+              </div>
+            )}
+          </div>
           <button type="button" className="mb-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm hover:bg-[#fffaf2]" onClick={() => { setEmojiOpen((v) => !v); setStickerOpen(false); setShortcutOpen(false); }} title="Emojis">
             <Laugh size={18} />
           </button>
@@ -1131,7 +1207,7 @@ export function WhatsappThread({
           </button>
 
           <div className="relative flex-1">
-            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => { setShortcutOpen(text.trimStart().startsWith('/')); refreshThreadMessages(true); }} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); } }} placeholder={recordedAudio ? 'Escute o áudio e clique em enviar.' : file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
+            <textarea ref={textareaRef} className="input min-h-[44px] resize-y rounded-[20px] border-transparent bg-white px-4 py-3 text-xs shadow-sm focus:border-[#25D366]" value={text} onChange={(event) => { const value = event.target.value; setText(value); setShortcutOpen(value.trimStart().startsWith('/')); setEmojiOpen(false); setStickerOpen(false); }} onFocus={() => { setShortcutOpen(text.trimStart().startsWith('/')); refreshThreadMessages(true); }} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); send(); } if (event.key === 'Escape') { setShortcutOpen(false); setEmojiOpen(false); setStickerOpen(false); setAttachOpen(false); } }} placeholder={recordedAudio ? 'Escute o áudio e clique em enviar.' : file ? 'Legenda opcional. Ctrl + Enter envia.' : 'Mensagem ou / para modelo. Ctrl + Enter envia.'} />
 
             {shortcutOpen && slashTerm !== null && (
               <div className="absolute bottom-[calc(100%+8px)] left-0 z-20 max-h-80 w-full overflow-auto rounded-2xl border border-[#d7ded4] bg-white p-2 shadow-xl">
@@ -1204,6 +1280,16 @@ export function WhatsappThread({
           {recording ? <p className="break-safe text-[10px] font-black leading-relaxed text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="break-safe text-[10px] font-bold leading-relaxed text-slate-600">{feedback}</p> : <p className="break-safe text-[10px] leading-relaxed text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>
+
+      {specialKind && (
+        <WhatsappSpecialComposer
+          kind={specialKind}
+          conversation={conversation}
+          onClose={() => setSpecialKind(null)}
+          onSent={(conversationId) => { onSent?.(conversationId || conversation?.id); window.setTimeout(() => refreshThreadMessages(true), 250); }}
+        />
+      )}
+      {callMode && <WhatsappCallPanel conversation={conversation} mode={callMode} onClose={() => setCallMode(null)} />}
     </div>
   );
 }

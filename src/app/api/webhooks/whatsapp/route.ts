@@ -208,7 +208,7 @@ export async function POST(req: Request) {
       if (!firmIntegration?.law_firm_id) continue;
 
       const lawFirmId = firmIntegration.law_firm_id;
-      const eventId = entry?.id || value?.messages?.[0]?.id || value?.statuses?.[0]?.id || null;
+      const eventId = value?.calls?.[0]?.id || value?.messages?.[0]?.id || value?.statuses?.[0]?.id || entry?.id || null;
 
       await admin.from('webhook_events').insert({
         law_firm_id: lawFirmId,

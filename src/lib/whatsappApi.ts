@@ -665,6 +665,14 @@ export function firstTextFromInboundMessage(message: any) {
   if (message.type === 'video') return message.video?.caption || '[Vídeo recebido]';
   if (message.type === 'sticker') return '[Figurinha recebida]';
   if (message.type === 'reaction') return message.reaction?.emoji || '[Reação recebida]';
+  if (message.type === 'location') {
+    const name = message.location?.name || '';
+    const address = message.location?.address || '';
+    const lat = message.location?.latitude;
+    const lng = message.location?.longitude;
+    return name || address || (lat != null && lng != null ? `Localização: ${lat}, ${lng}` : '[Localização recebida]');
+  }
+  if (message.type === 'call_permission_reply') return message.call_permission_reply?.response || '[Resposta de permissão de chamada]';
   return `[${message.type || 'Mensagem'} recebida]`;
 }
 
@@ -739,4 +747,148 @@ export async function sendWhatsAppReaction(input: {
 
   if (error) throw new Error(error.message);
   return { payload, message: data };
+}
+
+export async function sendWhatsAppStructured(input: {
+  lawFirmId: string;
+  to: string;
+  kind: 'location' | 'poll' | 'event' | 'call_permission' | 'call_cta';
+  data: Record<string, any>;
+  clientId?: string | null;
+  sentBy?: string | null;
+}) {
+  const config = await getWhatsAppConfig(input.lawFirmId);
+  if (!config.configured) throw new Error('WhatsApp API não configurado.');
+
+  const to = normalizeBrazilPhone(input.to);
+  if (!to) throw new Error('Telefone/WhatsApp do cliente não informado.');
+
+  const endpoint = `${config.baseUrl}/${config.phoneNumberId}/messages`;
+  const kind = input.kind;
+  const data = input.data || {};
+  let requestBody: any;
+  let body = '';
+  let messageType = kind;
+
+  if (kind === 'location') {
+    const latitude = Number(data.latitude);
+    const longitude = Number(data.longitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new Error('Latitude inválida.');
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Longitude inválida.');
+    const location: any = { latitude, longitude };
+    if (String(data.name || '').trim()) location.name = String(data.name).trim().slice(0, 1000);
+    if (String(data.address || '').trim()) location.address = String(data.address).trim().slice(0, 1000);
+    body = location.name || location.address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    requestBody = { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'location', location };
+  } else if (kind === 'poll') {
+    const question = String(data.question || '').trim();
+    const options = Array.isArray(data.options) ? data.options.map((v: any) => String(v || '').trim()).filter(Boolean).slice(0, 3) : [];
+    if (!question) throw new Error('Digite a pergunta da enquete.');
+    if (options.length < 2) throw new Error('A enquete precisa de pelo menos duas opções.');
+    const pollId = String(data.pollId || `poll-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+    body = question;
+    requestBody = {
+      messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: question.slice(0, 1024) },
+        footer: { text: 'Enquete • escolha uma opção' },
+        action: {
+          buttons: options.map((title: string, index: number) => ({
+            type: 'reply',
+            reply: { id: `${pollId}:${index}`.slice(0, 256), title: title.slice(0, 20) },
+          })),
+        },
+      },
+    };
+    data.pollId = pollId;
+    data.options = options;
+  } else if (kind === 'event') {
+    const title = String(data.title || '').trim();
+    const date = String(data.date || '').trim();
+    const time = String(data.time || '').trim();
+    const place = String(data.location || '').trim();
+    const notes = String(data.notes || '').trim();
+    if (!title) throw new Error('Digite o nome do evento.');
+    if (!date) throw new Error('Escolha a data do evento.');
+    const eventId = String(data.eventId || `event-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+    const lines = [`📅 ${title}`, `Data: ${date}${time ? ` às ${time}` : ''}`];
+    if (place) lines.push(`Local: ${place}`);
+    if (notes) lines.push(notes);
+    body = lines.join('\n');
+    requestBody = {
+      messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: body.slice(0, 1024) },
+        footer: { text: 'Evento' },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: `${eventId}:confirmar`, title: 'Confirmar' } },
+            { type: 'reply', reply: { id: `${eventId}:talvez`, title: 'Talvez' } },
+            { type: 'reply', reply: { id: `${eventId}:nao`, title: 'Não posso' } },
+          ],
+        },
+      },
+    };
+    data.eventId = eventId;
+  } else if (kind === 'call_permission') {
+    body = String(data.body || 'Podemos ligar para você pelo WhatsApp para tratar deste atendimento?').trim().slice(0, 1024);
+    requestBody = {
+      messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive',
+      interactive: {
+        type: 'call_permission_request',
+        action: { name: 'call_permission_request' },
+        body: { text: body },
+      },
+    };
+  } else if (kind === 'call_cta') {
+    body = String(data.body || 'Se preferir, você pode ligar para o escritório pelo WhatsApp.').trim().slice(0, 1024);
+    requestBody = {
+      messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive',
+      interactive: {
+        type: 'voice_call',
+        body: { text: body },
+        action: {
+          name: 'voice_call',
+          parameters: {
+            display_text: String(data.displayText || 'Ligar no WhatsApp').slice(0, 20),
+            ttl_minutes: Math.max(1, Math.min(10080, Number(data.ttlMinutes || 100))),
+          },
+        },
+      },
+    };
+  } else {
+    throw new Error('Tipo de mensagem especial não suportado.');
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(friendlyWhatsAppError(payload));
+
+  const externalId = payload?.messages?.[0]?.id || null;
+  const admin = createAdminSupabase();
+  const conversation = await getOrCreateConversation({ lawFirmId: input.lawFirmId, clientId: input.clientId, phone: to });
+  const saved = await admin.from('whatsapp_messages').insert({
+    law_firm_id: input.lawFirmId,
+    conversation_id: conversation.id,
+    client_id: input.clientId || conversation.client_id || null,
+    direction: 'outbound',
+    message_type: messageType,
+    body,
+    external_id: externalId,
+    status: 'sent',
+    sent_by: input.sentBy || null,
+    raw_payload: { meta_response: payload, advos: { kind, ...data }, meta_request: requestBody },
+  }).select('*').single();
+  if (saved.error) throw new Error(saved.error.message);
+
+  await admin.from('whatsapp_conversations').update({ last_message_at: nowIso(), updated_at: nowIso() })
+    .eq('id', conversation.id).eq('law_firm_id', input.lawFirmId);
+
+  return { payload, externalId, conversationId: conversation.id, message: saved.data };
 }
