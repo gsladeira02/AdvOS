@@ -1,4 +1,13 @@
-# AdvOS V9.34
+# AdvOS V9.35
+
+## V9.35 — Ativar, desativar e excluir tags
+
+- Cada tag agora possui ações explícitas **Salvar**, **Ativar/Desativar** e **Excluir**.
+- **Desativar** mantém a tag cadastrada e preserva seus vínculos para reativação futura.
+- **Excluir** é definitivo e remove a tag também das conversas onde estiver aplicada.
+- A confirmação de exclusão informa claramente o impacto antes de continuar.
+- O array legado de tags nas conversas também é limpo para não deixar referências antigas.
+- Nenhuma migração SQL nova é necessária; usa a mesma estrutura da v9.33.
 
 ## V9.34 — Cores visuais e prévia de tags
 
