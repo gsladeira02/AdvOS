@@ -1,7 +1,5 @@
-const CACHE_NAME = 'advos-pwa-v9-19';
+const CACHE_NAME = 'advos-pwa-v9-21';
 const STATIC_ASSETS = [
-  '/',
-  '/login',
   '/offline.html',
   '/manifest.json',
   '/icons/icon-192.png',
@@ -28,6 +26,7 @@ self.addEventListener('activate', (event) => {
 
 function shouldBypassCache(url, request) {
   if (request.method !== 'GET') return true;
+  if (url.pathname === '/' || url.pathname === '/login') return true;
   if (url.pathname.startsWith('/api/')) return true;
   if (url.pathname.includes('/auth/')) return true;
   if (url.pathname.startsWith('/app/whatsapp')) return true;
