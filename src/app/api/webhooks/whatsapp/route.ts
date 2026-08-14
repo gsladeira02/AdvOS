@@ -5,6 +5,7 @@ import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { readRawBody, verifyMetaWebhookSignature, SecurityError, assertTrustedMetaMediaUrl } from '@/lib/security';
 import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 import { attachWhatsappMediaToClientFolder, ensureWhatsappLead } from '@/lib/whatsappCRM';
+import { optimizeStoredDocument } from '@/lib/documentOptimization';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -100,10 +101,18 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     const baseName = safeFileName(mediaNode?.filename || `${messageType}-${mediaId}.${extensionFromMime(mimeType)}`);
     // Mídia recebida também passa pela mesma validação de conteúdo dos uploads manuais.
     assertSafeUploadedFile(baseName, mimeType, bytes);
-    const storagePath = `${lawFirmId}/whatsapp/inbound/${Date.now()}-${baseName}`;
+    const processed = await optimizeStoredDocument({
+      buffer: bytes,
+      fileName: baseName,
+      mimeType,
+      convertToPdf: false,
+    });
+    assertSafeUploadedFile(processed.fileName, processed.mimeType, processed.buffer);
+    const storedName = safeFileName(processed.fileName || baseName);
+    const storagePath = `${lawFirmId}/whatsapp/inbound/${Date.now()}-${storedName}`;
 
-    const upload = await admin.storage.from('documents').upload(storagePath, bytes, {
-      contentType: mimeType,
+    const upload = await admin.storage.from('documents').upload(storagePath, processed.buffer, {
+      contentType: processed.mimeType,
       upsert: false,
     });
     if (upload.error) throw new Error(upload.error.message);
@@ -111,9 +120,9 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     return {
       mediaUrl: mediaId,
       storagePath,
-      mimeType,
-      fileSize: Number(meta.file_size || bytes.length || 0) || null,
-      fileName: baseName,
+      mimeType: processed.mimeType,
+      fileSize: processed.storedBytes || null,
+      fileName: storedName,
     };
   } catch (error) {
     console.error('Erro ao cachear mídia recebida do WhatsApp:', error);

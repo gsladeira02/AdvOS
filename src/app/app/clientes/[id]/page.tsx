@@ -251,7 +251,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
     <section className="card mb-6 p-5">
       <h2 className="text-xl font-black">Enviar documentos para a pasta</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Arraste um ou mais arquivos para dentro da pasta do cliente. Você pode escolher o nome de cada documento antes do envio; se deixar em branco, o AdvOS usa o nome original do arquivo.
+        Arraste um ou mais arquivos para dentro da pasta do cliente. O AdvOS compacta automaticamente antes de salvar e, nos formatos compatíveis, você pode escolher converter para PDF. Você também pode definir o nome de cada documento antes do envio.
       </p>
       <ClientFileUploader clientId={client.id} />
     </section>

@@ -1,8 +1,9 @@
-# AdvOS v9.39
+# AdvOS v9.54
 
-Versão de hardening de segurança sobre a v9.38.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.54.
 
 ## Destaques
+- Compactação automática de documentos antes do armazenamento e opção de conversão para PDF nos formatos compatíveis.
 - Login interno por e-mail e senha, com usuários cadastrados/ativos, sessão controlada e trilha de segurança.
 - AAL2 exigido no servidor e nas RLS expostas ao navegador.
 - Sessão local com encerramento por inatividade e tempo máximo.

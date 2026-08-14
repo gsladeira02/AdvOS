@@ -4,6 +4,7 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
 import { assertContentLength, SecurityError, enforceRateLimit, publicErrorMessage } from '@/lib/security';
+import { optimizeStoredDocument } from '@/lib/documentOptimization';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,6 +99,17 @@ async function normalizeFileForWhatsApp(file: File, forceRecordedAudio = false) 
         fileName = `${fileName.replace(/\.[^.]+$/, '') || 'audio-whatsapp'}.${extension}`;
       }
     }
+  }
+
+  if (!looksAudio) {
+    const processed = await optimizeStoredDocument({ buffer, fileName, mimeType, convertToPdf: false });
+    return {
+      buffer: processed.buffer,
+      fileName: processed.fileName,
+      mimeType: processed.mimeType,
+      converted: processed.optimized,
+      size: processed.storedBytes,
+    };
   }
 
   return {

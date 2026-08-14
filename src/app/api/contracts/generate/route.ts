@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { safeInternalPath } from '@/lib/security';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { optimizeStoredDocument } from '@/lib/documentOptimization';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getIntegrationConfig } from '@/lib/integrations';
@@ -475,9 +476,14 @@ export async function POST(req: Request) {
 
   const filename = filenameFor(data.document_type, data.client_name);
   const pdfBuffer = await generatePdfBuffer(data);
+  const optimizedPdf = await optimizeStoredDocument({
+    buffer: Buffer.from(pdfBuffer),
+    fileName: filename,
+    mimeType: 'application/pdf',
+  });
   const storagePath = `${profile.law_firm_id}/contratos/${Date.now()}-${filename}`;
 
-  await admin.storage.from('documents').upload(storagePath, pdfBuffer, {
+  await admin.storage.from('documents').upload(storagePath, optimizedPdf.buffer, {
     contentType: 'application/pdf',
     upsert: true,
   }).catch(() => null);
@@ -490,7 +496,7 @@ export async function POST(req: Request) {
     title: filename,
     doc_type: data.document_type,
     storage_path: storagePath,
-    notes: 'PDF gerado automaticamente pela pasta do cliente no AdvOS.',
+    notes: `PDF gerado automaticamente pela pasta do cliente no AdvOS e otimizado antes do armazenamento. Tamanho: ${optimizedPdf.storedBytes} bytes.`,
     signature_status: 'preparando_zapsign',
   }).select('id').single();
 

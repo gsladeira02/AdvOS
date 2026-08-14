@@ -3,6 +3,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { assertContentLength, SecurityError, enforceRateLimit } from '@/lib/security';
 import { assertSafeUploadedFile } from '@/lib/fileSecurity';
+import { optimizeStoredDocument } from '@/lib/documentOptimization';
 
 export const runtime = 'nodejs';
 
@@ -101,13 +102,16 @@ export async function POST(req: Request) {
   }
 
   const titles = form.getAll('titles').map((value) => String(value || '').trim());
+  const convertToPdf = form.getAll('convert_to_pdf').map((value) => ['1', 'true', 'yes', 'sim'].includes(String(value || '').toLowerCase()));
   const legacyTitle = str(form.get('title'));
   const uploaded: any[] = [];
+  let optimizedCount = 0;
+  let convertedCount = 0;
+  let savedBytes = 0;
 
   for (let index = 0; index < files.length; index++) {
     const file = files[index];
     const originalName = safeName(file.name || 'arquivo');
-    const title = displayNameFromFile(file, titles[index] || legacyTitle);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     try {
@@ -116,10 +120,30 @@ export async function POST(req: Request) {
       const payload = { error: error instanceof SecurityError ? error.message : 'Arquivo rejeitado pela validação de segurança.', uploaded };
       return ajax ? NextResponse.json(payload, { status: error instanceof SecurityError ? error.status : 415 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
     }
-    const storagePath = `${profile.law_firm_id}/clientes/${clientId}/${Date.now()}-${index}-${originalName}`;
+    let processed;
+    try {
+      processed = await optimizeStoredDocument({
+        buffer,
+        fileName: originalName,
+        mimeType: file.type || 'application/octet-stream',
+        convertToPdf: Boolean(convertToPdf[index]),
+      });
+      assertSafeUploadedFile(processed.fileName, processed.mimeType, processed.buffer);
+    } catch (error: any) {
+      const payload = { error: error?.message || 'Não foi possível otimizar o documento.', uploaded };
+      return ajax ? NextResponse.json(payload, { status: 415 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
+    }
 
-    const upload = await admin.storage.from('documents').upload(storagePath, buffer, {
-      contentType: file.type || 'application/octet-stream',
+    if (processed.optimized) optimizedCount += 1;
+    if (processed.convertedToPdf) convertedCount += 1;
+    savedBytes += processed.savingsBytes;
+
+    const storedName = safeName(processed.fileName || originalName);
+    const title = displayNameFromFile(file, titles[index] || legacyTitle || (processed.convertedToPdf ? storedName : ''));
+    const storagePath = `${profile.law_firm_id}/clientes/${clientId}/${Date.now()}-${index}-${storedName}`;
+
+    const upload = await admin.storage.from('documents').upload(storagePath, processed.buffer, {
+      contentType: processed.mimeType || 'application/octet-stream',
       upsert: false,
     });
 
@@ -134,7 +158,7 @@ export async function POST(req: Request) {
       title,
       doc_type: 'arquivo_cliente',
       storage_path: storagePath,
-      notes: `Arquivo enviado manualmente para a pasta do cliente. Nome original: ${file.name || originalName}`,
+      notes: `Arquivo enviado manualmente para a pasta do cliente. Nome original: ${file.name || originalName}. Otimização: ${processed.strategy}. Tamanho original: ${processed.originalBytes} bytes. Tamanho armazenado: ${processed.storedBytes} bytes.${processed.convertedToPdf ? ' Convertido para PDF antes do armazenamento.' : ''}`,
       signature_status: 'sem_assinatura',
     }).select('id,title,storage_path').single();
 
@@ -155,6 +179,6 @@ export async function POST(req: Request) {
     entity_id: clientId,
   });
 
-  if (ajax) return NextResponse.json({ ok: true, uploaded });
+  if (ajax) return NextResponse.json({ ok: true, uploaded, summary: { optimized: optimizedCount, converted: convertedCount, savedBytes } });
   return NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload=1`, req.url), 303);
 }
