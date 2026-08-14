@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { assertContentLength, SecurityError } from '@/lib/security';
+import { assertContentLength, SecurityError, enforceRateLimit } from '@/lib/security';
+import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 
 export const runtime = 'nodejs';
 
@@ -58,6 +59,13 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminSupabase();
+  try {
+    await enforceRateLimit(admin, `user:${profile.auth_user_id}:client-files-upload`, 30, 600);
+  } catch (error: any) {
+    const payload = { error: error instanceof SecurityError ? error.message : 'Não foi possível validar o envio.' };
+    return ajax ? NextResponse.json(payload, { status: error instanceof SecurityError ? error.status : 503 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
+  }
+
   const { data: client } = await admin
     .from('clients')
     .select('id,name')
@@ -102,6 +110,12 @@ export async function POST(req: Request) {
     const title = displayNameFromFile(file, titles[index] || legacyTitle);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    try {
+      assertSafeUploadedFile(file.name || originalName, file.type || 'application/octet-stream', buffer);
+    } catch (error: any) {
+      const payload = { error: error instanceof SecurityError ? error.message : 'Arquivo rejeitado pela validação de segurança.', uploaded };
+      return ajax ? NextResponse.json(payload, { status: error instanceof SecurityError ? error.status : 415 }) : NextResponse.redirect(new URL(`/app/clientes/${clientId}?upload_error=1`, req.url), 303);
+    }
     const storagePath = `${profile.law_firm_id}/clientes/${clientId}/${Date.now()}-${index}-${originalName}`;
 
     const upload = await admin.storage.from('documents').upload(storagePath, buffer, {

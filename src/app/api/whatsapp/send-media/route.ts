@@ -3,7 +3,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { sendWhatsAppMedia, sendWhatsAppMediaBuffer } from '@/lib/whatsappApi';
-import { assertContentLength, SecurityError } from '@/lib/security';
+import { assertContentLength, SecurityError, enforceRateLimit, publicErrorMessage } from '@/lib/security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -133,6 +133,7 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminSupabase();
+    await enforceRateLimit(admin, `user:${session.user.id}:whatsapp-media`, 30, 60);
     const originalName = safeName(normalized.fileName || 'arquivo');
     const storagePath = `${profile.law_firm_id}/whatsapp/${Date.now()}-${originalName}`;
 
@@ -186,6 +187,7 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar arquivo pelo WhatsApp.' }, { status });
+    console.error('Erro no envio de mídia WhatsApp:', error);
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao enviar arquivo pelo WhatsApp.') }, { status });
   }
 }

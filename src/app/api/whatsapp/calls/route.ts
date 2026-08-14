@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
+import { enforceRateLimit, publicErrorMessage, readJsonBody, SecurityError } from '@/lib/security';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getWhatsAppConfig } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
-import { readJsonBody, SecurityError } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -79,13 +79,15 @@ export async function GET(req: Request) {
     });
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao consultar Calling API.' }, { status });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao consultar Calling API.') }, { status });
   }
 }
 
 export async function POST(req: Request) {
   try {
     const { profile } = await getCurrentProfile();
+    const admin = createAdminSupabase();
+    await enforceRateLimit(admin, `user:${profile.auth_user_id}:whatsapp-calls`, 10, 60);
     const body = await readJsonBody(req, 262144);
     const action = String(body.action || '').trim();
     const config = await getWhatsAppConfig(profile.law_firm_id);
@@ -123,6 +125,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, callId, payload });
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro na chamada.' }, { status });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro na chamada.') }, { status });
   }
 }

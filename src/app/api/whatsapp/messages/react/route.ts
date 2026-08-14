@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { sendWhatsAppReaction } from '@/lib/whatsappApi';
-import { readJsonBody, SecurityError } from '@/lib/security';
+import { readJsonBody, SecurityError, publicErrorMessage } from '@/lib/security';
 
 function str(value: any) {
   return String(value || '').trim();
@@ -43,6 +43,6 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao reagir mensagem.' }, { status });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao reagir mensagem.') }, { status });
   }
 }

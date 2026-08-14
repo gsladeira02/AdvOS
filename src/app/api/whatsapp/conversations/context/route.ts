@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicErrorMessage } from '@/lib/security';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { loadWhatsappConversationContext } from '@/lib/whatsappOperations';
@@ -25,6 +26,6 @@ export async function GET(req: Request) {
     const context = await loadWhatsappConversationContext(admin, profile.law_firm_id, conversationId);
     return NextResponse.json({ ok: true, ...context }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Não foi possível carregar notas e histórico.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Não foi possível carregar notas e histórico.') }, { status: 400 });
   }
 }

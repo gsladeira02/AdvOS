@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { assertContentLength, readJsonBody, SecurityError } from '@/lib/security';
+import { assertContentLength, readJsonBody, SecurityError, publicErrorMessage } from '@/lib/security';
 
 function slugify(value: any) {
   return String(value || '')
@@ -67,7 +67,7 @@ export async function GET() {
     if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true, templates: data || [] });
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar modelos.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao carregar modelos.') }, { status: 400 });
   }
 }
 

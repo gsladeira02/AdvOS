@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicErrorMessage } from '@/lib/security';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { clientIdFromVirtualConversationId, enrichMessagesWithSenderProfiles, isVirtualConversationId, virtualConversationId } from '@/lib/whatsappConversations';
@@ -104,6 +105,6 @@ export async function GET(req: Request) {
       fetchedAt: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar mensagens.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao carregar mensagens.') }, { status: 400 });
   }
 }

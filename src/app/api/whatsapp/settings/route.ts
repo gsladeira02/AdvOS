@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { loadWhatsappSettings, normalizeStageKey, WHATSAPP_COLORS } from '@/lib/whatsappSettings';
-import { assertContentLength, readJsonBody, SecurityError } from '@/lib/security';
+import { assertContentLength, readJsonBody, SecurityError, publicErrorMessage } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -29,7 +29,7 @@ export async function GET() {
     const admin = createAdminSupabase();
     return await settingsResponse(admin, profile.law_firm_id);
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar configurações do WhatsApp.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao carregar configurações do WhatsApp.') }, { status: 400 });
   }
 }
 
@@ -250,6 +250,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Ação inválida.' }, { status: 400 });
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Não foi possível salvar a configuração.' }, { status });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Não foi possível salvar a configuração.') }, { status });
   }
 }

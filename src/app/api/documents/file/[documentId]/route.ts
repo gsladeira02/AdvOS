@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { recordSecurityEvent } from '@/lib/audit';
+import { enforceRateLimit, SecurityError } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,12 +37,13 @@ function safeHttpsUrl(value?: string | null) {
 
 export async function GET(req: Request, context: { params: Promise<{ documentId: string }> }) {
   try {
-    const { profile } = await getCurrentProfile();
+    const { session, profile } = await getCurrentProfile();
     const { documentId } = await context.params;
     const id = String(documentId || '').trim();
     if (!id) return new NextResponse('Documento não encontrado.', { status: 404 });
 
     const admin = createAdminSupabase();
+    await enforceRateLimit(admin, `user:${session.user.id}:document-access`, 120, 600, 'Muitos acessos a documentos em pouco tempo. Aguarde e tente novamente.');
     const { data: doc } = await admin
       .from('documents')
       .select('id,title,storage_path,external_url')
@@ -75,6 +78,16 @@ export async function GET(req: Request, context: { params: Promise<{ documentId:
     const filename = safeFilename(pathName || doc.title || `documento-${doc.id}`);
     const disposition = !forceDownload && canRenderInline(contentType) ? 'inline' : 'attachment';
 
+    await recordSecurityEvent({
+      lawFirmId: profile.law_firm_id,
+      authUserId: session.user.id,
+      eventType: forceDownload ? 'document_downloaded' : 'document_viewed',
+      entity: 'documents',
+      entityId: doc.id,
+      req,
+      metadata: { bytes: bytes.length, disposition },
+    });
+
     return new NextResponse(bytes, {
       status: 200,
       headers: {
@@ -88,6 +101,7 @@ export async function GET(req: Request, context: { params: Promise<{ documentId:
     });
   } catch (error) {
     console.error('Erro ao servir documento privado:', error);
+    if (error instanceof SecurityError) return new NextResponse(error.message, { status: error.status });
     return new NextResponse('Não foi possível abrir o documento.', { status: 400 });
   }
 }

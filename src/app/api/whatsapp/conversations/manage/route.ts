@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicErrorMessage, readJsonBody } from '@/lib/security';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
   try {
     const { session, profile } = await getCurrentProfile();
     const admin = createAdminSupabase();
-    const body = await req.json().catch(() => ({}));
+    const body = await readJsonBody(req, 262144);
     const action = text(body?.action, 50);
     const conversationId = text(body?.conversationId, 80);
     if (!conversationId) return NextResponse.json({ ok: false, error: 'Conversa inválida.' }, { status: 400 });
@@ -362,6 +363,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Ação inválida.' }, { status: 400 });
   } catch (error: any) {
     console.error('Erro ao gerenciar conversa do WhatsApp:', error);
-    return NextResponse.json({ ok: false, error: error?.message || 'Não foi possível atualizar a conversa.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Não foi possível atualizar a conversa.') }, { status: 400 });
   }
 }

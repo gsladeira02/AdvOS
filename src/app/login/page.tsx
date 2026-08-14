@@ -4,6 +4,14 @@ import { createBrowserSupabase } from '@/lib/supabase/browser';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+async function secureTarget(supabase: any) {
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (error) return '/login?erro=mfa';
+  if (data?.currentLevel === 'aal2') return pwaTarget();
+  if (data?.nextLevel === 'aal2') return '/auth/mfa';
+  return '/auth/mfa/setup';
+}
+
 function pwaTarget() {
   if (typeof window === 'undefined') return '/app/dashboard';
   const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any)?.standalone;
@@ -23,7 +31,7 @@ export default function Login() {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       if (data.session) {
-        window.location.replace(pwaTarget());
+        secureTarget(supabase).then((target) => window.location.replace(target));
         return;
       }
       setCheckingSession(false);
@@ -31,7 +39,7 @@ export default function Login() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-        window.location.replace(pwaTarget());
+        secureTarget(supabase).then((target) => window.location.replace(target));
       }
     });
 
@@ -51,7 +59,7 @@ export default function Login() {
       setError('E-mail ou senha inválidos.');
       return;
     }
-    window.location.replace(pwaTarget());
+    window.location.replace(await secureTarget(supabase));
   }
 
   return (
@@ -80,7 +88,7 @@ export default function Login() {
             {checkingSession ? 'Verificando sessão...' : loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">Sua sessão permanece ativa neste dispositivo até você sair da conta.</p>
+        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">Após a senha, o AdvOS exige um código do aplicativo autenticador.</p>
       </div>
     </main>
   );

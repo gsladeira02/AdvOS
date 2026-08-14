@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { sendWhatsAppTemplate, sendWhatsAppText } from '@/lib/whatsappApi';
-import { readJsonBody, SecurityError } from '@/lib/security';
+import { readJsonBody, SecurityError, enforceRateLimit, publicErrorMessage } from '@/lib/security';
+import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -27,6 +28,8 @@ function isCustomerCareWindowError(message: string) {
 export async function POST(req: Request) {
   try {
     const { session, profile } = await getCurrentProfile();
+    const admin = createAdminSupabase();
+    await enforceRateLimit(admin, `user:${session.user.id}:whatsapp-send`, 90, 60);
     const body = await readJsonBody(req, 131072);
 
     const phone = str(body.phone || body.to);
@@ -79,6 +82,7 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     const status = error instanceof SecurityError ? error.status : 400;
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao enviar WhatsApp.' }, { status });
+    console.error('Erro no envio WhatsApp:', error);
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao enviar WhatsApp.') }, { status });
   }
 }

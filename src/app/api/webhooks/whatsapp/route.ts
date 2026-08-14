@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { firstTextFromInboundMessage, getOrCreateConversation, getWhatsAppConfig } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
-import { readRawBody, verifyMetaWebhookSignature, SecurityError } from '@/lib/security';
+import { readRawBody, verifyMetaWebhookSignature, SecurityError, assertTrustedMetaMediaUrl } from '@/lib/security';
+import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 import { attachWhatsappMediaToClientFolder, ensureWhatsappLead } from '@/lib/whatsappCRM';
 
 export const dynamic = 'force-dynamic';
@@ -80,7 +81,8 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     const meta = await metaResponse.json().catch(() => ({}));
     if (!metaResponse.ok || !meta?.url) throw new Error(meta?.error?.message || 'Meta não retornou URL da mídia.');
 
-    const fileResponse = await fetch(meta.url, {
+    const trustedMediaUrl = assertTrustedMetaMediaUrl(meta.url);
+    const fileResponse = await fetch(trustedMediaUrl, {
       headers: { Authorization: `Bearer ${config.token}` },
       cache: 'no-store',
     });
@@ -96,6 +98,8 @@ async function cacheInboundMedia(admin: any, lawFirmId: string, mediaNode: any, 
     const bytes = Buffer.from(await fileResponse.arrayBuffer());
     if (bytes.length > maxInboundMedia) throw new Error('Mídia recebida excede o limite seguro de 25 MB.');
     const baseName = safeFileName(mediaNode?.filename || `${messageType}-${mediaId}.${extensionFromMime(mimeType)}`);
+    // Mídia recebida também passa pela mesma validação de conteúdo dos uploads manuais.
+    assertSafeUploadedFile(baseName, mimeType, bytes);
     const storagePath = `${lawFirmId}/whatsapp/inbound/${Date.now()}-${baseName}`;
 
     const upload = await admin.storage.from('documents').upload(storagePath, bytes, {

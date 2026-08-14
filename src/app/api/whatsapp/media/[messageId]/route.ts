@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getWhatsAppConfig } from '@/lib/whatsappApi';
+import { assertTrustedMetaMediaUrl, enforceRateLimit, SecurityError } from '@/lib/security';
+import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,8 +57,9 @@ function extensionFromMime(mime?: string | null) {
 
 export async function GET(req: Request, context: { params: Promise<{ messageId: string }> }) {
   try {
-    const { profile } = await getCurrentProfile();
+    const { session, profile } = await getCurrentProfile();
     const admin = createAdminSupabase();
+    await enforceRateLimit(admin, `user:${session.user.id}:whatsapp-media-read`, 120, 600, 'Muitos acessos a mídias em pouco tempo. Aguarde e tente novamente.');
     const params = await context.params;
     const messageId = decodeURIComponent(params.messageId || '');
     const url = new URL(req.url);
@@ -83,6 +86,7 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
         if (bytes.length > maxMedia) return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
         const contentType = message.mime_type || stored.type || 'application/octet-stream';
         const finalName = filename.includes('.') ? filename : `${filename}.${extensionFromMime(contentType)}`;
+        assertSafeUploadedFile(finalName, contentType, bytes);
         const disposition = !download && canRenderInline(contentType) ? 'inline' : 'attachment';
         return new NextResponse(bytes, {
           status: 200,
@@ -113,7 +117,8 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
       throw new Error(message);
     }
 
-    const fileResponse = await fetch(meta.url, {
+    const trustedMediaUrl = assertTrustedMetaMediaUrl(meta.url);
+    const fileResponse = await fetch(trustedMediaUrl, {
       headers: { Authorization: `Bearer ${config.token}` },
       cache: 'no-store',
     });
@@ -129,6 +134,7 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
     const bytes = Buffer.from(await fileResponse.arrayBuffer());
     if (bytes.length > maxMedia) return new NextResponse('Mídia excede o limite permitido.', { status: 413 });
     const finalName = filename.includes('.') ? filename : `${filename}.${extensionFromMime(contentType)}`;
+    assertSafeUploadedFile(finalName, contentType, bytes);
     const disposition = !download && canRenderInline(contentType) ? 'inline' : 'attachment';
 
     return new NextResponse(bytes, {
@@ -143,6 +149,7 @@ export async function GET(req: Request, context: { params: Promise<{ messageId: 
     });
   } catch (error) {
     console.error('Erro ao carregar mídia do WhatsApp:', error);
+    if (error instanceof SecurityError) return new NextResponse(error.message, { status: error.status });
     return new NextResponse('Não foi possível carregar a mídia.', { status: 400 });
   }
 }

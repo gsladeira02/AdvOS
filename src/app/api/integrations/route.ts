@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { defaultBaseUrl, safeIntegrationBaseUrl, tokenLast4 } from '@/lib/integrations';
+import { enforceRateLimit, SecurityError } from '@/lib/security';
+import { recordSecurityEvent } from '@/lib/audit';
 
 function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
@@ -24,6 +26,11 @@ export async function POST(req: Request) {
   const submittedWebhookSecret = str(f.get('webhook_secret'));
   const enabled = str(f.get('enabled')) === 'true';
   const admin = createAdminSupabase();
+  try {
+    await enforceRateLimit(admin, `user:${session.user.id}:integration-settings`, 20, 3600);
+  } catch (error: any) {
+    return NextResponse.json({ error: error instanceof SecurityError ? error.message : 'Não foi possível validar a operação.' }, { status: error instanceof SecurityError ? error.status : 503 });
+  }
 
   const existing = await admin
     .from('integration_settings')
@@ -79,5 +86,6 @@ export async function POST(req: Request) {
     entity: 'integration_settings',
   });
 
+  await recordSecurityEvent({ lawFirmId: profile.law_firm_id, authUserId: session.user.id, eventType: 'integration_updated', entity: 'integration_settings', req, metadata: { provider, enabled, environment } });
   return NextResponse.redirect(new URL('/app/integracoes', req.url), 303);
 }

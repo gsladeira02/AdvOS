@@ -25,14 +25,14 @@ export default async function Usuarios() {
           <input className="input" name="email" type="email" placeholder="E-mail" required />
           <input className="input" name="phone" placeholder="Celular" />
           <input className="input" name="oab_number" placeholder="OAB (opcional)" />
-          <input className="input" name="password" type="password" placeholder="Senha provisória" required />
+          <div><input className="input" name="password" type="password" autoComplete="new-password" placeholder="Senha provisória forte" required /><p className="mt-1 text-[11px] font-bold text-slate-500">Mín. 14 caracteres, maiúscula, minúscula, número e símbolo.</p></div>
           <button className="btn btn-primary">Criar usuário</button>
         </form>
       </section>
 
       <div className="table-responsive">
         <table className="table min-w-[680px]">
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Celular</th><th>OAB</th><th>Status</th></tr></thead>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Celular</th><th>OAB</th><th>Status</th><th>Acesso</th></tr></thead>
           <tbody>
             {users.map((u: any) => (
               <tr key={u.id}>
@@ -41,6 +41,18 @@ export default async function Usuarios() {
                 <td>{u.phone || '-'}</td>
                 <td>{u.oab_number || '-'}</td>
                 <td><span className={`badge ${u.status === 'ativo' ? 'badge-ok' : 'badge-warn'}`}>{statusLabel(u.status)}</span></td>
+                <td>
+                  {String(u.auth_user_id || '') === String(profile.auth_user_id || '') ? (
+                    <span className="text-xs font-bold text-slate-400">Sua conta</span>
+                  ) : (
+                    <form action="/api/users" method="post">
+                      <input type="hidden" name="action" value="toggle_status" />
+                      <input type="hidden" name="profile_id" value={u.id} />
+                      <input type="hidden" name="status" value={u.status === 'ativo' ? 'inativo' : 'ativo'} />
+                      <button className={`btn ${u.status === 'ativo' ? 'btn-secondary' : 'btn-primary'}`} type="submit">{u.status === 'ativo' ? 'Desativar' : 'Ativar'}</button>
+                    </form>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

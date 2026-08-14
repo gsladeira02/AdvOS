@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicErrorMessage } from '@/lib/security';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { loadWhatsappDashboard } from '@/lib/whatsappDashboard';
@@ -14,6 +15,6 @@ export async function GET() {
     const dashboard = await loadWhatsappDashboard(admin, profile.law_firm_id);
     return NextResponse.json({ ok: true, dashboard }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || 'Erro ao carregar dashboard do WhatsApp.' }, { status: 400 });
+    return NextResponse.json({ ok: false, error: publicErrorMessage(error, 'Erro ao carregar dashboard do WhatsApp.') }, { status: 400 });
   }
 }
