@@ -18,8 +18,6 @@ function firstHeaderValue(value: string | null) {
 }
 
 function requestOrigin(request: NextRequest) {
-  // Em proxies como a Vercel, priorizamos os headers encaminhados para comparar
-  // com a origem pública real acessada pelo navegador.
   const forwardedHost = firstHeaderValue(request.headers.get('x-forwarded-host'));
   const host = forwardedHost || firstHeaderValue(request.headers.get('host')) || request.nextUrl.host;
   const forwardedProto = firstHeaderValue(request.headers.get('x-forwarded-proto'));
@@ -41,53 +39,83 @@ function mutationOriginAllowed(request: NextRequest) {
   const secFetchSite = String(request.headers.get('sec-fetch-site') || '').trim().toLowerCase();
   const expectedOrigin = requestOrigin(request);
 
-  // Fetch Metadata é uma barreira adicional contra CSRF. Uma requisição que o
-  // próprio navegador classifica como cross-site nunca deve gravar no AdvOS.
   if (secFetchSite === 'cross-site') return false;
+  if (origin && origin !== 'null') return sameOrigin(origin, expectedOrigin);
 
-  if (origin && origin !== 'null') {
-    return sameOrigin(origin, expectedOrigin);
-  }
-
-  // `Origin: null` é permitido pelo padrão para origens opacas. Não o aceitamos
-  // cegamente: só liberamos quando o navegador confirma same-origin ou quando
-  // o Referer comprova o domínio do próprio AdvOS.
   if (origin === 'null') {
     if (secFetchSite === 'same-origin') return true;
     if (referer && sameOrigin(referer, expectedOrigin)) return true;
     return false;
   }
 
-  // Alguns contextos legítimos omitem Origin. Same-origin continua seguro e,
-  // quando disponível, o Referer funciona como confirmação adicional.
   if (secFetchSite === 'same-origin') return true;
   if (referer) return sameOrigin(referer, expectedOrigin);
-
-  // Requisições sem Origin/Referer/Fetch-Metadata podem ser chamadas internas
-  // ou ferramentas autenticadas. As próprias rotas continuam exigindo sessão.
   return true;
+}
+
+function csp(nonce: string) {
+  const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  let supabaseOrigin = '';
+  let supabaseWs = '';
+  try {
+    const parsed = new URL(supabaseUrl);
+    supabaseOrigin = parsed.origin;
+    supabaseWs = parsed.origin.replace(/^http/, 'ws');
+  } catch {}
+
+  const connect = ["'self'", supabaseOrigin, supabaseWs].filter(Boolean).join(' ');
+  const devEval = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
+  const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${devEval}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src ${connect}`,
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ') + upgrade;
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nonce = btoa(crypto.randomUUID());
+  const policy = csp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', policy);
 
-  // Webhooks são chamadas servidor-servidor e possuem validação própria.
-  if (isWebhook(pathname)) return NextResponse.next();
+  let response: NextResponse;
 
-  if (MUTATING.has(request.method)) {
+  if (!isWebhook(pathname) && MUTATING.has(request.method)) {
     const declaredLength = Number(request.headers.get('content-length') || '0');
     if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes(pathname)) {
-      return NextResponse.json({ error: 'Requisição muito grande.' }, { status: 413 });
+      response = NextResponse.json({ error: 'Requisição muito grande.' }, { status: 413 });
+      response.headers.set('Content-Security-Policy', policy);
+      return response;
     }
 
     if (!mutationOriginAllowed(request)) {
-      return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
+      response = NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
+      response.headers.set('Content-Security-Policy', policy);
+      return response;
     }
   }
 
-  return NextResponse.next();
+  response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', policy);
+  return response;
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/auth/signout'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|sw.js|offline.html).*)',
+  ],
 };

@@ -95,6 +95,7 @@ export function ClientFileUploader({ clientId }: { clientId: string }) {
           ref={inputRef}
           className="hidden"
           type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.mp3,.m4a,.mp4,.aac,.ogg,.opus,.wav,.amr"
           multiple
           onChange={(event) => event.target.files && addFiles(event.target.files)}
         />

@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
-import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageCircle } from 'lucide-react';
+import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageCircle, ShieldCheck } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
+import { SessionSecurityGuard } from '@/components/SessionSecurityGuard';
 
 const items = [
   ['/app/dashboard', 'Início', Home],
@@ -18,6 +19,7 @@ const items = [
   ['/app/integracoes', 'Integrações', Plug],
   ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
   ['/app/configuracoes', 'Configurações', Settings],
+  ['/app/seguranca', 'Segurança', ShieldCheck],
 ] as const;
 
 const mobileItems = [
@@ -51,13 +53,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   const navigationItems = isAdminRole(profile.role)
     ? items
-    : items.filter(([href]) => !['/app/usuarios', '/app/integracoes', '/app/integracoes/asaas/importar'].includes(href));
+    : items.filter(([href]) => !['/app/usuarios', '/app/integracoes', '/app/integracoes/asaas/importar', '/app/seguranca'].includes(href));
 
   const firmName = profileWithFirm?.law_firms?.name || 'AdvOS interno';
   const userName = profile.full_name || session.user.email || 'Usuário';
 
   return (
     <div className="page-shell">
+      <SessionSecurityGuard />
       <div className="desktop-grid grid min-h-[100dvh] md:grid-cols-[172px_1fr]">
         <aside className="sidebar sticky top-0 hidden h-screen flex-col border-r border-[#e6dccb] bg-white/95 px-2 py-3 shadow-sm backdrop-blur md:flex">
           <Link href="/app/dashboard" title={`AdvOS — ${firmName}`} className="mb-3 flex h-10 items-center gap-2 rounded-2xl bg-ink px-2 text-xs font-black text-white shadow-sm">

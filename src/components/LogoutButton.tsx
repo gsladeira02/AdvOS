@@ -40,6 +40,11 @@ export function LogoutButton({ mobile = false }: { mobile?: boolean }) {
       }
     } catch {}
 
+    try {
+      localStorage.removeItem('advos_session_started_at');
+      localStorage.removeItem('advos_last_activity_at');
+    } catch {}
+
     window.location.replace('/login?logout=1');
   }
 

@@ -59,3 +59,53 @@ export function safeInternalPath(value: string | null | undefined, fallback: str
   if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return fallback;
   return path;
 }
+
+export function publicErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof SecurityError) return error.message;
+  const message = String((error as any)?.message || '').trim();
+  if (!message) return fallback;
+
+  // Evita devolver detalhes de Postgres/PostgREST/Storage/stack ao navegador.
+  if (/\b(?:PGRST\d+|Postgres|PostgreSQL|relation |column |constraint |duplicate key|violates |permission denied|row-level|RLS|schema cache|SQLSTATE|JWT|service_role|stack trace)\b/i.test(message)) {
+    return fallback;
+  }
+  if (message.length > 600) return fallback;
+  return message;
+}
+
+export async function enforceRateLimit(
+  admin: any,
+  key: string,
+  limit: number,
+  windowSeconds: number,
+  message = 'Muitas tentativas. Aguarde um pouco e tente novamente.'
+) {
+  const safeLimit = Math.max(1, Math.min(10000, Math.floor(limit)));
+  const safeWindow = Math.max(1, Math.min(86400, Math.floor(windowSeconds)));
+  const { data, error } = await admin.rpc('advos_consume_rate_limit', {
+    p_key: String(key || '').slice(0, 240),
+    p_limit: safeLimit,
+    p_window_seconds: safeWindow,
+  });
+  if (error) {
+    console.error('Falha no rate limit de segurança:', error);
+    // Fail closed apenas para operações sensíveis que optaram por este helper.
+    throw new SecurityError('Não foi possível validar o limite de segurança.', 503);
+  }
+  if (data !== true) throw new SecurityError(message, 429);
+}
+
+export function assertTrustedMetaMediaUrl(value: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(String(value || '').trim());
+  } catch {
+    throw new SecurityError('URL de mídia inválida.', 502);
+  }
+  const host = parsed.hostname.toLowerCase();
+  const trusted = host === 'fbsbx.com' || host.endsWith('.fbsbx.com') || host === 'facebook.com' || host.endsWith('.facebook.com');
+  if (parsed.protocol !== 'https:' || !trusted || parsed.username || parsed.password) {
+    throw new SecurityError('Origem da mídia não autorizada.', 502);
+  }
+  return parsed.toString();
+}
