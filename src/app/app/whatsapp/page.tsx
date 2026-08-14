@@ -163,6 +163,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialTags={whatsappSettings.tags || []}
         initialLeadStages={whatsappSettings.stages || []}
         initialPreferences={whatsappSettings.preferences || {}}
+        initialAutoReplies={whatsappSettings.autoReplies || []}
         initialView={initialView as any}
         initialSettingsSection={initialSettingsSection}
         canConfigure={canConfigure}

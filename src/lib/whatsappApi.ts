@@ -140,6 +140,7 @@ export async function sendWhatsAppText(input: {
   message: string;
   clientId?: string | null;
   sentBy?: string | null;
+  automation?: { ruleId?: string | null; ruleName?: string | null } | null;
 }) {
   const config = await getWhatsAppConfig(input.lawFirmId);
   if (!config.configured) {
@@ -190,7 +191,9 @@ export async function sendWhatsAppText(input: {
     external_id: externalId,
     status: 'sent',
     sent_by: input.sentBy || null,
-    raw_payload: payload,
+    raw_payload: input.automation
+      ? { ...payload, advos: { automated: true, auto_reply_rule_id: input.automation.ruleId || null, auto_reply_rule_name: input.automation.ruleName || 'Resposta automática' } }
+      : payload,
   }).select('*').single();
 
   if (savedMessageError) throw new Error(savedMessageError.message);

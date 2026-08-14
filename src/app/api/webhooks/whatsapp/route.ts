@@ -6,6 +6,7 @@ import { readRawBody, verifyMetaWebhookSignature, SecurityError, assertTrustedMe
 import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 import { attachWhatsappMediaToClientFolder, ensureWhatsappLead } from '@/lib/whatsappCRM';
 import { optimizeStoredDocument } from '@/lib/documentOptimization';
+import { sendLeadAutoReplies } from '@/lib/whatsappAutoReplies';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -287,8 +288,9 @@ export async function POST(req: Request) {
         });
 
         // Contato desconhecido vira lead, nunca cliente automaticamente.
+        let leadRecord: any = null;
         if (!client?.id) {
-          await ensureWhatsappLead(admin, {
+          leadRecord = await ensureWhatsappLead(admin, {
             lawFirmId,
             conversationId: conversation.id,
             phone,
@@ -328,6 +330,22 @@ export async function POST(req: Request) {
           .eq('law_firm_id', lawFirmId);
 
         if (conversationUpdateError) throw new Error(conversationUpdateError.message);
+
+        // Respostas automáticas são exclusivas para contatos que ainda são leads.
+        // O log por regra+conversa impede disparos duplicados mesmo se a Meta
+        // reenviar o webhook. Regras com palavra-chave usam o texto desta mensagem.
+        if (!client?.id) {
+          await sendLeadAutoReplies(admin, {
+            lawFirmId,
+            conversationId: conversation.id,
+            phone,
+            leadName: contact?.profile?.name || conversation.lead_name || null,
+            inboundText: firstTextFromInboundMessage(message),
+            inboundMessageId: savedInboundMessage?.id || null,
+            department: reopenedDepartment,
+            isNewLead: leadRecord?._wasCreated === true,
+          });
+        }
       }
 
       for (const status of value?.statuses || []) {

@@ -123,6 +123,7 @@ export function WhatsappCentralClient({
   initialTags = [],
   initialLeadStages = [],
   initialPreferences = {},
+  initialAutoReplies = [],
   initialView = 'atendimento',
   initialSettingsSection = 'tags',
   canConfigure = false,
@@ -139,6 +140,7 @@ export function WhatsappCentralClient({
   initialTags?: any[];
   initialLeadStages?: any[];
   initialPreferences?: any;
+  initialAutoReplies?: any[];
   initialView?: WhatsappWorkspaceView;
   initialSettingsSection?: string;
   canConfigure?: boolean;
@@ -160,6 +162,7 @@ export function WhatsappCentralClient({
   const [tagCatalog, setTagCatalog] = useState<any[]>(initialTags || []);
   const [leadStages, setLeadStages] = useState<any[]>(initialLeadStages || []);
   const [preferences, setPreferences] = useState<any>(initialPreferences || {});
+  const [autoReplies, setAutoReplies] = useState<any[]>(initialAutoReplies || []);
   const [templateOptions, setTemplateOptions] = useState<WhatsappTemplateOption[]>(templates || []);
   const initialSelected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
   const [activeDepartment, setActiveDepartment] = useState<WhatsappDepartment>(() => {
@@ -653,9 +656,10 @@ export function WhatsappCentralClient({
           tags={tagCatalog}
           stages={leadStages}
           preferences={preferences}
+          autoReplies={autoReplies}
           templates={templateOptions as any}
           initialSection={initialSettingsSection}
-          onSettingsChanged={(next) => { setTagCatalog(next.tags || []); setLeadStages(next.stages || []); setPreferences(next.preferences || {}); }}
+          onSettingsChanged={(next) => { setTagCatalog(next.tags || []); setLeadStages(next.stages || []); setPreferences(next.preferences || {}); setAutoReplies(next.autoReplies || []); }}
           onTemplatesChanged={(next) => setTemplateOptions(next as WhatsappTemplateOption[])}
         />
       ) : (

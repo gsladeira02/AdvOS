@@ -412,6 +412,7 @@ export function WhatsappThread({
 
   function senderNameForMessage(message: any) {
     if (message?.direction !== 'outbound') return '';
+    if (message?.raw_payload?.advos?.automated) return `Resposta automática · ${String(message?.raw_payload?.advos?.auto_reply_rule_name || 'Automação')}`;
     if (message?.sent_by_name) return String(message.sent_by_name);
     const sentBy = String(message?.sent_by || '');
     const user: any = sentBy ? teamUserById.get(sentBy) : null;

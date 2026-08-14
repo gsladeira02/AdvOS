@@ -17,6 +17,15 @@ function safeColor(value: any) {
   return (WHATSAPP_COLORS as readonly string[]).includes(color) ? color : 'slate';
 }
 
+function messageText(value: any, max = 4096) {
+  return String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().slice(0, max);
+}
+
+function keywordList(value: any) {
+  const source = Array.isArray(value) ? value : String(value || '').split(',');
+  return Array.from(new Set(source.map((item: any) => text(item, 60).toLocaleLowerCase('pt-BR')).filter(Boolean))).slice(0, 20);
+}
+
 async function settingsResponse(admin: any, lawFirmId: string) {
   const settings = await loadWhatsappSettings(admin, lawFirmId);
   return NextResponse.json({ ok: true, ...settings }, { headers: { 'Cache-Control': 'no-store' } });
@@ -41,6 +50,59 @@ export async function POST(req: Request) {
     const admin = createAdminSupabase();
     const body = await readJsonBody(req, 256 * 1024);
     const action = text(body?.action, 50);
+
+    if (action === 'save_auto_reply') {
+      const id = text(body?.id, 80);
+      const name = text(body?.name, 80);
+      const message = messageText(body?.message);
+      const triggerType = body?.triggerType === 'keyword' ? 'keyword' : 'new_lead';
+      const keywords = triggerType === 'keyword' ? keywordList(body?.keywords) : [];
+      const department = body?.department === 'financeiro_juridico' || body?.department === 'atendimento' ? body.department : null;
+      if (!name) throw new Error('Informe um nome para a resposta automática.');
+      if (!message) throw new Error('Informe a mensagem automática.');
+      if (triggerType === 'keyword' && !keywords.length) throw new Error('Informe pelo menos uma palavra-chave.');
+
+      const payload = {
+        law_firm_id: profile.law_firm_id,
+        name,
+        trigger_type: triggerType,
+        message,
+        keywords,
+        department,
+        active: body?.active !== false,
+        sort_order: Math.max(0, Math.min(9999, Number(body?.sortOrder || 10) || 10)),
+        updated_at: new Date().toISOString(),
+      };
+      const query = id
+        ? admin.from('whatsapp_auto_replies').update(payload).eq('law_firm_id', profile.law_firm_id).eq('id', id)
+        : admin.from('whatsapp_auto_replies').insert(payload);
+      const { error } = await query;
+      if (error) {
+        if (['42P01', 'PGRST205'].includes(String(error.code || ''))) throw new Error('Rode o SQL v9_56_whatsapp_auto_replies.sql no Supabase antes de cadastrar respostas automáticas.');
+        throw new Error(error.message);
+      }
+      return await settingsResponse(admin, profile.law_firm_id);
+    }
+
+    if (action === 'set_auto_reply_active') {
+      const id = text(body?.id, 80);
+      if (!id) throw new Error('Resposta automática inválida.');
+      const { error } = await admin
+        .from('whatsapp_auto_replies')
+        .update({ active: body?.active === true, updated_at: new Date().toISOString() })
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+      return await settingsResponse(admin, profile.law_firm_id);
+    }
+
+    if (action === 'delete_auto_reply') {
+      const id = text(body?.id, 80);
+      if (!id) throw new Error('Resposta automática inválida.');
+      const { error } = await admin.from('whatsapp_auto_replies').delete().eq('law_firm_id', profile.law_firm_id).eq('id', id);
+      if (error) throw new Error(error.message);
+      return await settingsResponse(admin, profile.law_firm_id);
+    }
 
     if (action === 'save_tag') {
       const id = text(body?.id, 80);

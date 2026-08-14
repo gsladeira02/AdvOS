@@ -24,7 +24,7 @@ export async function ensureWhatsappLead(admin: any, input: {
   if (lookupError) throw new Error(lookupError.message);
 
   if (existing) {
-    if (existing.stage === 'convertido') return existing;
+    if (existing.stage === 'convertido') return { ...existing, _wasCreated: false };
     const patch: any = {
       last_contact_at: input.contactedAt || now,
       updated_at: now,
@@ -38,7 +38,7 @@ export async function ensureWhatsappLead(admin: any, input: {
       .select('*')
       .single();
     if (error) throw new Error(error.message);
-    return data;
+    return { ...data, _wasCreated: false };
   }
 
   const defaultStage = await defaultWhatsappLeadStage(admin, input.lawFirmId);
@@ -56,7 +56,7 @@ export async function ensureWhatsappLead(admin: any, input: {
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return data;
+  return { ...data, _wasCreated: true };
 }
 
 export async function attachWhatsappMediaToClientFolder(admin: any, input: {

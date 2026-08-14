@@ -13,7 +13,7 @@ export function normalizeStageKey(value: any) {
 }
 
 export async function loadWhatsappSettings(admin: any, lawFirmId: string) {
-  const [{ data: tags, error: tagsError }, { data: stages, error: stagesError }, { data: preferences, error: preferencesError }] = await Promise.all([
+  const [{ data: tags, error: tagsError }, { data: stages, error: stagesError }, { data: preferences, error: preferencesError }, autoRepliesResult] = await Promise.all([
     admin
       .from('whatsapp_tags')
       .select('id,name,color,active,sort_order,created_at,updated_at')
@@ -33,15 +33,27 @@ export async function loadWhatsappSettings(admin: any, lawFirmId: string) {
       .select('*')
       .eq('law_firm_id', lawFirmId)
       .maybeSingle(),
+    admin
+      .from('whatsapp_auto_replies')
+      .select('id,name,trigger_type,message,keywords,department,active,sort_order,created_at,updated_at')
+      .eq('law_firm_id', lawFirmId)
+      .order('active', { ascending: false })
+      .order('sort_order')
+      .order('created_at'),
   ]);
 
   if (tagsError) throw new Error(tagsError.message);
   if (stagesError) throw new Error(stagesError.message);
   if (preferencesError) throw new Error(preferencesError.message);
+  const autoRepliesError = autoRepliesResult?.error;
+  const autoReplyErrorCode = String(autoRepliesError?.code || '');
+  const autoRepliesUnavailable = autoReplyErrorCode === '42P01' || autoReplyErrorCode === 'PGRST205' || String(autoRepliesError?.message || '').toLowerCase().includes('does not exist') || String(autoRepliesError?.message || '').toLowerCase().includes('schema cache');
+  if (autoRepliesError && !autoRepliesUnavailable) throw new Error(autoRepliesError.message);
 
   return {
     tags: tags || [],
     stages: stages || [],
+    autoReplies: autoRepliesUnavailable ? [] : (autoRepliesResult?.data || []),
     preferences: preferences || {
       law_firm_id: lawFirmId,
       lead_label_singular: 'Lead',

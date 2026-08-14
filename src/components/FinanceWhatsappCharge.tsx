@@ -123,7 +123,10 @@ export function FinanceWhatsappCharge(props: {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível enviar o template oficial.');
-      setFeedback('Template oficial enviado pela API. Confira a entrega na aba WhatsApp.');
+      const metaId = String(result?.externalId || result?.message?.external_id || '').trim();
+      setFeedback(null);
+      window.alert(`Mensagem enviada com sucesso pela API oficial do WhatsApp.${metaId ? `\n\nID da mensagem Meta: ${metaId}` : ''}`);
+      setOpen(false);
     } catch (error: any) {
       setFeedback(error?.message || 'Erro ao enviar template oficial pela Meta.');
     } finally {
@@ -207,7 +210,7 @@ export function FinanceWhatsappCharge(props: {
               )}
               {metaTemplateName && (
                 <button type="button" className="btn btn-secondary !rounded-lg !px-3 !py-2 text-xs" onClick={sendOfficialTemplate} disabled={sending || !props.phone}>
-                  Enviar modelo oficial
+                  Enviar pela API
                 </button>
               )}
               <a href={whatsappHref} target="_blank" rel="noreferrer" className={`btn btn-secondary !rounded-lg !px-3 !py-2 text-xs ${metaTemplateName ? 'sm:col-span-2' : ''}`}>
