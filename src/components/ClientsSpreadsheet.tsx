@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Filter, MessageCircle, Search, UserRound } from 'lucide-react';
 import { TablePagination } from '@/components/TablePagination';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 export type ClientSpreadsheetRow = {
   id: string;
@@ -14,6 +15,8 @@ export type ClientSpreadsheetRow = {
   whatsapp?: string | null;
   email?: string | null;
   created_at?: string | null;
+  avatar_path?: string | null;
+  avatar_updated_at?: string | null;
   legal_services?: { id?: string | null; name?: string | null } | null;
 };
 
@@ -150,7 +153,7 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
           </tr></thead>
           <tbody>{paginatedClients.map((client) => (
             <tr key={client.id}>
-              <td><Link href={`/app/clientes/${client.id}`} className="table-primary-link" title={client.name || ''}>{client.name || '-'}</Link></td>
+              <td><div className="flex min-w-0 items-center gap-2"><ClientAvatar clientId={client.id} name={client.name} avatarPath={client.avatar_path} avatarUpdatedAt={client.avatar_updated_at} className="h-8 w-8" fallbackClassName="bg-[#e7f3ef] text-[#075e54]" /><Link href={`/app/clientes/${client.id}`} className="table-primary-link min-w-0 truncate" title={client.name || ''}>{client.name || '-'}</Link></div></td>
               <td>{client.doc || '-'}</td><td>{typeShort(client.client_type)}</td>
               <td><span className="table-ellipsis max-w-[220px]" title={client.legal_services?.name || ''}>{client.legal_services?.name || '-'}</span></td>
               <td>{client.whatsapp || client.phone || '-'}</td><td><span className="table-ellipsis max-w-[230px]" title={client.email || ''}>{client.email || '-'}</span></td>
@@ -168,9 +171,12 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
         {paginatedClients.map((client) => (
           <details className="mobile-record" key={client.id}>
             <summary>
-              <div className="mobile-record-main">
-                <strong>{client.name || '-'}</strong>
-                <span>{client.legal_services?.name || typeShort(client.client_type)}</span>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <ClientAvatar clientId={client.id} name={client.name} avatarPath={client.avatar_path} avatarUpdatedAt={client.avatar_updated_at} className="h-9 w-9" fallbackClassName="bg-[#e7f3ef] text-[#075e54]" />
+                <div className="mobile-record-main min-w-0">
+                  <strong>{client.name || '-'}</strong>
+                  <span>{client.legal_services?.name || typeShort(client.client_type)}</span>
+                </div>
               </div>
               <div className="mobile-record-side">
                 <span className="mobile-record-meta">{typeShort(client.client_type)}</span><ChevronDown size={15} className="disclosure-chevron" />

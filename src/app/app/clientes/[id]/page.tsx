@@ -10,6 +10,7 @@ import { dateBR, money } from '@/lib/utils';
 import { ClientFileUploader } from '@/components/ClientFileUploader';
 import { FinanceInstallmentActions } from '@/components/FinanceInstallmentActions';
 import { PAYMENT_METHOD_OPTIONS } from '@/lib/finance';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 function docLabel(type?: string) {
   if (type === 'procuracao_hipossuficiencia') return 'Procuração com hipossuficiência';
@@ -133,8 +134,31 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       </section>
     )}
 
+    {query?.foto_atualizada && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Foto do cliente atualizada com sucesso.</section>}
+    {query?.foto_removida && <section className="compact-alert mb-4 border-slate-200 bg-slate-50 text-slate-700">Foto do cliente removida.</section>}
+    {query?.foto_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível atualizar a foto. Use JPG, PNG ou WebP com até 8 MB.</section>}
+
     <section className="card mb-6 p-5">
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+      <div className="grid gap-5 xl:grid-cols-[150px_minmax(0,1fr)_280px]">
+        <div className="flex flex-col items-center gap-3 xl:items-start">
+          <ClientAvatar clientId={client.id} name={client.name} avatarPath={client.avatar_path} avatarUpdatedAt={client.avatar_updated_at} className="h-28 w-28 [&>span]:text-2xl" fallbackClassName="bg-[#e7f3ef] text-[#075e54]" imageClassName="object-cover" />
+          <form action="/api/clients/avatar" method="post" encType="multipart/form-data" className="grid w-full max-w-[220px] gap-2">
+            <input type="hidden" name="client_id" value={client.id} />
+            <label className="btn btn-secondary cursor-pointer text-center text-[11px]">
+              {client.avatar_path ? 'Trocar foto' : 'Adicionar foto'}
+              <input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" required />
+            </label>
+            <button className="btn btn-primary text-[11px]">Salvar foto</button>
+          </form>
+          {client.avatar_path && (
+            <form action="/api/clients/avatar" method="post" className="w-full max-w-[220px]">
+              <input type="hidden" name="client_id" value={client.id} />
+              <input type="hidden" name="remove" value="1" />
+              <button className="btn btn-ghost w-full text-[11px] text-red-700">Remover foto</button>
+            </form>
+          )}
+          <p className="text-center text-[10px] font-bold leading-relaxed text-slate-500 xl:text-left">JPG, PNG ou WebP. O AdvOS redimensiona e compacta automaticamente.</p>
+        </div>
         <div>
           <h2 className="text-2xl font-black">Dados do cliente</h2>
           <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">

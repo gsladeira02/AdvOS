@@ -30,6 +30,7 @@ import { WhatsappSpecialComposer, type WhatsappSpecialKind } from '@/components/
 import { WhatsappCallPanel } from '@/components/WhatsappCallPanel';
 import { WhatsappConversationControls } from '@/components/WhatsappConversationControls';
 import { WhatsappLocationCard } from '@/components/WhatsappLocationCard';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 export type WhatsappTemplateOption = {
   id: string;
@@ -1108,9 +1109,20 @@ export function WhatsappThread({
               <X size={17} className="hidden xl:block" />
             </button>
           )}
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">
-            {title.split(' ').filter(Boolean).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || '?'}
-          </div>
+          {conversation?.client_id || conversation?.clients?.id ? (
+            <ClientAvatar
+              clientId={conversation?.client_id || conversation?.clients?.id}
+              name={title}
+              avatarPath={conversation?.clients?.avatar_path}
+              avatarUpdatedAt={conversation?.clients?.avatar_updated_at}
+              className="h-9 w-9 ring-1 ring-white/20"
+              fallbackClassName="bg-white/20 text-white"
+            />
+          ) : (
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-xs font-black">
+              {title.split(' ').filter(Boolean).slice(0, 2).map((part: string) => part[0]).join('').toUpperCase() || '?'}
+            </div>
+          )}
           <div className="min-w-0">
             <h2 className="break-safe text-sm font-black leading-tight">{title}</h2>
             <p className="truncate text-[10px] font-bold text-white/75">{conversation.phone}</p>

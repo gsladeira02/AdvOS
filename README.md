@@ -24,3 +24,7 @@ Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporan
 - Menos detalhes internos expostos em respostas de erro.
 
 Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indicada. Para esta versão, execute também `supabase/v9_58_comercial_marketing.sql`.
+
+## v9.62 — Foto do cliente
+
+A ficha do cliente agora aceita foto privada. A imagem é otimizada automaticamente e aparece em Clientes e no WhatsApp. Execute `supabase/v9_62_foto_cliente.sql` antes de usar o recurso.

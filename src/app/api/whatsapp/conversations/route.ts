@@ -34,7 +34,7 @@ function matchesSearch(item: any, search: string) {
 async function getClientsWithPhone(admin: any, lawFirmId: string) {
   const { data, error } = await admin
     .from('clients')
-    .select('id,law_firm_id,name,phone,whatsapp,created_at')
+    .select('*')
     .eq('law_firm_id', lawFirmId)
     .or('phone.not.is.null,whatsapp.not.is.null')
     .order('name');
@@ -49,7 +49,7 @@ async function getClientForVirtual(admin: any, lawFirmId: string, virtualId: str
 
   const { data, error } = await admin
     .from('clients')
-    .select('id,law_firm_id,name,phone,whatsapp,created_at')
+    .select('*')
     .eq('law_firm_id', lawFirmId)
     .eq('id', clientId)
     .maybeSingle();
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     if (!selected && requestedId && !requestedIsVirtual) {
       const { data: requestedConversation } = await admin
         .from('whatsapp_conversations')
-        .select('*, clients(id,name,whatsapp,phone)')
+        .select('*, clients(*)')
         .eq('law_firm_id', profile.law_firm_id)
         .eq('id', requestedId)
         .maybeSingle();

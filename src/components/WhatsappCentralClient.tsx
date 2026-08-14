@@ -5,6 +5,7 @@ import { Archive, Check, CheckCheck, Filter, MessageCircle, RefreshCw, Search, S
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 import { WhatsappSettingsCenter } from '@/components/WhatsappSettingsCenter';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 function titleFor(conversation: any) {
   return conversation?.clients?.name || conversation?.lead?.name || conversation?.lead_name || conversation?.phone || 'Conversa';
@@ -587,9 +588,20 @@ export function WhatsappCentralClient({
         onClick={() => selectConversation(item, kind)}
         className={`flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#e7f3ef]' : 'bg-white'}`}
       >
-        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black text-white ${isContact ? 'bg-[#25D366]' : isLead ? 'bg-[#d97706]' : 'bg-[#075e54]'}`}>
-          {isContact ? <Users size={14} /> : initials(title)}
-        </div>
+        {item?.client_id || item?.clients?.id ? (
+          <ClientAvatar
+            clientId={item?.client_id || item?.clients?.id}
+            name={title}
+            avatarPath={item?.clients?.avatar_path}
+            avatarUpdatedAt={item?.clients?.avatar_updated_at}
+            className="h-9 w-9"
+            fallbackClassName={isContact ? 'bg-[#25D366] text-white' : 'bg-[#075e54] text-white'}
+          />
+        ) : (
+          <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black text-white ${isLead ? 'bg-[#d97706]' : 'bg-[#075e54]'}`}>
+            {initials(title)}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           {isContact ? (
             <>

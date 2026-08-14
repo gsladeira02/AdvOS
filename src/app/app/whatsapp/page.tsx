@@ -72,7 +72,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
     admin
       .from('clients')
-      .select('id,law_firm_id,name,phone,whatsapp,created_at')
+      .select('*')
       .eq('law_firm_id', profile.law_firm_id)
       .or('phone.not.is.null,whatsapp.not.is.null')
       .order('name'),

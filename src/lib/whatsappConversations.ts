@@ -71,6 +71,8 @@ export function virtualContactFromClient(client: any, conversations: any[] = [])
       name: client.name,
       whatsapp: client.whatsapp,
       phone: client.phone,
+      avatar_path: client.avatar_path || null,
+      avatar_updated_at: client.avatar_updated_at || null,
     },
   };
 }
@@ -151,7 +153,7 @@ export async function loadVisibleConversations(admin: any, lawFirmId: string, ma
     const batch = activeIds.slice(index, index + batchSize);
     const { data, error } = await admin
       .from('whatsapp_conversations')
-      .select('*, clients(id,name,whatsapp,phone,email,doc)')
+      .select('*, clients(*)')
       .eq('law_firm_id', lawFirmId)
       .in('id', batch);
 
