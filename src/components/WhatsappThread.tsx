@@ -387,6 +387,7 @@ export function WhatsappThread({
   const [specialKind, setSpecialKind] = useState<WhatsappSpecialKind | null>(null);
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
+  const [deleteOpenId, setDeleteOpenId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [recordedAudio, setRecordedAudio] = useState<RecordedAudioState | null>(null);
   const [recording, setRecording] = useState(false);
@@ -465,9 +466,11 @@ export function WhatsappThread({
         onSent?.(nextConversationId);
       }
       const serverMessages = result.messages || [];
+      const excludedMessageIds = new Set((result.excludedMessageIds || []).map((id: any) => String(id)));
       setItems((current) => {
-        if (!serverMessages.length && current.length) return current;
-        return mergeMessageLists(serverMessages, current);
+        const retained = current.filter((item: any) => !excludedMessageIds.has(String(item?.id || '')));
+        if (!serverMessages.length) return retained;
+        return mergeMessageLists(serverMessages, retained);
       });
       if (!silent) setFeedback('Conversa atualizada.');
     } catch (error: any) {
@@ -556,6 +559,8 @@ export function WhatsappThread({
     });
     setNewMessagesBelow(false);
     setFeedback(null);
+    setReactionOpenId(null);
+    setDeleteOpenId(null);
     if (conversationId && !conversation?.virtual) {
       window.setTimeout(() => refreshThreadMessages(true), 80);
       window.setTimeout(() => refreshThreadMessages(true), 650);
@@ -667,21 +672,26 @@ export function WhatsappThread({
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
-  async function deleteMessage(messageId: string) {
+  async function deleteMessage(messageId: string, scope: 'for_me' | 'for_everyone') {
+    setDeleteOpenId(null);
     if (!messageId || String(messageId).startsWith('local-')) {
       setItems((current) => current.filter((item: any) => item.id !== messageId));
       return;
+    }
+    if (scope === 'for_everyone') {
+      const confirmed = window.confirm('Apagar esta mensagem para todos os usuários do AdvOS? A API oficial da Meta não permite que o AdvOS remova retroativamente a mensagem do WhatsApp do cliente.');
+      if (!confirmed) return;
     }
     try {
       const response = await fetch('/api/whatsapp/messages/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId }),
+        body: JSON.stringify({ messageId, scope }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível apagar.');
       setItems((current) => current.filter((item: any) => item.id !== messageId));
-      setFeedback('Mensagem apagada no AdvOS.');
+      setFeedback(result?.warning || (scope === 'for_me' ? 'Mensagem apagada apenas para você.' : 'Mensagem apagada para todos no AdvOS.'));
       onSent?.(conversation?.id);
     } catch (error: any) {
       setFeedback(error?.message || 'Não foi possível apagar a mensagem. Tente novamente.');
@@ -1144,13 +1154,22 @@ export function WhatsappThread({
               return (
                 <div key={message.id || stableMessageKey(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'}`}>
                   <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'}`}>
-                    <div className={`absolute top-1 hidden items-center gap-1 group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
+                    <div className={`absolute top-1 flex items-center gap-1 md:hidden md:group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
                       <button type="button" onClick={() => setReactionOpenId(reactionOpenId === message.id ? null : String(message.id))} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Reagir">
                         <Smile size={12} />
                       </button>
-                      <button type="button" onClick={() => deleteMessage(message.id)} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Apagar mensagem no AdvOS">
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="relative">
+                        <button type="button" onClick={() => { setDeleteOpenId(deleteOpenId === String(message.id) ? null : String(message.id)); setReactionOpenId(null); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Apagar mensagem">
+                          <Trash2 size={12} />
+                        </button>
+                        {deleteOpenId === String(message.id) && (
+                          <div className={`absolute top-7 z-40 w-48 overflow-hidden rounded-xl border border-[#e6dccb] bg-white py-1 text-left shadow-xl ${outbound ? 'right-0' : 'left-0'}`}>
+                            <button type="button" className="block w-full px-3 py-2 text-left text-[11px] font-bold text-slate-800 hover:bg-slate-50" onClick={() => void deleteMessage(String(message.id), 'for_me')}>Apagar para mim</button>
+                            <button type="button" className="block w-full px-3 py-2 text-left text-[11px] font-bold text-red-700 hover:bg-red-50" onClick={() => void deleteMessage(String(message.id), 'for_everyone')}>Apagar para todos</button>
+                            <div className="border-t border-slate-100 px-3 py-2 text-[9px] font-medium leading-4 text-slate-500">“Para todos” remove de todos os usuários do AdvOS. A Meta não oferece revogação remota pela Cloud API.</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {reactionOpenId === message.id && (
                       <div className={`absolute top-[-36px] z-20 flex gap-1 rounded-full border border-[#e6dccb] bg-white px-2 py-1 shadow-lg ${outbound ? 'right-0' : 'left-0'}`}>

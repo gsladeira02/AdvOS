@@ -52,7 +52,7 @@ async function materializeSelectedConversation(admin: any, lawFirmId: string, se
 
 export default async function WhatsAppCentral({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
-  const { profile } = await getCurrentProfile();
+  const { session, profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
   const canConfigure = isAdminRole(profile.role);
 
@@ -122,8 +122,19 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         .is('deleted_at', null)
         .order('created_at', { ascending: true })
     : { data: [] as any[] };
+  const initialMessageIds = (rawMessages || []).map((row: any) => row.id).filter(Boolean);
+  const { data: initialHiddenRows } = initialMessageIds.length
+    ? await admin
+        .from('whatsapp_message_user_hides')
+        .select('message_id')
+        .eq('law_firm_id', profile.law_firm_id)
+        .eq('auth_user_id', session.user.id)
+        .in('message_id', initialMessageIds)
+    : { data: [] as any[] };
+  const initialHiddenIds = new Set((initialHiddenRows || []).map((row: any) => String(row.message_id)));
+  const visibleRawMessages = (rawMessages || []).filter((row: any) => !initialHiddenIds.has(String(row.id)));
   const messages = selected && !selected.virtual
-    ? await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, rawMessages || [])
+    ? await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, visibleRawMessages)
     : [];
 
   const active = Boolean(integration?.enabled && integration?.token_last4 && integration?.raw_settings?.phone_number_id);

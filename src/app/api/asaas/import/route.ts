@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { assertContentLength, SecurityError } from '@/lib/security';
+import { paymentMethodFromBillingType } from '@/lib/finance';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -373,6 +374,7 @@ export async function POST(req: Request) {
             payment_url: paymentUrl || null,
             invoice_url: paymentUrl || null,
             billing_type: billingType,
+            payment_method: paymentMethodFromBillingType(billingType),
             integration_status: 'importada',
             import_source: 'asaas_arquivo',
             import_batch_id: batchId,
@@ -403,6 +405,7 @@ export async function POST(req: Request) {
             payment_url: paymentUrl || null,
             invoice_url: paymentUrl || null,
             billing_type: billingType,
+            payment_method: paymentMethodFromBillingType(billingType),
             integration_status: 'importada',
             import_source: 'asaas_arquivo',
             import_key: importKey,

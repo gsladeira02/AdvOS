@@ -22,6 +22,8 @@ export async function POST(req: Request) {
   const amount = Number(f.get('amount') || 0);
   const requestedStatus = String(f.get('status') || 'pendente').trim();
   const status = ALLOWED_STATUS.has(requestedStatus) ? requestedStatus : 'pendente';
+  const paymentMethod = String(f.get('payment_method') || '').trim() || null;
+  const redirectTo = String(f.get('redirect_to') || '/app/financeiro').trim();
 
   const { data: contract, error: contractError } = await admin.from('financial_contracts').insert({
     law_firm_id: profile.law_firm_id,
@@ -42,8 +44,10 @@ export async function POST(req: Request) {
     due_date: f.get('due_date') || null,
     status,
     paid_at: status === 'pago' ? todayBrazil() : null,
+    payment_method: paymentMethod,
   });
 
   if (installmentError) return NextResponse.json({ error: 'Não foi possível criar a parcela.' }, { status: 400 });
-  return NextResponse.redirect(new URL('/app/financeiro', req.url), 303);
+  const safeRedirect = redirectTo.startsWith('/app/') ? redirectTo : '/app/financeiro';
+  return NextResponse.redirect(new URL(safeRedirect, req.url), 303);
 }

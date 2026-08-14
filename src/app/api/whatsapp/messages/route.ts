@@ -57,7 +57,7 @@ async function resolveConversation(admin: any, lawFirmId: string, requestedId: s
 
 export async function GET(req: Request) {
   try {
-    const { profile } = await getCurrentProfile();
+    const { session, profile } = await getCurrentProfile();
     const admin = createAdminSupabase();
     const url = new URL(req.url);
     const requestedId = String(url.searchParams.get('conversationId') || '').trim();
@@ -89,6 +89,28 @@ export async function GET(req: Request) {
 
     if (error) throw new Error(error.message);
 
+    const messageIds = (messages || []).map((row: any) => row.id).filter(Boolean);
+    const { data: hiddenRows } = messageIds.length
+      ? await admin
+          .from('whatsapp_message_user_hides')
+          .select('message_id')
+          .eq('law_firm_id', profile.law_firm_id)
+          .eq('auth_user_id', session.user.id)
+          .in('message_id', messageIds)
+      : { data: [] as any[] };
+    const hiddenIds = new Set((hiddenRows || []).map((row: any) => String(row.message_id)));
+    const visibleMessages = (messages || []).filter((row: any) => !hiddenIds.has(String(row.id)));
+    const { data: deletedRows } = await admin
+      .from('whatsapp_messages')
+      .select('id')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('conversation_id', conversation.id)
+      .not('deleted_at', 'is', null);
+    const excludedMessageIds = Array.from(new Set([
+      ...Array.from(hiddenIds),
+      ...(deletedRows || []).map((row: any) => String(row.id)),
+    ]));
+
     if (Number(conversation.unread_count || 0) > 0) {
       await admin
         .from('whatsapp_conversations')
@@ -101,7 +123,8 @@ export async function GET(req: Request) {
       ok: true,
       conversationId: conversation.id,
       conversation,
-      messages: await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, messages || []),
+      messages: await enrichMessagesWithSenderProfiles(admin, profile.law_firm_id, visibleMessages),
+      excludedMessageIds,
       fetchedAt: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' } });
   } catch (error: any) {

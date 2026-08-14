@@ -5,6 +5,7 @@ import { optimizeStoredDocument } from '@/lib/documentOptimization';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getIntegrationConfig } from '@/lib/integrations';
+import { paymentMethodFromBillingType } from '@/lib/finance';
 
 function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
@@ -355,6 +356,7 @@ async function createAsaasCharges(admin: any, profile: any, financialContractId:
       status: 'pendente',
       provider: 'asaas',
       billing_type: billingType,
+      payment_method: paymentMethodFromBillingType(billingType),
       integration_status: config.configured ? 'preparando' : 'configuracao_pendente',
     }).select('id').single();
 
@@ -396,6 +398,7 @@ async function createAsaasCharges(admin: any, profile: any, financialContractId:
         invoice_url: payment.invoiceUrl || null,
         bank_slip_url: payment.bankSlipUrl || null,
         billing_type: payment.billingType || billingType,
+        payment_method: paymentMethodFromBillingType(payment.billingType || billingType),
         raw_payload: payment,
         updated_at: new Date().toISOString(),
       }).eq('id', installment.id).eq('law_firm_id', profile.law_firm_id);

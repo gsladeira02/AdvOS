@@ -172,6 +172,7 @@ create table if not exists financial_installments (
   pix_qr_code text,
   pix_payload text,
   billing_type text,
+  payment_method text,
   integration_status text,
   import_source text,
   import_key text,
@@ -464,3 +465,16 @@ create index if not exists idx_whatsapp_conversations_firm_last on whatsapp_conv
 create index if not exists idx_whatsapp_conversations_phone on whatsapp_conversations(law_firm_id, phone);
 create index if not exists idx_whatsapp_messages_conversation_created on whatsapp_messages(conversation_id, created_at);
 create index if not exists idx_whatsapp_messages_external_id on whatsapp_messages(external_id);
+
+
+create table if not exists whatsapp_message_user_hides (
+  id uuid primary key default uuid_generate_v4(),
+  law_firm_id uuid not null references law_firms(id) on delete cascade,
+  message_id uuid not null references whatsapp_messages(id) on delete cascade,
+  auth_user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(message_id, auth_user_id)
+);
+
+alter table whatsapp_message_user_hides enable row level security;
+create index if not exists idx_whatsapp_message_user_hides_user on whatsapp_message_user_hides(law_firm_id, auth_user_id, message_id);

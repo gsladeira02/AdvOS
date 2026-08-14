@@ -7,6 +7,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { money } from '@/lib/utils';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
+import { PAYMENT_METHOD_OPTIONS } from '@/lib/finance';
 
 export default async function Financeiro() {
   const { profile } = await getCurrentProfile();
@@ -65,13 +66,14 @@ export default async function Financeiro() {
       />
 
       <ResponsiveFormSection title="Nova cobrança" description="Lançamento manual para cobranças que ainda não vieram do Asaas.">
-        <form action="/api/finance" method="post" className="compact-form-grid grid gap-2.5 md:grid-cols-2 xl:grid-cols-5">
+        <form action="/api/finance" method="post" className="compact-form-grid grid gap-2.5 md:grid-cols-2 xl:grid-cols-6">
           <select className="input compact-input" name="client_id"><option value="">Cliente</option>{clientsList.map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}</select>
           <input className="input compact-input" name="description" placeholder="Descrição" required />
           <input className="input compact-input" name="amount" type="number" step="0.01" placeholder="Valor" required />
           <input className="input compact-input" name="due_date" type="date" />
+          <select className="input compact-input" name="payment_method" defaultValue="">{PAYMENT_METHOD_OPTIONS.map(([value,label]) => <option value={value} key={value || 'none'}>{label}</option>)}</select>
           <select className="input compact-input" name="status"><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select>
-          <button className="btn btn-primary md:col-span-2 xl:col-span-5">Cadastrar cobrança</button>
+          <button className="btn btn-primary md:col-span-2 xl:col-span-6">Cadastrar cobrança</button>
         </form>
       </ResponsiveFormSection>
     </div>

@@ -6,6 +6,8 @@ import { ChevronDown, Filter, Search } from 'lucide-react';
 import { FinanceWhatsappCharge, type ChargeTemplateOption } from '@/components/FinanceWhatsappCharge';
 import { dateBR, money } from '@/lib/utils';
 import { TablePagination } from '@/components/TablePagination';
+import { FinanceInstallmentActions } from '@/components/FinanceInstallmentActions';
+import { paymentMethodLabel } from '@/lib/finance';
 
 type ClientOption = {
   id: string;
@@ -125,7 +127,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
       .filter((i: any) => {
         const client = i.financial_contracts?.clients;
         const label = installmentLabel(i);
-        const haystack = normalize(`${client?.name || ''} ${label} ${i.status || ''}`);
+        const haystack = normalize(`${client?.name || ''} ${label} ${i.status || ''} ${paymentMethodLabel(i.payment_method, i.billing_type)}`);
         const due = String(i.due_date || '');
 
         if (clientFilter && client?.id !== clientFilter) return false;
@@ -236,7 +238,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
 
       <div className="hidden overflow-x-auto md:block">
         <table className="professional-table min-w-[820px] w-full">
-          <thead><tr><th>Cliente</th><th><SortButton label="Vencimento" active={sortKey === 'due_date'} dir={sortDir} onClick={() => toggleSort('due_date')} /></th><th><SortButton label="Valor" active={sortKey === 'amount'} dir={sortDir} onClick={() => toggleSort('amount')} /></th><th>Parcela</th><th>Status</th><th>Cobrar</th></tr></thead>
+          <thead><tr><th>Cliente</th><th><SortButton label="Vencimento" active={sortKey === 'due_date'} dir={sortDir} onClick={() => toggleSort('due_date')} /></th><th><SortButton label="Valor" active={sortKey === 'amount'} dir={sortDir} onClick={() => toggleSort('amount')} /></th><th>Parcela</th><th>Status</th><th>Pagamento / excluir</th><th>Cobrar</th></tr></thead>
           <tbody>{paginatedInstallments.map((item: any) => {
             const client = item.financial_contracts?.clients;
             const label = installmentLabel(item);
@@ -246,6 +248,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
               <td>{client?.id ? <Link href={`/app/clientes/${client.id}`} className="table-primary-link" title={client?.name || ''}>{client?.name || '-'}</Link> : <span className="table-primary-link">{client?.name || '-'}</span>}</td>
               <td>{dateBR(item.due_date)}</td><td className="font-black">{money(item.amount)}</td><td><span className="table-ellipsis max-w-[280px]" title={label}>{label}</span></td>
               <td className="w-[180px]"><select value={item.status || 'pendente'} disabled={statusUpdating === item.id} onChange={(event) => void changeStatus(String(item.id), event.target.value)} className={`finance-status-select ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select></td>
+              <td className="w-[210px]"><FinanceInstallmentActions installmentId={String(item.id)} paymentMethod={item.payment_method} billingType={item.billing_type} compact onUpdated={(paymentMethod) => setRows((current) => current.map((row:any) => String(row.id) === String(item.id) ? {...row,payment_method:paymentMethod} : row))} onDeleted={() => setRows((current) => current.filter((row:any) => String(row.id) !== String(item.id)))} /></td>
               <td className="w-[68px] text-center"><FinanceWhatsappCharge paid={item.status === 'pago'} clientId={client?.id} clientName={client?.name} phone={phone} installmentLabel={label} amount={Number(item.amount || 0)} dueDate={item.due_date} asaasUrl={url} firmName={firmName} firmPhone={firmPhone} userName={userName} templates={templates} /></td>
             </tr>;
           })}</tbody>
@@ -264,8 +267,9 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
               <div className="mobile-record-side"><strong>{money(item.amount)}</strong><span className={`mobile-status-dot ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}>{item.status === 'pago' ? 'Recebido' : item.status === 'atrasado' ? 'Em atraso' : 'Aguardando'}</span><ChevronDown size={15} className="disclosure-chevron" /></div>
             </summary>
             <div className="mobile-record-details">
-              <div className="mobile-detail-grid"><div><span>Vencimento</span><b>{dateBR(item.due_date)}</b></div><div><span>Valor</span><b>{money(item.amount)}</b></div><div className="col-span-2"><span>Descrição</span><b>{label}</b></div></div>
+              <div className="mobile-detail-grid"><div><span>Vencimento</span><b>{dateBR(item.due_date)}</b></div><div><span>Valor</span><b>{money(item.amount)}</b></div><div><span>Pagamento</span><b>{paymentMethodLabel(item.payment_method, item.billing_type)}</b></div><div><span>Descrição</span><b>{label}</b></div></div>
               <label className="mt-3 block"><span className="label mb-1">Status</span><select value={item.status || 'pendente'} disabled={statusUpdating === item.id} onChange={(event) => void changeStatus(String(item.id), event.target.value)} className={`finance-status-select ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select></label>
+              <div className="mt-3"><span className="label mb-1">Forma de pagamento / excluir</span><FinanceInstallmentActions installmentId={String(item.id)} paymentMethod={item.payment_method} billingType={item.billing_type} onUpdated={(paymentMethod) => setRows((current) => current.map((row:any) => String(row.id) === String(item.id) ? {...row,payment_method:paymentMethod} : row))} onDeleted={() => setRows((current) => current.filter((row:any) => String(row.id) !== String(item.id)))} /></div>
               <div className="mobile-record-actions"><FinanceWhatsappCharge paid={item.status === 'pago'} clientId={client?.id} clientName={client?.name} phone={phone} installmentLabel={label} amount={Number(item.amount || 0)} dueDate={item.due_date} asaasUrl={url} firmName={firmName} firmPhone={firmPhone} userName={userName} templates={templates} />{client?.id && <Link href={`/app/clientes/${client.id}`} className="btn btn-secondary">Abrir cliente</Link>}</div>
             </div>
           </details>;

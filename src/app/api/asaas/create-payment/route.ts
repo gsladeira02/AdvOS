@@ -3,6 +3,7 @@ import { safeInternalPath } from '@/lib/security';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getIntegrationConfig } from '@/lib/integrations';
+import { paymentMethodFromBillingType } from '@/lib/finance';
 
 function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
@@ -111,6 +112,7 @@ export async function POST(req: Request) {
       status: mapAsaasStatus(payment.status),
       ...paymentLinks(payment),
       billing_type: payment.billingType || billingType,
+      payment_method: paymentMethodFromBillingType(payment.billingType || billingType),
       raw_payload: payment,
       updated_at: new Date().toISOString(),
     }).eq('id', installment.id).eq('law_firm_id', profile.law_firm_id);

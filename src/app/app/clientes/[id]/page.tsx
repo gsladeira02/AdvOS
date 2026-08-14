@@ -8,6 +8,8 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
 import { dateBR, money } from '@/lib/utils';
 import { ClientFileUploader } from '@/components/ClientFileUploader';
+import { FinanceInstallmentActions } from '@/components/FinanceInstallmentActions';
+import { PAYMENT_METHOD_OPTIONS } from '@/lib/finance';
 
 function docLabel(type?: string) {
   if (type === 'procuracao_hipossuficiencia') return 'Procuração com hipossuficiência';
@@ -73,6 +75,28 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       .eq('law_firm_id', profile.law_firm_id)
       .order('name'),
   ]);
+
+  const clientFinancialContractsRes = await admin
+    .from('financial_contracts')
+    .select('id,description,total_amount,status,created_at')
+    .eq('law_firm_id', profile.law_firm_id)
+    .eq('client_id', id)
+    .order('created_at', { ascending: false });
+  const clientFinancialContracts = clientFinancialContractsRes.data || [];
+  const clientFinancialIds = clientFinancialContracts.map((row: any) => row.id).filter(Boolean);
+  const clientFinanceInstallmentsRes = clientFinancialIds.length
+    ? await admin
+        .from('financial_installments')
+        .select('*')
+        .eq('law_firm_id', profile.law_firm_id)
+        .in('contract_id', clientFinancialIds)
+        .order('due_date', { ascending: false })
+    : { data: [] as any[] };
+  const clientContractById = new Map(clientFinancialContracts.map((row: any) => [String(row.id), row]));
+  const clientFinanceRows = (clientFinanceInstallmentsRes.data || []).map((row: any) => ({
+    ...row,
+    contract: clientContractById.get(String(row.contract_id)) || null,
+  }));
 
   const generated = generatedRes.data || [];
   const financialIds = generated.map((g: any) => g.financial_contract_id).filter(Boolean);
@@ -150,6 +174,42 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       </div>
     </section>
 
+    <section className="card mb-6 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black">Financeiro do cliente</h2>
+          <p className="mt-1 text-sm text-slate-600">Cadastre cobranças diretamente nesta ficha, informe a forma de pagamento e exclua lançamentos antigos sem sair do cliente.</p>
+        </div>
+        <Link href={`/app/financeiro`} className="btn btn-secondary">Abrir Financeiro</Link>
+      </div>
+
+      <form action="/api/finance" method="post" className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-6">
+        <input type="hidden" name="client_id" value={client.id} />
+        <input type="hidden" name="redirect_to" value={`/app/clientes/${client.id}`} />
+        <input className="input compact-input md:col-span-2" name="description" placeholder="Descrição da cobrança" required />
+        <input className="input compact-input" name="amount" type="number" min="0" step="0.01" placeholder="Valor" required />
+        <input className="input compact-input" name="due_date" type="date" />
+        <select className="input compact-input" name="payment_method" defaultValue="">{PAYMENT_METHOD_OPTIONS.map(([value,label]) => <option value={value} key={value || 'none'}>{label}</option>)}</select>
+        <select className="input compact-input" name="status" defaultValue="pendente"><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select>
+        <button className="btn btn-primary md:col-span-2 xl:col-span-6">Cadastrar cobrança para este cliente</button>
+      </form>
+
+      <div className="table-responsive mt-5">
+        <table className="table min-w-[920px]">
+          <thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Forma de pagamento / ações</th></tr></thead>
+          <tbody>{clientFinanceRows.map((item: any) => <tr key={item.id}>
+            <td><b>{item.contract?.description || 'Cobrança'}</b>{item.provider === 'asaas' && <span className="ml-2 badge badge-warn">Asaas</span>}</td>
+            <td>{dateBR(item.due_date)}</td>
+            <td className="font-black">{money(item.amount || 0)}</td>
+            <td><span className={`badge ${item.status === 'pago' ? 'badge-ok' : item.status === 'atrasado' ? 'badge-danger' : 'badge-warn'}`}>{item.status === 'pago' ? 'Pagamento recebido' : item.status === 'atrasado' ? 'Em atraso' : 'Aguardando pagamento'}</span></td>
+            <td><FinanceInstallmentActions installmentId={String(item.id)} paymentMethod={item.payment_method} billingType={item.billing_type} compact /></td>
+          </tr>)}</tbody>
+        </table>
+        {!clientFinanceRows.length && <p className="mt-3 text-sm text-slate-500">Nenhuma cobrança cadastrada para este cliente.</p>}
+      </div>
+      <p className="mt-3 text-xs text-slate-500">Excluir aqui remove a mesma cobrança exibida no Financeiro. Cobranças já criadas no Asaas não são canceladas automaticamente no Asaas.</p>
+    </section>
+
     <section className="card mb-6 p-6">
       <div className="mb-5">
         <h2 className="text-2xl font-black">Gerar documentos e cobrança</h2>
@@ -186,6 +246,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <select className="input mt-1" name="billing_type" defaultValue="BOLETO">
               <option value="BOLETO">Boleto</option>
               <option value="PIX">Pix</option>
+              <option value="CREDIT_CARD">Cartão de crédito</option>
               <option value="UNDEFINED">Cliente escolhe</option>
             </select>
           </div>
