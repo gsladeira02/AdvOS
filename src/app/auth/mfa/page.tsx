@@ -4,6 +4,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { LockKeyhole } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
+const AUTH_TIMEOUT_MS = 12000;
+
+async function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('AUTH_TIMEOUT')), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function verifiedTotpFactors(data: any) {
   const candidates = [
     ...(Array.isArray(data?.totp) ? data.totp : []),
@@ -29,24 +45,29 @@ export default function MfaChallengePage() {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await withTimeout(supabase.auth.getUser());
       if (!active) return;
       if (!user) return window.location.replace('/login');
 
-      const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const assurance = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel());
       if (!active) return;
       if (assurance.data?.currentLevel === 'aal2') return window.location.replace('/app/dashboard');
       if (assurance.data?.nextLevel !== 'aal2') return window.location.replace('/auth/mfa/setup');
 
       const mfa: any = supabase.auth.mfa;
-      const result = await mfa.listFactors();
+      const result = await withTimeout(mfa.listFactors());
       const factors = verifiedTotpFactors(result?.data);
       if (!active) return;
       if (!factors.length) return window.location.replace('/auth/mfa/setup');
       setFactorId(String(factors[0].id));
       setLoading(false);
-    })().catch(() => {
-      if (active) { setLoading(false); setError('Não foi possível carregar o segundo fator.'); }
+    })().catch((err: any) => {
+      if (active) {
+        setLoading(false);
+        setError(String(err?.message || '') === 'AUTH_TIMEOUT'
+          ? 'A verificação demorou mais que o esperado. Tente novamente.'
+          : 'Não foi possível carregar o segundo fator.');
+      }
     });
     return () => { active = false; };
   }, [supabase]);
@@ -57,13 +78,20 @@ export default function MfaChallengePage() {
     if (!factorId || clean.length !== 6) return;
     setLoading(true);
     setError('');
-    const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId, code: clean });
-    setLoading(false);
-    if (verifyError) {
-      setError('Código inválido ou expirado. Tente novamente.');
-      return;
+    try {
+      const { error: verifyError } = await withTimeout(supabase.auth.mfa.challengeAndVerify({ factorId, code: clean }));
+      if (verifyError) {
+        setError('Código inválido ou expirado. Tente novamente.');
+        return;
+      }
+      window.location.replace('/app/dashboard');
+    } catch (err: any) {
+      setError(String(err?.message || '') === 'AUTH_TIMEOUT'
+        ? 'A validação demorou mais que o esperado. Tente novamente.'
+        : 'Não foi possível validar o código. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
-    window.location.replace('/app/dashboard');
   }
 
   async function signOut() {

@@ -5,6 +5,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 
+const AUTH_TIMEOUT_MS = 12000;
+
+async function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('AUTH_TIMEOUT')), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export default function MfaSetupPage() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [loading, setLoading] = useState(true);
@@ -18,13 +34,13 @@ export default function MfaSetupPage() {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await withTimeout(supabase.auth.getUser());
       if (!active) return;
       if (!user) {
         window.location.replace('/login');
         return;
       }
-      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const { data } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel());
       if (!active) return;
       if (data?.currentLevel === 'aal2') {
         window.location.replace('/app/dashboard');
@@ -35,7 +51,13 @@ export default function MfaSetupPage() {
         return;
       }
       setLoading(false);
-    })().catch(() => setLoading(false));
+    })().catch((err: any) => {
+      if (!active) return;
+      setLoading(false);
+      setError(String(err?.message || '') === 'AUTH_TIMEOUT'
+        ? 'A verificação demorou mais que o esperado. Tente novamente.'
+        : 'Não foi possível verificar sua conta. Tente novamente.');
+    });
     return () => { active = false; };
   }, [supabase]);
 
@@ -47,7 +69,7 @@ export default function MfaSetupPage() {
     // Removemos apenas esses rascunhos antes de criar um novo QR Code.
     try {
       const mfa: any = supabase.auth.mfa;
-      const listed = await mfa.listFactors();
+      const listed = await withTimeout(mfa.listFactors());
       const candidates = [
         ...(Array.isArray(listed?.data?.totp) ? listed.data.totp : []),
         ...(Array.isArray(listed?.data?.all) ? listed.data.all : []),
@@ -64,18 +86,25 @@ export default function MfaSetupPage() {
       }
     } catch {}
 
-    const { data, error: enrollError } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName: 'AdvOS',
-    });
-    setEnrolling(false);
-    if (enrollError || !data?.id || !data?.totp) {
-      setError('Não foi possível iniciar a autenticação em dois fatores.');
-      return;
+    try {
+      const { data, error: enrollError } = await withTimeout(supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'AdvOS',
+      }));
+      if (enrollError || !data?.id || !data?.totp) {
+        setError('Não foi possível iniciar a autenticação em dois fatores.');
+        return;
+      }
+      setFactorId(data.id);
+      setQrCode(data.totp.qr_code || '');
+      setSecret(data.totp.secret || '');
+    } catch (err: any) {
+      setError(String(err?.message || '') === 'AUTH_TIMEOUT'
+        ? 'A configuração demorou mais que o esperado. Tente novamente.'
+        : 'Não foi possível iniciar a autenticação em dois fatores.');
+    } finally {
+      setEnrolling(false);
     }
-    setFactorId(data.id);
-    setQrCode(data.totp.qr_code || '');
-    setSecret(data.totp.secret || '');
   }
 
   async function verify() {
@@ -86,13 +115,20 @@ export default function MfaSetupPage() {
     }
     setError('');
     setEnrolling(true);
-    const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({ factorId, code: clean });
-    setEnrolling(false);
-    if (verifyError) {
-      setError('Código inválido ou expirado. Confira o autenticador e tente novamente.');
-      return;
+    try {
+      const { error: verifyError } = await withTimeout(supabase.auth.mfa.challengeAndVerify({ factorId, code: clean }));
+      if (verifyError) {
+        setError('Código inválido ou expirado. Confira o autenticador e tente novamente.');
+        return;
+      }
+      window.location.replace('/app/dashboard');
+    } catch (err: any) {
+      setError(String(err?.message || '') === 'AUTH_TIMEOUT'
+        ? 'A validação demorou mais que o esperado. Tente novamente.'
+        : 'Não foi possível validar o código. Tente novamente.');
+    } finally {
+      setEnrolling(false);
     }
-    window.location.replace('/app/dashboard');
   }
 
   async function signOut() {
