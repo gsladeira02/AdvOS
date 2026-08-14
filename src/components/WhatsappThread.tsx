@@ -29,6 +29,7 @@ import { renderMessageTemplate } from '@/lib/messageTemplates';
 import { WhatsappSpecialComposer, type WhatsappSpecialKind } from '@/components/WhatsappSpecialComposer';
 import { WhatsappCallPanel } from '@/components/WhatsappCallPanel';
 import { WhatsappConversationControls } from '@/components/WhatsappConversationControls';
+import { WhatsappLocationCard } from '@/components/WhatsappLocationCard';
 
 export type WhatsappTemplateOption = {
   id: string;
@@ -962,20 +963,16 @@ export function WhatsappThread({
 
     if (messageType === 'location') {
       const location = structured?.kind === 'location' ? structured : (message?.raw_payload?.location || {});
-      const latitude = Number(location?.latitude);
-      const longitude = Number(location?.longitude);
-      const validCoords = Number.isFinite(latitude) && Number.isFinite(longitude);
-      const mapHref = validCoords ? `https://www.google.com/maps?q=${latitude},${longitude}` : '';
+      const coordinateFallback = String(message?.body || '').match(/(-?\d{1,2}(?:\.\d+)?)\s*[,;]\s*(-?\d{1,3}(?:\.\d+)?)/);
+      const latitude = Number(location?.latitude ?? coordinateFallback?.[1]);
+      const longitude = Number(location?.longitude ?? coordinateFallback?.[2]);
       return (
-        <div className="min-w-[220px] space-y-2">
-          <div className="rounded-xl bg-emerald-50 p-3">
-            <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">📍 Localização</div>
-            <div className="mt-1 text-xs font-black text-slate-900">{location?.name || 'Local compartilhado'}</div>
-            {location?.address && <div className="mt-0.5 text-[10px] font-semibold text-slate-600">{location.address}</div>}
-            {validCoords && <div className="mt-1 text-[9px] font-mono text-slate-500">{latitude.toFixed(6)}, {longitude.toFixed(6)}</div>}
-          </div>
-          {mapHref && <a href={mapHref} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black text-[#075e54] hover:underline">Abrir no mapa</a>}
-        </div>
+        <WhatsappLocationCard
+          latitude={latitude}
+          longitude={longitude}
+          name={location?.name || null}
+          address={location?.address || null}
+        />
       );
     }
 

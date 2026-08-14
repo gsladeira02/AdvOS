@@ -9,7 +9,6 @@ import { buildClientContacts, clientIdFromVirtualConversationId, enrichMessagesW
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { DEFAULT_MESSAGE_TEMPLATES } from '@/lib/messageTemplates';
 import { loadWhatsappSettings } from '@/lib/whatsappSettings';
-import { loadWhatsappDashboard } from '@/lib/whatsappDashboard';
 
 
 async function ensureMessageTemplates(admin: any, lawFirmId: string) {
@@ -87,10 +86,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       .order('full_name'),
   ]);
 
-  const [whatsappSettings, initialDashboard] = await Promise.all([
-    loadWhatsappSettings(admin, profile.law_firm_id),
-    loadWhatsappDashboard(admin, profile.law_firm_id),
-  ]);
+  const whatsappSettings = await loadWhatsappSettings(admin, profile.law_firm_id);
 
   // Conversas reais ficam separadas dos contatos e são derivadas das
   // mensagens visíveis. Assim, uma mensagem recebida sempre promove a conversa.
@@ -104,7 +100,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
       || (contacts || []).find((item: any) => item.id === selectedId || item.conversation_id === selectedId)
       || null)
     : null;
-  const requestedAllowedView = requestedView === 'dashboard' || requestedView === 'financeiro_juridico' || requestedView === 'atendimento' || requestedView === 'encerrados' || (requestedView === 'configuracoes' && canConfigure)
+  const requestedAllowedView = requestedView === 'financeiro_juridico' || requestedView === 'atendimento' || requestedView === 'encerrados' || (requestedView === 'configuracoes' && canConfigure)
     ? requestedView
     : '';
   const initialView = requestedAllowedView
@@ -167,7 +163,6 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialTags={whatsappSettings.tags || []}
         initialLeadStages={whatsappSettings.stages || []}
         initialPreferences={whatsappSettings.preferences || {}}
-        initialDashboard={initialDashboard}
         initialView={initialView as any}
         initialSettingsSection={initialSettingsSection}
         canConfigure={canConfigure}

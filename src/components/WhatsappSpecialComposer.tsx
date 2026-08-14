@@ -27,6 +27,12 @@ export function WhatsappSpecialComposer({ kind, conversation, onClose, onSent }:
 
   const title = kind === 'location' ? 'Enviar localização' : kind === 'poll' ? 'Criar enquete' : 'Criar evento';
   const Icon = kind === 'location' ? MapPin : kind === 'poll' ? Vote : CalendarDays;
+  const latitudeNumber = Number(latitude);
+  const longitudeNumber = Number(longitude);
+  const hasValidLocation = Number.isFinite(latitudeNumber) && Number.isFinite(longitudeNumber) && latitudeNumber >= -90 && latitudeNumber <= 90 && longitudeNumber >= -180 && longitudeNumber <= 180;
+  const locationPreviewUrl = hasValidLocation
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent([longitudeNumber - 0.008, latitudeNumber - 0.008, longitudeNumber + 0.008, latitudeNumber + 0.008].join(','))}&layer=mapnik&marker=${encodeURIComponent(`${latitudeNumber},${longitudeNumber}`)}`
+    : '';
 
   async function useCurrentLocation() {
     setError('');
@@ -123,9 +129,15 @@ export function WhatsappSpecialComposer({ kind, conversation, onClose, onSent }:
           {kind === 'location' && <>
             <button type="button" onClick={useCurrentLocation} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#e7f7ef] px-3 py-2.5 text-xs font-black text-[#075e54]"><MapPin size={15}/> Usar minha localização atual</button>
             <div className="grid grid-cols-2 gap-2"><input className="input" value={latitude} onChange={(e)=>setLatitude(e.target.value)} placeholder="Latitude" inputMode="decimal"/><input className="input" value={longitude} onChange={(e)=>setLongitude(e.target.value)} placeholder="Longitude" inputMode="decimal"/></div>
+            {hasValidLocation && (
+              <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-slate-50">
+                <iframe title="Prévia da localização" src={locationPreviewUrl} className="h-[180px] w-full border-0" loading="lazy" referrerPolicy="no-referrer" />
+                <div className="px-3 py-2 text-[9px] font-bold text-slate-600">Prévia da localização que será enviada.</div>
+              </div>
+            )}
             <input className="input" value={locationName} onChange={(e)=>setLocationName(e.target.value)} placeholder="Nome do local (opcional)"/>
             <input className="input" value={address} onChange={(e)=>setAddress(e.target.value)} placeholder="Endereço (opcional)"/>
-            <p className="text-[10px] font-semibold leading-relaxed text-slate-500">O cliente receberá um cartão de localização nativo do WhatsApp.</p>
+            <p className="text-[10px] font-semibold leading-relaxed text-slate-500">O cliente receberá uma localização nativa do WhatsApp. O AdvOS também guarda as coordenadas no histórico para você abrir o mapa depois.</p>
           </>}
 
           {kind === 'poll' && <>

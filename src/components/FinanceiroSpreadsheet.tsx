@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FinanceWhatsappCharge, type ChargeTemplateOption } from '@/components/FinanceWhatsappCharge';
 import { dateBR, money } from '@/lib/utils';
@@ -34,18 +34,6 @@ function toTime(date?: string | null) {
   if (!date) return 0;
   const time = new Date(`${date}T00:00:00`).getTime();
   return Number.isFinite(time) ? time : 0;
-}
-
-function statusBadge(status: string) {
-  if (status === 'pago') return 'badge-ok';
-  if (status === 'atrasado') return 'badge-danger';
-  return 'badge-warn';
-}
-
-function statusLabel(status: string) {
-  if (status === 'pago') return 'Pago';
-  if (status === 'atrasado') return 'Atrasado';
-  return 'Pendente';
 }
 
 function chargeUrl(installment: any) {
@@ -87,6 +75,9 @@ function SortButton(props: {
 }
 
 export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPhone, userName, templates }: FinanceiroSpreadsheetProps) {
+  const [rows, setRows] = useState<any[]>(installments || []);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState('');
   const [clientFilter, setClientFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('atrasado');
   const [dateFrom, setDateFrom] = useState('');
@@ -95,8 +86,38 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
   const [sortKey, setSortKey] = useState<SortKey>('due_date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
+  useEffect(() => {
+    setRows(installments || []);
+  }, [installments]);
+
+  async function changeStatus(installmentId: string, nextStatus: string) {
+    if (!installmentId || statusUpdating) return;
+    const previous = rows.find((item: any) => String(item.id) === String(installmentId));
+    if (!previous || previous.status === nextStatus) return;
+
+    setStatusUpdating(installmentId);
+    setStatusError('');
+    setRows((current) => current.map((item: any) => String(item.id) === String(installmentId) ? { ...item, status: nextStatus } : item));
+
+    try {
+      const response = await fetch('/api/finance/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ installmentId, status: nextStatus }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível alterar o status.');
+      setRows((current) => current.map((item: any) => String(item.id) === String(installmentId) ? { ...item, ...(result.installment || {}) } : item));
+    } catch (error: any) {
+      setRows((current) => current.map((item: any) => String(item.id) === String(installmentId) ? previous : item));
+      setStatusError(error?.message || 'Não foi possível alterar o status da cobrança.');
+    } finally {
+      setStatusUpdating(null);
+    }
+  }
+
   const filteredInstallments = useMemo(() => {
-    return [...installments]
+    return [...rows]
       .filter((i: any) => {
         const client = i.financial_contracts?.clients;
         const label = installmentLabel(i);
@@ -118,7 +139,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
         if (sortKey === 'due_date') result = toTime(a.due_date) - toTime(b.due_date);
         return sortDir === 'asc' ? result : -result;
       });
-  }, [installments, clientFilter, statusFilter, dateFrom, dateTo, searchText, sortKey, sortDir]);
+  }, [rows, clientFilter, statusFilter, dateFrom, dateTo, searchText, sortKey, sortDir]);
 
   const filteredTotal = useMemo(() => {
     return filteredInstallments.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
@@ -163,10 +184,10 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
           </select>
 
           <select className="input !rounded-lg !px-3 !py-2 text-xs" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} title="Filtrar por status">
-            <option value="atrasado">Atrasadas</option>
+            <option value="atrasado">Em atraso</option>
             <option value="em_aberto">Em aberto</option>
-            <option value="pendente">Pendentes</option>
-            <option value="pago">Pagas</option>
+            <option value="pendente">Aguardando pagamento</option>
+            <option value="pago">Pagamento recebido</option>
             <option value="todos">Todas</option>
           </select>
 
@@ -181,6 +202,8 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
           <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={clearFilters}>Limpar</button>
         </div>
       </div>
+
+      {statusError && <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-[11px] font-bold text-red-700">{statusError}</div>}
 
       <div className="overflow-x-auto">
         <table className="min-w-[860px] w-full border-collapse bg-white text-xs">
@@ -225,7 +248,25 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
                   <td className="px-3 py-2">
                     <div className="max-w-[300px] truncate font-semibold text-slate-800" title={label}>{label}</div>
                   </td>
-                  <td className="px-3 py-2"><span className={`badge !px-2 !py-1 !text-[10px] ${statusBadge(item.status)}`}>{statusLabel(item.status)}</span></td>
+                  <td className="min-w-[190px] px-3 py-2">
+                    <select
+                      value={item.status || 'pendente'}
+                      disabled={statusUpdating === item.id}
+                      onChange={(event) => void changeStatus(String(item.id), event.target.value)}
+                      className={`w-full rounded-lg border px-2 py-1.5 text-[10px] font-black outline-none transition disabled:cursor-wait disabled:opacity-60 ${
+                        item.status === 'pago'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : item.status === 'atrasado'
+                            ? 'border-red-200 bg-red-50 text-red-800'
+                            : 'border-amber-200 bg-amber-50 text-amber-800'
+                      }`}
+                      aria-label={`Alterar status de ${client?.name || 'cobrança'}`}
+                    >
+                      <option value="pendente">Aguardando pagamento</option>
+                      <option value="atrasado">Em atraso</option>
+                      <option value="pago">Pagamento recebido</option>
+                    </select>
+                  </td>
                   <td className="w-[88px] px-3 py-2 text-center">
                     <FinanceWhatsappCharge
                       paid={item.status === 'pago'}

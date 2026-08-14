@@ -325,7 +325,8 @@ export async function POST(req: Request) {
         const now = new Date().toISOString();
         const updates: any = {
           status: status.status || 'status',
-          raw_payload: status,
+          // Não sobrescrever raw_payload: ele contém o conteúdo original da mensagem.
+          // Em localizações, por exemplo, latitude/longitude ficam ali para o histórico do AdvOS.
           updated_at: now,
         };
         if (status.status === 'delivered') updates.delivered_at = new Date(Number(status.timestamp || Date.now() / 1000) * 1000).toISOString();

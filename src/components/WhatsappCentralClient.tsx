@@ -1,10 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, BarChart3, Check, CheckCheck, Filter, MessageCircle, RefreshCw, Search, Settings2, UserCheck, Users, X } from 'lucide-react';
+import { Archive, Check, CheckCheck, Filter, MessageCircle, RefreshCw, Search, Settings2, UserCheck, Users, X } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
-import { WhatsappDashboard } from '@/components/WhatsappDashboard';
 import { WhatsappSettingsCenter } from '@/components/WhatsappSettingsCenter';
 
 function titleFor(conversation: any) {
@@ -102,7 +101,7 @@ function leadStageLabel(value: string | null | undefined, stages: any[] = []) {
 
 type WhatsappTab = 'conversas' | 'leads' | 'contatos';
 type WhatsappDepartment = 'atendimento' | 'financeiro_juridico';
-type WhatsappWorkspaceView = 'dashboard' | 'atendimento' | 'financeiro_juridico' | 'encerrados' | 'configuracoes';
+type WhatsappWorkspaceView = 'atendimento' | 'financeiro_juridico' | 'encerrados' | 'configuracoes';
 
 function dedupeById(items: any[]) {
   const seen = new Set<string>();
@@ -124,7 +123,6 @@ export function WhatsappCentralClient({
   initialTags = [],
   initialLeadStages = [],
   initialPreferences = {},
-  initialDashboard = null,
   initialView = 'atendimento',
   initialSettingsSection = 'tags',
   canConfigure = false,
@@ -141,7 +139,6 @@ export function WhatsappCentralClient({
   initialTags?: any[];
   initialLeadStages?: any[];
   initialPreferences?: any;
-  initialDashboard?: any;
   initialView?: WhatsappWorkspaceView;
   initialSettingsSection?: string;
   canConfigure?: boolean;
@@ -637,16 +634,13 @@ export function WhatsappCentralClient({
   return (
     <div className="space-y-3">
       <nav className="flex flex-wrap gap-2 rounded-2xl border border-[#e6dccb] bg-white p-2 shadow-sm" aria-label="Áreas do WhatsApp">
-        <button type="button" onClick={() => switchWorkspace('dashboard')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'dashboard' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><BarChart3 size={14}/>Dashboard</button>
         <button type="button" onClick={() => switchWorkspace('atendimento')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'atendimento' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><MessageCircle size={14}/>Atendimento</button>
         <button type="button" onClick={() => switchWorkspace('financeiro_juridico')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'financeiro_juridico' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Users size={14}/>Financeiro/Jurídico</button>
         <button type="button" onClick={() => switchWorkspace('encerrados')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'encerrados' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Archive size={14}/>Encerrados{closedCount > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${workspaceView === 'encerrados' ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{closedCount}</span>}</button>
         {canConfigure && <button type="button" onClick={() => switchWorkspace('configuracoes')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'configuracoes' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Settings2 size={14}/>Configurações</button>}
       </nav>
 
-      {workspaceView === 'dashboard' ? (
-        <WhatsappDashboard initialDashboard={initialDashboard} leadPlural={leadPlural} />
-      ) : workspaceView === 'configuracoes' && canConfigure ? (
+      {workspaceView === 'configuracoes' && canConfigure ? (
         <WhatsappSettingsCenter
           tags={tagCatalog}
           stages={leadStages}

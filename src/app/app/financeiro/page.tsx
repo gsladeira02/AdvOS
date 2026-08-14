@@ -51,7 +51,7 @@ export default async function Financeiro() {
     <div>
       <PageHeader
         title="Financeiro"
-        subtitle={`Pendente: ${money(total)} • Atrasado: ${money(overdueTotal)}`}
+        subtitle={`Aguardando pagamento: ${money(total - overdueTotal)} • Em atraso: ${money(overdueTotal)}`}
       />
 
       <FinanceiroSpreadsheet
@@ -77,9 +77,9 @@ export default async function Financeiro() {
           <input className="input" name="amount" type="number" step="0.01" placeholder="Valor" required />
           <input className="input" name="due_date" type="date" />
           <select className="input" name="status">
-            <option>pendente</option>
-            <option>pago</option>
-            <option>atrasado</option>
+            <option value="pendente">Aguardando pagamento</option>
+            <option value="atrasado">Em atraso</option>
+            <option value="pago">Pagamento recebido</option>
           </select>
           <button className="btn btn-primary md:col-span-2 xl:col-span-5">Cadastrar cobrança</button>
         </form>

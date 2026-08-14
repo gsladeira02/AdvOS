@@ -1,17 +1,28 @@
-# AdvOS v9.39
+# AdvOS v9.49
 
-Versão de hardening de segurança sobre a v9.38.
+Sistema interno de gestão do escritório com clientes, processos, prazos, tarefas, documentos, contratos, serviços, financeiro e central de WhatsApp.
 
-## Destaques
-- Login interno por e-mail e senha, com usuários cadastrados/ativos, sessão controlada e trilha de segurança.
-- AAL2 exigido no servidor e nas RLS expostas ao navegador.
-- Sessão local com encerramento por inatividade e tempo máximo.
-- CSP com nonce e headers de segurança reforçados.
-- Rate limiting persistente para operações sensíveis.
-- Uploads e mídias validados por extensão + assinatura real do arquivo.
-- Downloads de mídia da Meta limitados a origens HTTPS controladas pela Meta.
-- Eventos de segurança separados do histórico funcional.
-- Administração para ativar/desativar usuários.
-- Menos detalhes internos expostos em respostas de erro.
+## Autenticação
+- Login normal por e-mail e senha.
+- Usuário precisa estar cadastrado e ativo no AdvOS.
+- Não há MFA/TOTP obrigatório.
+- Sessão, auditoria, RLS, rate limiting e demais hardenings de segurança permanecem ativos.
 
-Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indicada.
+## Painel geral
+O painel principal em `/app/dashboard` consolida indicadores do escritório, incluindo leads, serviços, financeiro, processos, prazos e tarefas. O Dashboard não fica mais dentro do WhatsApp.
+
+## Financeiro
+Os status apresentados ao usuário são:
+- Aguardando pagamento (`pendente`)
+- Em atraso (`atrasado`)
+- Pagamento recebido (`pago`)
+
+O status pode ser alterado diretamente na tabela financeira.
+
+## WhatsApp
+A central mantém Atendimento, Financeiro/Jurídico, Encerrados e Configurações. Leads, tags, responsáveis, notas internas, histórico operacional e vínculo de mídia ao cliente continuam disponíveis.
+
+Localizações são enviadas pela mensagem nativa de localização da WhatsApp Cloud API e ficam visualizáveis no histórico do AdvOS. O mapa interno usa somente `www.openstreetmap.org` como origem de frame permitida pela CSP.
+
+## Migrações
+A v9.49 não adiciona migration de banco. Para instalações vindas de versões antigas, mantenha as migrations anteriores aplicadas, inclusive a v9.48 quando o MFA obrigatório tiver sido removido.
