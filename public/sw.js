@@ -1,4 +1,4 @@
-const CACHE_NAME = 'advos-pwa-v9-64-static-only';
+const CACHE_NAME = 'advos-pwa-v9-65-static-only';
 const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.json',

@@ -102,9 +102,11 @@ export async function POST(req: Request) {
     assertSafeUploadedFile(filename, mimeType, bytes);
 
     const integration = await getIntegrationConfig(lawFirmId, 'openai');
-    const envFallback = !integration.row && Boolean(process.env.OPENAI_API_KEY);
-    if (!integration.token || (!integration.configured && !envFallback)) {
-      return NextResponse.json({ ok: false, error: 'Configure e ative a transcrição em Integrações antes de usar este recurso.' }, { status: 409 });
+    if (!integration.token) {
+      return NextResponse.json({ ok: false, error: 'Nenhuma OpenAI API Key foi encontrada. Informe a chave em Integrações → Transcrição de áudios ou configure OPENAI_API_KEY na Vercel.' }, { status: 409 });
+    }
+    if (!integration.enabled) {
+      return NextResponse.json({ ok: false, error: 'A transcrição está desativada. Vá em Integrações → Transcrição de áudios, escolha Ativada e salve.' }, { status: 409 });
     }
 
     const configuredModel = str(integration.row?.raw_settings?.transcription_model);
@@ -123,7 +125,8 @@ export async function POST(req: Request) {
     const requestBody = new FormData();
     requestBody.set('model', model);
     requestBody.set('file', new Blob([bytes], { type: mimeType }), filename);
-    requestBody.set('language', 'pt');
+    if (model === 'gpt-transcribe') requestBody.append('languages[]', 'pt');
+    else requestBody.set('language', 'pt');
     requestBody.set('response_format', 'json');
     requestBody.set('prompt', 'Mensagem de voz de atendimento jurídico em português do Brasil. Transcreva fielmente, preservando nomes próprios, datas, valores, números de processos, CPF, CNPJ, telefones e termos jurídicos quando forem falados.');
 

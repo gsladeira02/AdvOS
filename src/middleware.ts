@@ -9,6 +9,7 @@ function isWebhook(pathname: string) {
 function maxBodyBytes(pathname: string) {
   if (pathname === '/api/client-files/upload') return 251 * 1024 * 1024;
   if (pathname === '/api/whatsapp/send-media') return 18 * 1024 * 1024;
+  if (pathname === '/api/whatsapp/messages/transcribe') return 27 * 1024 * 1024;
   if (pathname === '/api/asaas/import') return 12 * 1024 * 1024;
   return 2 * 1024 * 1024;
 }

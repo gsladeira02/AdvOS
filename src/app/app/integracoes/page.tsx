@@ -24,6 +24,22 @@ function statusMessage(kind: 'asaas' | 'whatsapp', code?: string) {
   return null;
 }
 
+function openaiStatusMessage(code?: string) {
+  if (!code) return null;
+  if (code === 'salvo') return { cls: 'border-green-200 bg-green-50 text-green-800', text: 'Configuração de transcrição salva. Clique em “Testar transcrição” para validar a chave antes de usar no WhatsApp.' };
+  if (code === 'testado') return { cls: 'border-green-200 bg-green-50 text-green-800', text: 'Transcrição testada com sucesso. O recurso está pronto para uso no WhatsApp.' };
+  if (code === 'sem_chave') return { cls: 'border-amber-200 bg-amber-50 text-amber-800', text: 'Nenhuma OpenAI API Key foi encontrada. Informe uma chave abaixo ou configure OPENAI_API_KEY na Vercel.' };
+  if (code === 'desativada') return { cls: 'border-amber-200 bg-amber-50 text-amber-800', text: 'A chave existe, mas a transcrição está desativada. Selecione “Ativada”, salve e teste novamente.' };
+  if (code === 'chave_invalida') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'A OpenAI recusou a API Key. Gere/confira a chave usada para a API e salve novamente.' };
+  if (code === 'sem_permissao') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'A chave foi reconhecida, mas o projeto não tem permissão para o modelo selecionado. Troque o modelo ou ajuste o projeto da API.' };
+  if (code === 'modelo_indisponivel') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'O modelo selecionado não está disponível para esta conta. Escolha outro modelo de transcrição e teste novamente.' };
+  if (code === 'sem_creditos') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'A conta da API está sem créditos/cota para transcrição. Verifique o faturamento da API da OpenAI.' };
+  if (code === 'limite') return { cls: 'border-amber-200 bg-amber-50 text-amber-800', text: 'A API limitou temporariamente as requisições. Tente novamente depois.' };
+  if (code === 'timeout') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'O teste excedeu o tempo de resposta. Tente novamente.' };
+  if (code === 'erro_teste') return { cls: 'border-red-200 bg-red-50 text-red-800', text: 'Não foi possível concluir o teste. Veja “Último retorno” no cartão de transcrição e tente novamente.' };
+  return null;
+}
+
 export default async function Integracoes({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const query = await searchParams;
   const { profile } = await getCurrentAdminProfile();
@@ -41,9 +57,19 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
   const zapStatus = integrationStatus(zapsign);
   const asaasStatus = integrationStatus(asaas);
   const whatsappStatus = integrationStatus(whatsapp);
-  const openaiStatus = integrationStatus(openai);
+  const openaiHasEnvKey = Boolean(process.env.OPENAI_API_KEY);
+  const openaiEffectiveEnabled = openai ? Boolean(openai.enabled) : openaiHasEnvKey;
+  const openaiEffectiveHasKey = Boolean(openai?.token_last4 || openaiHasEnvKey);
+  const openaiStatus = !openaiEffectiveEnabled
+    ? { label: 'desativada', cls: 'badge-warn' }
+    : openai?.status === 'testado'
+      ? { label: 'ativa', cls: 'badge-ok' }
+      : openaiEffectiveHasKey
+        ? { label: openai?.token_last4 ? 'configurada' : 'via Vercel', cls: 'badge-info' }
+        : { label: 'sem chave', cls: 'badge-danger' };
   const asaasMsg = statusMessage('asaas', query?.asaas);
   const whatsappMsg = statusMessage('whatsapp', query?.whatsapp);
+  const openaiMsg = openaiStatusMessage(query?.openai);
   const whatsappRaw = whatsapp?.raw_settings || {};
   const openaiRaw = openai?.raw_settings || {};
 
@@ -53,6 +79,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
       {asaasMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${asaasMsg.cls}`}>{asaasMsg.text}</section>}
       {whatsappMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${whatsappMsg.cls}`}>{whatsappMsg.text}</section>}
+      {openaiMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${openaiMsg.cls}`}>{openaiMsg.text}</section>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
@@ -301,7 +328,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             <input type="hidden" name="environment" value="producao" />
             <div>
               <label className="label">Status</label>
-              <select name="enabled" defaultValue={openai?.enabled ? 'true' : 'false'} className="input mt-1">
+              <select name="enabled" defaultValue={openai ? (openai.enabled ? 'true' : 'false') : 'true'} className="input mt-1">
                 <option value="false">Desativada</option>
                 <option value="true">Ativada</option>
               </select>
@@ -328,11 +355,20 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
             </div>
 
             <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs leading-relaxed text-slate-600">
-              A transcrição é feita somente quando alguém clica em <b>Transcrever áudio</b>. O resultado fica salvo na mensagem para não processar o mesmo áudio novamente.
+              A transcrição é feita somente quando alguém clica em <b>Transcrever áudio</b>. O resultado fica salvo na mensagem para não processar o mesmo áudio novamente. Ao informar uma nova chave, o AdvOS ativa a transcrição automaticamente.
             </div>
+
+            {openai?.notes && <p className="break-safe rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {openai.notes}</p>}
 
             <button className="btn btn-primary">Salvar transcrição</button>
           </form>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <form action="/api/openai/test" method="post"><button className="btn btn-secondary">Testar transcrição</button></form>
+            <span className="text-[11px] leading-relaxed text-slate-500">
+              {openai?.token_last4 ? `Chave salva terminando em ${openai.token_last4}.` : openaiHasEnvKey ? 'Usando OPENAI_API_KEY configurada na Vercel.' : 'Nenhuma chave detectada.'}
+            </span>
+          </div>
         </section>
       </div>
     </div>

@@ -37,3 +37,7 @@ Mensagens de voz agora possuem a ação **Transcrever áudio**. O texto fica sal
 ## v9.64 — Hotfix de transcrição
 
 Corrige falhas genéricas de transcrição, melhora a preparação de OGG/Opus para WAV 16 kHz e passa a diferenciar erros de migration, API Key, permissão, cota/faturamento, formato e timeout. Execute `supabase/v9_64_transcricao_audio_hotfix.sql` mesmo que a migration v9.63 já tenha sido aplicada.
+
+## V9.65 — Transcrição de áudio
+
+Em **Integrações → Transcrição de áudios**, deixe o status como **Ativada**, salve a OpenAI API Key (ou configure `OPENAI_API_KEY` na Vercel) e use **Testar transcrição**. O teste precisa retornar sucesso antes do uso no WhatsApp. Não há SQL novo na v9.65; mantenha aplicada a migration `supabase/v9_64_transcricao_audio_hotfix.sql`.

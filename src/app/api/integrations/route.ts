@@ -24,7 +24,10 @@ export async function POST(req: Request) {
   const requestedBaseUrl = str(f.get('api_base_url')) || defaultBaseUrl(provider, environment);
   const apiBaseUrl = safeIntegrationBaseUrl(provider, environment, requestedBaseUrl);
   const submittedWebhookSecret = str(f.get('webhook_secret'));
-  const enabled = str(f.get('enabled')) === 'true';
+  const requestedEnabled = str(f.get('enabled')) === 'true';
+  // Ao informar uma nova chave da OpenAI, ativamos a transcrição automaticamente.
+  // Para desativar depois, basta salvar novamente sem informar chave e escolher Desativada.
+  const enabled = provider === 'openai' && apiToken ? true : requestedEnabled;
   const admin = createAdminSupabase();
   try {
     await enforceRateLimit(admin, `user:${session.user.id}:integration-settings`, 20, 3600);
@@ -96,5 +99,6 @@ export async function POST(req: Request) {
   });
 
   await recordSecurityEvent({ lawFirmId: profile.law_firm_id, authUserId: session.user.id, eventType: 'integration_updated', entity: 'integration_settings', req, metadata: { provider, enabled, environment } });
-  return NextResponse.redirect(new URL('/app/integracoes', req.url), 303);
+  const destination = provider === 'openai' ? '/app/integracoes?openai=salvo' : '/app/integracoes';
+  return NextResponse.redirect(new URL(destination, req.url), 303);
 }

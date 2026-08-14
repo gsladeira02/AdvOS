@@ -81,16 +81,21 @@ export async function getIntegrationConfig(lawFirmId: string, provider: Provider
         ? process.env.OPENAI_API_BASE_URL
         : process.env.WHATSAPP_API_BASE_URL;
   const token = data?.api_token || envToken || '';
-  const environment = data?.environment || 'sandbox';
+  const environment = data?.environment || (provider === 'openai' ? 'producao' : 'sandbox');
   const baseUrl = safeIntegrationBaseUrl(provider, environment, data?.api_base_url || envBase || null);
+  // Se não existe registro para OpenAI, uma OPENAI_API_KEY válida no ambiente já é
+  // suficiente para disponibilizar a transcrição. Se existe registro, respeitamos
+  // explicitamente o status habilitado/desabilitado salvo pelo escritório.
+  const enabled = data ? Boolean(data.enabled) : provider === 'openai' ? Boolean(envToken) : false;
 
   return {
     row: data as IntegrationRow | null,
-    enabled: Boolean(data?.enabled),
-    configured: Boolean(data?.enabled && token),
+    enabled,
+    configured: Boolean(enabled && token),
     token,
     baseUrl,
     environment,
+    tokenSource: data?.api_token ? 'database' : envToken ? 'environment' : 'none',
     defaultBillingType: data?.default_billing_type || 'BOLETO',
     webhookSecret: data?.webhook_secret || '',
   };
