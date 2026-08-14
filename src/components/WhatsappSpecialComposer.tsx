@@ -28,19 +28,54 @@ export function WhatsappSpecialComposer({ kind, conversation, onClose, onSent }:
   const title = kind === 'location' ? 'Enviar localização' : kind === 'poll' ? 'Criar enquete' : 'Criar evento';
   const Icon = kind === 'location' ? MapPin : kind === 'poll' ? Vote : CalendarDays;
 
-  function useCurrentLocation() {
+  async function useCurrentLocation() {
     setError('');
+
+    if (!window.isSecureContext) {
+      setError('A localização só pode ser solicitada em uma conexão segura (HTTPS).');
+      return;
+    }
+
     if (!navigator.geolocation) {
       setError('Este navegador não oferece geolocalização.');
       return;
     }
+
+    try {
+      if (navigator.permissions?.query) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        if (permission.state === 'denied') {
+          setError('A localização está bloqueada para o AdvOS neste navegador. Abra as permissões do site, altere Localização para Permitir e tente novamente.');
+          return;
+        }
+      }
+    } catch {
+      // Alguns navegadores não expõem o estado de geolocalização pela Permissions API.
+      // Nesses casos, a solicitação abaixo continua sendo a fonte de verdade.
+    }
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLatitude(position.coords.latitude.toFixed(6));
         setLongitude(position.coords.longitude.toFixed(6));
+        setError('');
       },
-      () => setError('Não foi possível obter a localização. Verifique a permissão do navegador.'),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+      (geoError) => {
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          setError('Permissão de localização negada. Libere a Localização nas permissões deste site e tente novamente.');
+          return;
+        }
+        if (geoError.code === geoError.POSITION_UNAVAILABLE) {
+          setError('O dispositivo não conseguiu determinar sua localização. Verifique GPS, Wi‑Fi ou sinal de rede e tente novamente.');
+          return;
+        }
+        if (geoError.code === geoError.TIMEOUT) {
+          setError('A localização demorou mais do que o esperado. Tente novamente em um local com melhor sinal.');
+          return;
+        }
+        setError('Não foi possível obter a localização neste dispositivo.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   }
 
