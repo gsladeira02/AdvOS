@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
-const ALLOWED_MODELS = new Set(['gpt-transcribe', 'gpt-4o-mini-transcribe']);
+const ALLOWED_MODELS = new Set(['gpt-transcribe', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe']);
 
 function str(value: unknown) {
   return String(value || '').trim();
@@ -20,6 +20,8 @@ function extensionForMime(mime: string) {
   const clean = str(mime).toLowerCase().split(';')[0].trim();
   if (clean === 'audio/mpeg' || clean === 'audio/mp3') return 'mp3';
   if (clean === 'audio/mp4') return 'mp4';
+  if (clean === 'audio/m4a' || clean === 'audio/x-m4a') return 'm4a';
+  if (clean === 'audio/webm') return 'webm';
   if (clean === 'audio/wav' || clean === 'audio/x-wav') return 'wav';
   return 'mp3';
 }
@@ -32,7 +34,7 @@ function safeAudioName(name: string, mime: string) {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 120) || 'audio-whatsapp';
-  if (/\.(mp3|mp4|m4a|wav)$/i.test(base)) return base;
+  if (/\.(mp3|mp4|m4a|wav|webm)$/i.test(base)) return base;
   return `${base.replace(/\.[^.]+$/, '')}.${extensionForMime(mime)}`;
 }
 
@@ -58,7 +60,13 @@ export async function POST(req: Request) {
       .eq('id', messageId)
       .maybeSingle();
 
-    if (messageError) throw new Error(messageError.message);
+    if (messageError) {
+      const databaseMessage = str(messageError.message);
+      if (/transcription_(?:text|status|model|error)|transcribed_(?:at|by)/i.test(databaseMessage) || /schema cache/i.test(databaseMessage)) {
+        throw new SecurityError('A estrutura de transcrição ainda não está pronta no Supabase. Rode o SQL supabase/v9_64_transcricao_audio_hotfix.sql e tente novamente.', 409);
+      }
+      throw new Error(databaseMessage || 'Não foi possível consultar a mensagem.');
+    }
     if (!message?.id) return NextResponse.json({ ok: false, error: 'Áudio não encontrado.' }, { status: 404 });
 
     const messageType = str(message.message_type).toLowerCase();
@@ -115,20 +123,50 @@ export async function POST(req: Request) {
     const requestBody = new FormData();
     requestBody.set('model', model);
     requestBody.set('file', new Blob([bytes], { type: mimeType }), filename);
-    requestBody.append('languages[]', 'pt');
+    requestBody.set('language', 'pt');
     requestBody.set('response_format', 'json');
     requestBody.set('prompt', 'Mensagem de voz de atendimento jurídico em português do Brasil. Transcreva fielmente, preservando nomes próprios, datas, valores, números de processos, CPF, CNPJ, telefones e termos jurídicos quando forem falados.');
 
-    const response = await fetch(`${integration.baseUrl}/audio/transcriptions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${integration.token}` },
-      body: requestBody,
-      cache: 'no-store',
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000);
+    let response: Response;
+    try {
+      response = await fetch(`${integration.baseUrl}/audio/transcriptions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${integration.token}` },
+        body: requestBody,
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+    } catch (fetchError: any) {
+      if (fetchError?.name === 'AbortError') {
+        throw new SecurityError('A transcrição demorou mais de 90 segundos. Tente novamente.', 504);
+      }
+      throw new SecurityError('Não foi possível conectar à API de transcrição. Verifique a conexão e tente novamente.', 502);
+    } finally {
+      clearTimeout(timeout);
+    }
+
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const apiMessage = str(result?.error?.message) || 'A API de transcrição recusou o áudio.';
-      throw new Error(apiMessage);
+      const apiMessage = str(result?.error?.message);
+      const requestId = str(response.headers.get('x-request-id'));
+      console.error('OpenAI transcription error', { status: response.status, model, requestId, apiMessage });
+
+      if (response.status === 401) throw new SecurityError('A chave da OpenAI foi recusada. Atualize a API Key em Integrações → Transcrição de áudios.', 401);
+      if (response.status === 403) throw new SecurityError('A chave/projeto da OpenAI não tem permissão para usar o modelo de transcrição selecionado.', 403);
+      if (response.status === 404) throw new SecurityError(`O modelo de transcrição ${model} não está disponível para esta conta. Troque o modelo em Integrações.`, 404);
+      if (response.status === 413) throw new SecurityError('O arquivo de áudio é grande demais para a API de transcrição.', 413);
+      if (response.status === 429) {
+        const quota = /quota|billing|credit|insufficient/i.test(apiMessage);
+        throw new SecurityError(quota
+          ? 'A conta da OpenAI está sem cota/créditos disponíveis para transcrição. Verifique o faturamento da API.'
+          : 'A OpenAI limitou temporariamente as transcrições. Aguarde um pouco e tente novamente.', 429);
+      }
+      if (response.status === 400 && /format|codec|audio|decode|file/i.test(apiMessage)) {
+        throw new SecurityError('A API não conseguiu ler o formato deste áudio. Atualize a página e tente novamente; o AdvOS irá preparar uma versão WAV compatível.', 400);
+      }
+      throw new SecurityError(apiMessage ? `OpenAI: ${apiMessage}` : 'A API de transcrição recusou o áudio.', Math.max(400, Math.min(599, response.status || 400)));
     }
 
     const transcription = str(result?.text);

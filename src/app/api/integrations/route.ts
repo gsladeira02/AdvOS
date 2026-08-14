@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   const requestedTranscriptionModel = str(f.get('transcription_model'));
-  const transcriptionModel = ['gpt-transcribe', 'gpt-4o-mini-transcribe'].includes(requestedTranscriptionModel)
+  const transcriptionModel = ['gpt-transcribe', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe'].includes(requestedTranscriptionModel)
     ? requestedTranscriptionModel
     : 'gpt-transcribe';
 

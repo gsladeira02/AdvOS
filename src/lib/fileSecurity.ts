@@ -4,7 +4,7 @@ import { SecurityError } from '@/lib/security';
 const SAFE_EXTENSIONS = new Set([
   'pdf','jpg','jpeg','png','gif','webp','txt','csv',
   'doc','docx','xls','xlsx','ppt','pptx',
-  'zip','mp3','m4a','mp4','aac','ogg','opus','wav','amr'
+  'zip','mp3','m4a','mp4','webm','aac','ogg','opus','wav','amr'
 ]);
 const DANGEROUS_EXTENSIONS = new Set([
   'html','htm','svg','js','mjs','cjs','exe','dll','msi','bat','cmd','com','scr','ps1','sh','jar','apk','app','dmg','iso',
@@ -58,6 +58,7 @@ export function assertSafeUploadedFile(name: string, mime: string, buffer: Buffe
   else if (['txt','csv'].includes(ext)) valid = looksLikeText(buffer);
   else if (['mp3'].includes(ext)) valid = ascii(buffer,0,3)==='ID3' || (buffer.length > 1 && buffer[0]===0xff && (buffer[1] & 0xe0)===0xe0);
   else if (['m4a','mp4'].includes(ext)) valid = buffer.length >= 12 && ascii(buffer,4,8)==='ftyp';
+  else if (ext === 'webm') valid = starts(buffer,[0x1a,0x45,0xdf,0xa3]);
   else if (['ogg','opus'].includes(ext)) valid = ascii(buffer,0,4)==='OggS';
   else if (ext === 'wav') valid = ascii(buffer,0,4)==='RIFF' && ascii(buffer,8,12)==='WAVE';
   else if (ext === 'amr') valid = ascii(buffer,0,5)==='#!AMR';

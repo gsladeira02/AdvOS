@@ -255,6 +255,81 @@ function mixToMono(audioBuffer: AudioBuffer) {
   return mono;
 }
 
+function resampleMono(input: Float32Array, inputRate: number, outputRate = 16000) {
+  if (!input.length || !Number.isFinite(inputRate) || inputRate <= 0 || inputRate === outputRate) return input;
+  const outputLength = Math.max(1, Math.round(input.length * outputRate / inputRate));
+  const output = new Float32Array(outputLength);
+  const ratio = inputRate / outputRate;
+  for (let i = 0; i < outputLength; i += 1) {
+    const sourcePosition = i * ratio;
+    const left = Math.floor(sourcePosition);
+    const right = Math.min(input.length - 1, left + 1);
+    const fraction = sourcePosition - left;
+    output[i] = (input[left] || 0) * (1 - fraction) + (input[right] || 0) * fraction;
+  }
+  return output;
+}
+
+function encodeMonoWav(samples: Float32Array, sampleRate = 16000) {
+  const bytesPerSample = 2;
+  const dataSize = samples.length * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeAscii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[i] || 0));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+async function convertBlobToTranscriptionWav(blob: Blob, messageId: string) {
+  const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextCtor) throw new Error('Este navegador não consegue preparar o áudio. Use Chrome ou Edge atualizado.');
+
+  const audioContext = new AudioContextCtor();
+  try {
+    const decoded: AudioBuffer = await audioContext.decodeAudioData((await blob.arrayBuffer()).slice(0));
+    const mono = mixToMono(decoded);
+    const resampled = resampleMono(mono, decoded.sampleRate, 16000);
+    const wavBlob = encodeMonoWav(resampled, 16000);
+    if (!wavBlob.size) throw new Error('O áudio preparado ficou vazio.');
+    if (wavBlob.size > 25 * 1024 * 1024) throw new Error('O áudio convertido ultrapassa o limite de 25 MB para transcrição.');
+    return new File([wavBlob], `audio-${messageId}.wav`, { type: 'audio/wav' });
+  } catch (error: any) {
+    if (String(error?.message || '').includes('25 MB')) throw error;
+    throw new Error('Não foi possível decodificar este áudio do WhatsApp. Atualize a página e tente novamente pelo Chrome ou Edge.');
+  } finally {
+    if (typeof audioContext.close === 'function') audioContext.close().catch(() => null);
+  }
+}
+
+function transcriptionMime(blob: Blob, message: any) {
+  const blobMime = String(blob.type || '').toLowerCase().split(';')[0].trim();
+  const messageMime = String(message?.mime_type || '').toLowerCase().split(';')[0].trim();
+  const generic = !blobMime || blobMime === 'application/octet-stream' || blobMime === 'binary/octet-stream';
+  return generic ? messageMime : blobMime;
+}
+
 async function convertRecordedBlobToMp3File(blob: Blob) {
   const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext;
   if (!AudioContextCtor) throw new Error('Seu navegador não permite preparar áudio em MP3. Use Chrome ou Edge atualizado.');
@@ -702,23 +777,23 @@ export function WhatsappThread({
       if (!blob.size) throw new Error('O áudio está vazio.');
       if (blob.size > 25 * 1024 * 1024) throw new Error('O áudio ultrapassa o limite de 25 MB para transcrição.');
 
-      const cleanMime = String(blob.type || message?.mime_type || '').toLowerCase().split(';')[0].trim();
+      const cleanMime = transcriptionMime(blob, message);
       let preparedFile: File;
       if (cleanMime === 'audio/mpeg' || cleanMime === 'audio/mp3') {
         preparedFile = new File([blob], `audio-${messageId}.mp3`, { type: 'audio/mpeg' });
       } else if (cleanMime === 'audio/mp4') {
         preparedFile = new File([blob], `audio-${messageId}.mp4`, { type: 'audio/mp4' });
+      } else if (cleanMime === 'audio/m4a' || cleanMime === 'audio/x-m4a') {
+        preparedFile = new File([blob], `audio-${messageId}.m4a`, { type: 'audio/m4a' });
+      } else if (cleanMime === 'audio/webm') {
+        preparedFile = new File([blob], `audio-${messageId}.webm`, { type: 'audio/webm' });
       } else if (cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav') {
         preparedFile = new File([blob], `audio-${messageId}.wav`, { type: 'audio/wav' });
       } else {
-        // O WhatsApp normalmente entrega mensagens de voz como OGG/Opus. O endpoint
-        // de transcrição não lista OGG entre os formatos aceitos, então o navegador
-        // prepara um MP3 compatível antes de enviar ao servidor.
-        try {
-          preparedFile = await convertRecordedBlobToMp3File(blob);
-        } catch {
-          throw new Error('Não foi possível preparar este formato de áudio para transcrição neste navegador. Tente pelo Chrome ou Edge atualizado.');
-        }
+        // Mensagens de voz do WhatsApp costumam chegar em OGG/Opus, que não está
+        // na lista de formatos aceitos pelo endpoint de arquivo. Preparamos WAV
+        // mono 16 kHz para reduzir tamanho e aumentar a compatibilidade.
+        preparedFile = await convertBlobToTranscriptionWav(blob, messageId);
       }
 
       const form = new FormData();

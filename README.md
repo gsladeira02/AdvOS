@@ -1,6 +1,6 @@
-# AdvOS v9.63
+# AdvOS v9.64
 
-Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.63.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.64.
 
 ## Destaques
 - Painel Marketing & Comercial com funil do lead ao pagamento, receita por Meta/Google/campanha/anúncio, conversão, CPL, CPA, ROI e ROAS.
@@ -32,3 +32,8 @@ A ficha do cliente agora aceita foto privada. A imagem é otimizada automaticame
 ## v9.63 — Transcrição de áudios do WhatsApp
 
 Mensagens de voz agora possuem a ação **Transcrever áudio**. O texto fica salvo na própria mensagem e não é processado novamente. Configure a chave em **Integrações → Transcrição de áudios** e execute `supabase/v9_63_whatsapp_transcricao_audio.sql` antes de usar o recurso.
+
+
+## v9.64 — Hotfix de transcrição
+
+Corrige falhas genéricas de transcrição, melhora a preparação de OGG/Opus para WAV 16 kHz e passa a diferenciar erros de migration, API Key, permissão, cota/faturamento, formato e timeout. Execute `supabase/v9_64_transcricao_audio_hotfix.sql` mesmo que a migration v9.63 já tenha sido aplicada.

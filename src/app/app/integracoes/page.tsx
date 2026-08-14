@@ -317,6 +317,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
               <label className="label">Modelo de transcrição</label>
               <select name="transcription_model" defaultValue={openaiRaw.transcription_model || 'gpt-transcribe'} className="input mt-1">
                 <option value="gpt-transcribe">GPT Transcribe — recomendado</option>
+                <option value="gpt-4o-transcribe">GPT-4o Transcribe — alta precisão</option>
                 <option value="gpt-4o-mini-transcribe">GPT-4o mini Transcribe — econômico</option>
               </select>
             </div>
