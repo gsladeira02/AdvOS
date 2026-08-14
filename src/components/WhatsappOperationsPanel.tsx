@@ -121,7 +121,7 @@ export function WhatsappOperationsPanel({
 
   return (
     <>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2">
+      <div className="whatsapp-operations-row mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2">
         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide text-slate-400"><UserCheck size={10}/>Responsável</span>
         <select
           value={assignedTo}

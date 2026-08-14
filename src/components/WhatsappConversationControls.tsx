@@ -51,6 +51,7 @@ export function WhatsappConversationControls({
   const [leadNotes, setLeadNotes] = useState(conversation?.lead?.notes || '');
   const [leadStage, setLeadStage] = useState(conversation?.lead?.stage || 'novo');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(Array.isArray(conversation?.tag_ids) ? conversation.tag_ids.map(String) : []);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
   const activeTags = useMemo(() => (availableTags || []).filter((tag: any) => tag.active !== false), [availableTags]);
   const activeTagIdSet = useMemo(() => new Set(activeTags.map((tag: any) => String(tag.id))), [activeTags]);
@@ -59,9 +60,14 @@ export function WhatsappConversationControls({
     const ids = Array.isArray(conversation?.tag_ids) ? conversation.tag_ids.map(String).filter((id: string) => activeTagIdSet.has(id)) : [];
     setSelectedTagIds(ids);
     setLeadStage(conversation?.lead?.stage || 'novo');
+    setTagsOpen(false);
+    setLeadModal(false);
+    setClientModal(false);
+    setFeedback(null);
   }, [conversation?.id, conversation?.tag_ids, conversation?.lead?.stage, activeTagIdSet]);
 
   const selectedTags = useMemo(() => activeTags.filter((tag: any) => selectedTagIds.includes(String(tag.id))), [activeTags, selectedTagIds]);
+  const visibleSelectedTags = selectedTags.slice(0, 2);
   const selectableStages = useMemo(() => (leadStages || []).filter((stage: any) => stage.active !== false && stage.outcome !== 'won'), [leadStages]);
   const currentStage = leadStages.find((stage: any) => String(stage.stage_key) === String(conversation?.lead?.stage));
   const isClient = Boolean(conversation?.client_id || conversation?.clients?.id);
@@ -92,6 +98,15 @@ export function WhatsappConversationControls({
     if (!result) setSelectedTagIds(Array.isArray(conversation?.tag_ids) ? conversation.tag_ids.map(String) : []);
   }
 
+  async function transferConversation() {
+    const nextDepartment = department === 'atendimento' ? 'financeiro_juridico' : 'atendimento';
+    const result = await action({ action: 'set_department', department: nextDepartment });
+    if (result) {
+      setTagsOpen(false);
+      setFeedback(`Conversa transferida para ${departmentLabel(nextDepartment)}. Você permanece na caixa de entrada atual.`);
+    }
+  }
+
   function openLeadDetails() {
     setLeadName(conversation?.lead?.name || conversation?.lead_name || ''); setLeadEmail(conversation?.lead?.email || ''); setLeadService(conversation?.lead?.service_interest || ''); setLeadNotes(conversation?.lead?.notes || ''); setLeadStage(conversation?.lead?.stage || 'novo'); setLeadModal(true);
   }
@@ -113,8 +128,8 @@ export function WhatsappConversationControls({
 
   return (
     <>
-      <div className="shrink-0 border-b border-[#d7ded4] bg-white px-3 py-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="whatsapp-conversation-controls shrink-0 border-b border-[#d7ded4] bg-white px-3 py-2">
+        <div className="whatsapp-control-row flex flex-wrap items-center gap-2">
           {isClosed ? (
             <>
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-slate-700"><Archive size={10}/>Encerrada</span>
@@ -124,7 +139,7 @@ export function WhatsappConversationControls({
           ) : (
             <>
               <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wide ${department === 'financeiro_juridico' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}`}>{departmentLabel(department)}</span>
-              <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'set_department', department: department === 'atendimento' ? 'financeiro_juridico' : 'atendimento' })} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Transferir para {department === 'atendimento' ? 'Financeiro/Jurídico' : 'Atendimento'}</button>
+              <button type="button" disabled={busy || conversation?.virtual} onClick={() => void transferConversation()} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">Transferir para {department === 'atendimento' ? 'Financeiro/Jurídico' : 'Atendimento'}</button>
               <button type="button" disabled={busy || conversation?.virtual} onClick={() => action({ action: 'close_conversation' })} className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"><Archive size={10}/>Encerrar</button>
             </>
           )}
@@ -140,12 +155,13 @@ export function WhatsappConversationControls({
         </div>
 
         {!conversation?.virtual && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {selectedTags.map((tag: any) => <span key={tag.id} className={`inline-flex max-w-[180px] items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${tagTone(tag.color)}`}><Tag size={10} className="shrink-0"/><span className="truncate">{tag.name}</span></span>)}
-            <details className="relative">
-              <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 hover:bg-slate-50"><Tag size={10}/>{selectedTags.length ? 'Alterar tags' : 'Selecionar tags'}<ChevronDown size={10}/></summary>
-              <div className="absolute left-0 top-full z-[70] mt-1 w-64 max-w-[80vw] rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                <p className="px-2 pb-1 text-[9px] font-black uppercase text-slate-400">Tags cadastradas</p>
+          <div className="whatsapp-tag-row mt-2 flex flex-wrap items-center gap-1.5">
+            {visibleSelectedTags.map((tag: any) => <span key={tag.id} className={`inline-flex max-w-[150px] items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${tagTone(tag.color)}`}><Tag size={10} className="shrink-0"/><span className="truncate">{tag.name}</span></span>)}
+            {selectedTags.length > visibleSelectedTags.length && <span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-600">+{selectedTags.length - visibleSelectedTags.length}</span>}
+            <div className="relative">
+              <button type="button" aria-expanded={tagsOpen} onClick={() => setTagsOpen((value) => !value)} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black text-slate-700 hover:bg-slate-50"><Tag size={10}/>{selectedTags.length ? 'Alterar tags' : 'Selecionar tags'}<ChevronDown size={10} className={tagsOpen ? 'rotate-180' : ''}/></button>
+              {tagsOpen && <div className="whatsapp-tag-picker absolute left-0 top-full z-[70] mt-1 w-64 max-w-[80vw] rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                <div className="mb-1 flex items-center justify-between gap-2 px-2"><p className="text-[9px] font-black uppercase text-slate-400">Tags cadastradas</p><button type="button" onClick={() => setTagsOpen(false)} className="grid h-6 w-6 place-items-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Fechar seleção de tags"><X size={12}/></button></div>
                 <div className="max-h-56 overflow-y-auto">
                   {activeTags.map((tag: any) => {
                     const checked = selectedTagIds.includes(String(tag.id));
@@ -153,8 +169,8 @@ export function WhatsappConversationControls({
                   })}
                   {!activeTags.length && <p className="px-2 py-3 text-[10px] font-bold text-slate-500">Cadastre tags em WhatsApp → Configurações.</p>}
                 </div>
-              </div>
-            </details>
+              </div>}
+            </div>
           </div>
         )}
 

@@ -162,7 +162,11 @@ export function WhatsappCentralClient({
   const [preferences, setPreferences] = useState<any>(initialPreferences || {});
   const [templateOptions, setTemplateOptions] = useState<WhatsappTemplateOption[]>(templates || []);
   const initialSelected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
-  const [activeDepartment, setActiveDepartment] = useState<WhatsappDepartment>(() => initialSelected?.department === 'financeiro_juridico' || initialView === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento');
+  const [activeDepartment, setActiveDepartment] = useState<WhatsappDepartment>(() => {
+    if (initialView === 'financeiro_juridico') return 'financeiro_juridico';
+    if (initialView === 'atendimento') return 'atendimento';
+    return initialSelected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento';
+  });
   const [activeTab, setActiveTab] = useState<WhatsappTab>(() => {
     if (initialSelected?.contact || initialSelected?.virtual) return 'contatos';
     if (initialSelected?.lead && !initialSelected?.client_id) return 'leads';
@@ -192,17 +196,21 @@ export function WhatsappCentralClient({
 
   useEffect(() => {
     if (!selected || selected?.virtual || selected?.contact) return;
-    const nextDepartment: WhatsappDepartment = selected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento';
-    if (nextDepartment !== activeDepartment) setActiveDepartment(nextDepartment);
+    const selectedDepartment: WhatsappDepartment = selected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento';
+
+    // O setor da conversa e a caixa de entrada que o usuário está visualizando são
+    // estados diferentes. Ao transferir uma conversa, não mudamos automaticamente
+    // de caixa: a conversa pode continuar aberta, mas a lista permanece na origem.
     if (selected?.closed_at && workspaceView !== 'encerrados') {
       setWorkspaceView('encerrados');
       setActiveTab('conversas');
       window.history.replaceState(null, '', `/app/whatsapp?view=encerrados&conversa=${encodeURIComponent(String(selected?.id || selectedIdRef.current))}`);
     } else if (workspaceView === 'encerrados' && !selected?.closed_at) {
-      setWorkspaceView(nextDepartment);
-      window.history.replaceState(null, '', `/app/whatsapp?view=${nextDepartment}&conversa=${encodeURIComponent(String(selected?.id || selectedIdRef.current))}`);
+      setActiveDepartment(selectedDepartment);
+      setWorkspaceView(selectedDepartment);
+      window.history.replaceState(null, '', `/app/whatsapp?view=${selectedDepartment}&conversa=${encodeURIComponent(String(selected?.id || selectedIdRef.current))}`);
     }
-  }, [selected, activeDepartment, workspaceView]);
+  }, [selected, workspaceView]);
 
   useEffect(() => {
     if ((workspaceView === 'financeiro_juridico' || workspaceView === 'encerrados') && activeTab !== 'conversas') {
@@ -632,8 +640,8 @@ export function WhatsappCentralClient({
   }
 
   return (
-    <div className="space-y-3">
-      <nav className="flex flex-wrap gap-2 rounded-2xl border border-[#e6dccb] bg-white p-2 shadow-sm" aria-label="Áreas do WhatsApp">
+    <div className="whatsapp-workspace flex min-h-0 flex-col gap-2">
+      <nav className="whatsapp-workspace-nav flex flex-wrap gap-2 rounded-2xl border border-[#e6dccb] bg-white p-2 shadow-sm" aria-label="Áreas do WhatsApp">
         <button type="button" onClick={() => switchWorkspace('atendimento')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'atendimento' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><MessageCircle size={14}/>Atendimento</button>
         <button type="button" onClick={() => switchWorkspace('financeiro_juridico')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'financeiro_juridico' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Users size={14}/>Financeiro/Jurídico</button>
         <button type="button" onClick={() => switchWorkspace('encerrados')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'encerrados' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Archive size={14}/>Encerrados{closedCount > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${workspaceView === 'encerrados' ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{closedCount}</span>}</button>
@@ -739,7 +747,7 @@ export function WhatsappCentralClient({
       </section>
 
       {selected ? (
-        <div className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
+        <div key={String(selected?.id || selectedId)} className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
           <WhatsappThread conversation={selected} messages={messages || []} templates={templateOptions.filter((template: any) => template.active !== false)} availableTags={tagCatalog} leadStages={leadStages} leadLabel={leadSingular} teamUsers={teamUsers} currentUserId={currentUserId} currentUserName={currentUserName} canConfigure={canConfigure} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={handleConversationChanged} />
         </div>
       ) : (

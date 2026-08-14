@@ -276,3 +276,64 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
 @media(max-width:760px){.page-header>div{flex-direction:row!important;align-items:center!important;gap:8px!important}}
 @media(min-width:761px){.app-content .card.p-6{padding:18px!important}.app-content .card.p-5{padding:16px!important}.app-content .gap-6{gap:16px!important}}
 @media(max-width:760px){.app-content .card.p-6,.app-content .card.p-5,.app-content .card.p-4{padding:10px!important}.app-content .gap-6,.app-content .gap-5,.app-content .gap-4{gap:9px!important}.app-content h2.text-xl,.app-content h2.text-lg{font-size:13px!important}.app-content h3.text-lg{font-size:12px!important}.app-content p.text-sm{font-size:10px!important;line-height:1.4}.app-content .badge{font-size:8px!important;padding:3px 6px!important}}
+
+/* V9.52 — PWA estável, WhatsApp sem sobreposição e controles compactos */
+.whatsapp-workspace{width:100%;min-width:0}
+.whatsapp-workspace-nav{flex:none}
+.whatsapp-conversation-controls{position:relative;z-index:20}
+.whatsapp-control-row,.whatsapp-tag-row,.whatsapp-operations-row{min-width:0}
+.whatsapp-tag-picker{isolation:isolate}
+
+@media(max-width:760px){
+  /* O cabeçalho global do PWA já identifica o app; no WhatsApp, o cabeçalho da
+     página era redundante e roubava altura da conversa. */
+  .whatsapp-page>.page-header{display:none!important}
+  .whatsapp-page{min-width:0}
+  .whatsapp-page>.compact-alert,.whatsapp-page>section{margin-bottom:7px!important}
+
+  /* Navegação interna em uma única faixa, sem quebrar e empurrar a conversa. */
+  .whatsapp-workspace{gap:7px!important}
+  .whatsapp-workspace-nav{flex-wrap:nowrap!important;gap:4px!important;overflow-x:auto!important;overflow-y:hidden!important;border-radius:12px!important;padding:5px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .whatsapp-workspace-nav::-webkit-scrollbar{display:none}
+  .whatsapp-workspace-nav>button{min-height:34px!important;flex:none!important;border-radius:9px!important;padding:7px 9px!important;font-size:9px!important;white-space:nowrap!important}
+
+  /* Altura única e autoritativa: cabeçalho do PWA + faixa interna + navegação
+     inferior ficam fora da área útil da central. Substitui os cálculos antigos. */
+  .whatsapp-central{display:block!important;width:100%!important;max-width:100%!important;height:calc(100dvh - 176px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important;min-height:0!important;overflow:hidden!important}
+  .whatsapp-panel,.whatsapp-thread{height:100%!important;min-height:0!important;width:100%!important;max-width:100%!important;border-radius:12px!important;border-left:1px solid #d6ddd6!important;border-right:1px solid #d6ddd6!important}
+  .whatsapp-list-scroll{min-height:0!important;max-height:none!important;flex:1 1 0%!important;overflow-y:auto!important;overflow-x:hidden!important}
+
+  /* Cabeçalho operacional compacto: as ações continuam disponíveis sem criar
+     quatro ou cinco linhas sobre as mensagens. */
+  .whatsapp-conversation-controls{padding:6px 7px!important}
+  .whatsapp-control-row,.whatsapp-operations-row{flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;padding-bottom:2px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .whatsapp-control-row::-webkit-scrollbar,.whatsapp-operations-row::-webkit-scrollbar{display:none}
+  .whatsapp-control-row>* ,.whatsapp-operations-row>*{flex:none!important}
+  .whatsapp-control-row button,.whatsapp-control-row select,.whatsapp-operations-row button,.whatsapp-operations-row select{min-height:28px!important;max-width:220px!important;font-size:9px!important;white-space:nowrap!important}
+  .whatsapp-tag-row{margin-top:4px!important;min-height:28px;flex-wrap:nowrap!important;overflow:visible!important}
+  .whatsapp-tag-row>span{flex:none!important;max-width:112px!important}
+  .whatsapp-tag-picker{left:0!important;right:auto!important;width:min(280px,calc(100vw - 30px))!important;max-width:calc(100vw - 30px)!important}
+
+  /* Mais área para mensagens e um compositor que nunca fica atrás da barra inferior. */
+  .whatsapp-message-scroll{padding:8px 7px!important}
+  .whatsapp-message-scroll .group>div{max-width:88%!important}
+  .whatsapp-thread>div:last-child{padding:7px!important}
+  .whatsapp-thread textarea{min-height:40px!important;max-height:88px!important;padding:9px 12px!important;line-height:1.35!important}
+  .whatsapp-thread .relative.flex.items-end{gap:4px!important}
+  .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:34px!important;width:34px!important;min-width:34px!important}
+
+  /* PWA geral: conteúdo não entra sob a barra inferior e mantém uma única largura. */
+  .app-main{min-width:0!important;width:100%!important;padding:7px 7px calc(env(safe-area-inset-bottom,0px) + 66px)!important}
+  .app-content{min-width:0!important;width:100%!important;max-width:100%!important}
+  .mobile-pwa-top{min-height:46px}
+  .mobile-bottom-nav{min-height:58px}
+  .mobile-bottom-nav-item{min-width:0!important}
+  .mobile-bottom-nav-item span{font-size:8px!important}
+}
+
+@media(max-width:390px){
+  .whatsapp-central{height:calc(100dvh - 170px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
+  .whatsapp-workspace-nav>button{padding-left:8px!important;padding-right:8px!important}
+  .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:32px!important;width:32px!important;min-width:32px!important}
+  .whatsapp-message-scroll .group>div{max-width:91%!important}
+}

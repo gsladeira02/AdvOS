@@ -127,7 +127,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const active = Boolean(integration?.enabled && integration?.token_last4 && integration?.raw_settings?.phone_number_id);
 
   return (
-    <div>
+    <div className="whatsapp-page">
       <PageHeader
         title="WhatsApp"
         subtitle={`Atendimento, Financeiro/Jurídico e Encerrados com ${String(whatsappSettings.preferences?.lead_label_plural || 'Leads').toLowerCase()}, tags, clientes e histórico centralizado.`}
