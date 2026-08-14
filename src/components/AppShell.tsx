@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { redirect } from 'next/navigation';
 import { CalendarDays, CheckSquare, Home, Plug, Scale, Settings, Users, UserCog, Wallet, ListChecks, UploadCloud, MessageCircle, ShieldCheck } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
 import { SessionSecurityGuard } from '@/components/SessionSecurityGuard';
@@ -38,18 +37,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     .eq('id', profile.id)
     .maybeSingle();
 
-  if (profile.law_firm_id) {
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('status,current_period_end,grace_until')
-      .eq('law_firm_id', profile.law_firm_id)
-      .maybeSingle();
-
-    const today = new Date().toISOString().slice(0, 10);
-    if (sub && sub.status !== 'ativa' && sub.grace_until && sub.grace_until < today) {
-      redirect('/login?erro=assinatura');
-    }
-  }
 
   const navigationItems = isAdminRole(profile.role)
     ? items

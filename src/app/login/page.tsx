@@ -16,6 +16,12 @@ function errorMessage(code?: string) {
       return 'A autenticação demorou mais que o esperado. Tente novamente.';
     case 'server':
       return 'Não foi possível concluir a autenticação. Tente novamente.';
+    case 'session':
+      return 'Sua sessão não pôde ser confirmada. Entre novamente.';
+    case 'unauthorized':
+      return 'Este usuário não possui acesso autorizado ao AdvOS.';
+    case 'inactive':
+      return 'Este usuário está desativado no AdvOS.';
     default:
       return '';
   }
@@ -84,7 +90,7 @@ export default async function Login({ searchParams }: LoginPageProps) {
         </form>
 
         <p className="mt-4 text-center text-[11px] font-bold leading-relaxed text-slate-500">
-          Após a senha, o AdvOS solicita a autenticação em duas etapas.
+          Acesso restrito a usuários cadastrados e ativos no escritório.
         </p>
       </div>
     </main>

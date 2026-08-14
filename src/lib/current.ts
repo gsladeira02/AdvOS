@@ -14,15 +14,6 @@ async function getVerifiedUser(supabase: Awaited<ReturnType<typeof createServerS
   return user;
 }
 
-async function requireAal2(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error) redirect('/login?erro=mfa');
-
-  if (data?.currentLevel === 'aal2') return;
-  if (data?.nextLevel === 'aal2') redirect('/auth/mfa');
-  redirect('/auth/mfa/setup');
-}
-
 export async function getCurrentProfile(){
   const supabase = await createServerSupabase();
   const user = await getVerifiedUser(supabase);
@@ -34,14 +25,9 @@ export async function getCurrentProfile(){
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  // Usuários sem perfil nunca recebem acesso por estarem presentes no Supabase Auth.
-  if (!profile) redirect('/login?erro=nao-autorizado');
-  if (profile.status !== 'ativo') redirect('/login?erro=inativo');
-
-  // V9.39: qualquer tela/endpoint interno só prossegue com MFA concluído (AAL2).
-  // As rotas /auth/mfa e /auth/mfa/setup não usam este helper e continuam
-  // acessíveis com AAL1 para permitir a configuração/desafio do segundo fator.
-  await requireAal2(supabase);
+  // Usuários sem perfil ou desativados não recebem acesso ao AdvOS.
+  if (!profile) redirect('/login?error=unauthorized');
+  if (profile.status !== 'ativo') redirect('/login?error=inactive');
 
   return { supabase, session: { user }, profile };
 }
@@ -49,7 +35,6 @@ export async function getCurrentProfile(){
 export async function getCurrentSession(){
   const supabase = await createServerSupabase();
   const user = await getVerifiedUser(supabase);
-  await requireAal2(supabase);
   return { supabase, session: { user } };
 }
 

@@ -3,7 +3,7 @@
 Versão de hardening de segurança sobre a v9.38.
 
 ## Destaques
-- MFA TOTP obrigatório para usuários internos.
+- Login interno por e-mail e senha, com usuários cadastrados/ativos, sessão controlada e trilha de segurança.
 - AAL2 exigido no servidor e nas RLS expostas ao navegador.
 - Sessão local com encerramento por inatividade e tempo máximo.
 - CSP com nonce e headers de segurança reforçados.

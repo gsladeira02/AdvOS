@@ -25,10 +25,10 @@ export default async function SegurancaPage() {
 
   return (
     <div>
-      <PageHeader title="Segurança" subtitle="MFA, sessões e trilha de ações sensíveis do AdvOS." />
+      <PageHeader title="Segurança" subtitle="Sessões, acesso e trilha de ações sensíveis do AdvOS." />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <section className="card p-5"><p className="text-xs font-black uppercase tracking-wide text-slate-500">MFA</p><p className="mt-2 text-xl font-black text-emerald-700">Obrigatório</p><p className="mt-1 text-xs text-slate-500">Acesso interno exige AAL2 por aplicativo autenticador.</p></section>
+        <section className="card p-5"><p className="text-xs font-black uppercase tracking-wide text-slate-500">Acesso</p><p className="mt-2 text-xl font-black text-emerald-700">E-mail + senha</p><p className="mt-1 text-xs text-slate-500">Acesso restrito a usuários cadastrados e ativos, com senha forte e sessão controlada.</p></section>
         <section className="card p-5"><p className="text-xs font-black uppercase tracking-wide text-slate-500">Inatividade</p><p className="mt-2 text-xl font-black">60 minutos</p><p className="mt-1 text-xs text-slate-500">A interface encerra a sessão em dispositivo abandonado.</p></section>
         <section className="card p-5"><p className="text-xs font-black uppercase tracking-wide text-slate-500">Tempo máximo local</p><p className="mt-2 text-xl font-black">12 horas</p><p className="mt-1 text-xs text-slate-500">Configure também os limites autoritativos no Supabase Auth.</p></section>
       </div>

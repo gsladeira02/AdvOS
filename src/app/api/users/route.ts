@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
-    user_metadata: { full_name: fullName, advos_mfa_required: true },
+    user_metadata: { full_name: fullName },
   });
   if (error || !data.user?.id) return NextResponse.json({ error: 'Não foi possível criar o usuário.' }, { status: 400 });
 
