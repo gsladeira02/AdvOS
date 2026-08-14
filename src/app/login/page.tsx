@@ -20,7 +20,7 @@ async function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promis
   }
 }
 
-async function secureTarget(supabase: any) {
+async function secureTarget(supabase: ReturnType<typeof createBrowserSupabase>) {
   const { data, error } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel());
   if (error) throw error;
   if (data?.currentLevel === 'aal2') return pwaTarget();
