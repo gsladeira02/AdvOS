@@ -1,4 +1,4 @@
-# AdvOS v9.37
+# AdvOS v9.38
 
 Responsáveis, notas internas, filtros operacionais e autoria das mensagens no WhatsApp.
 
