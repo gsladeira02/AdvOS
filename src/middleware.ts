@@ -9,7 +9,6 @@ function isWebhook(pathname: string) {
 function maxBodyBytes(pathname: string) {
   if (pathname === '/api/client-files/upload') return 251 * 1024 * 1024;
   if (pathname === '/api/whatsapp/send-media') return 18 * 1024 * 1024;
-  if (pathname === '/api/whatsapp/messages/transcribe') return 27 * 1024 * 1024;
   if (pathname === '/api/asaas/import') return 12 * 1024 * 1024;
   return 2 * 1024 * 1024;
 }
@@ -64,12 +63,12 @@ function csp(nonce: string) {
     supabaseWs = parsed.origin.replace(/^http/, 'ws');
   } catch {}
 
-  const connect = ["'self'", supabaseOrigin, supabaseWs].filter(Boolean).join(' ');
+  const connect = ["'self'", supabaseOrigin, supabaseWs, 'https://huggingface.co', 'https://*.huggingface.co', 'https://*.hf.co', 'https://*.xethub.hf.co'].filter(Boolean).join(' ');
   const devEval = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
   const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${devEval}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${devEval}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

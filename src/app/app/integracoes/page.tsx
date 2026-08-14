@@ -79,7 +79,6 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
 
       {asaasMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${asaasMsg.cls}`}>{asaasMsg.text}</section>}
       {whatsappMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${whatsappMsg.cls}`}>{whatsappMsg.text}</section>}
-      {openaiMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${openaiMsg.cls}`}>{openaiMsg.text}</section>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
@@ -316,58 +315,23 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
         <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <p className="label">Inteligência artificial</p>
-              <h2 className="mt-2 text-xl font-black">Transcrição de áudios</h2>
-              <p className="mt-2 text-sm text-slate-600">Transcreva mensagens de voz do WhatsApp dentro do AdvOS. A chave fica salva apenas no servidor e nunca é enviada ao navegador.</p>
+              <p className="label">Inteligência artificial local</p>
+              <h2 className="mt-2 text-xl font-black">Transcrição de áudios no navegador</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">A transcrição agora é gratuita e acontece diretamente no computador, usando Whisper no navegador. Nenhuma OpenAI API Key ou Groq API Key é necessária.</p>
             </div>
-            <span className={`badge shrink-0 ${openaiStatus.cls}`}>{openaiStatus.label}</span>
+            <span className="badge badge-ok shrink-0">gratuita</span>
           </div>
 
-          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
-            <input type="hidden" name="provider" value="openai" />
-            <input type="hidden" name="environment" value="producao" />
-            <div>
-              <label className="label">Status</label>
-              <select name="enabled" defaultValue={openai ? (openai.enabled ? 'true' : 'false') : 'true'} className="input mt-1">
-                <option value="false">Desativada</option>
-                <option value="true">Ativada</option>
-              </select>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-900">
+              <b>Como funciona:</b> na primeira transcrição, o navegador baixa o modelo Whisper Base multilíngue. Depois, o modelo fica em cache no navegador e é reutilizado nas próximas mensagens.
             </div>
-
-            <div>
-              <label className="label">OpenAI API Key</label>
-              <input name="api_token" type="password" className="input mt-1" placeholder={openai?.token_last4 ? `Chave salva terminando em ${openai.token_last4}` : 'Cole a sua OpenAI API Key'} />
-              <p className="mt-2 text-xs text-slate-500">Deixe vazio para manter a chave atual. Também é possível usar OPENAI_API_KEY na Vercel.</p>
-            </div>
-
-            <div>
-              <label className="label">Modelo de transcrição</label>
-              <select name="transcription_model" defaultValue={openaiRaw.transcription_model || 'gpt-transcribe'} className="input mt-1">
-                <option value="gpt-transcribe">GPT Transcribe — recomendado</option>
-                <option value="gpt-4o-transcribe">GPT-4o Transcribe — alta precisão</option>
-                <option value="gpt-4o-mini-transcribe">GPT-4o mini Transcribe — econômico</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="label">Base URL</label>
-              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value="https://api.openai.com/v1" />
-            </div>
-
             <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs leading-relaxed text-slate-600">
-              A transcrição é feita somente quando alguém clica em <b>Transcrever áudio</b>. O resultado fica salvo na mensagem para não processar o mesmo áudio novamente. Ao informar uma nova chave, o AdvOS ativa a transcrição automaticamente.
+              <b>Privacidade:</b> o áudio é processado localmente no computador. O AdvOS salva somente o texto final da transcrição no histórico da mensagem.
             </div>
-
-            {openai?.notes && <p className="break-safe rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600"><b>Último retorno:</b> {openai.notes}</p>}
-
-            <button className="btn btn-primary">Salvar transcrição</button>
-          </form>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <form action="/api/openai/test" method="post"><button className="btn btn-secondary">Testar transcrição</button></form>
-            <span className="text-[11px] leading-relaxed text-slate-500">
-              {openai?.token_last4 ? `Chave salva terminando em ${openai.token_last4}.` : openaiHasEnvKey ? 'Usando OPENAI_API_KEY configurada na Vercel.' : 'Nenhuma chave detectada.'}
-            </span>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              <b>PWA:</b> a opção de transcrever fica propositalmente oculta no aplicativo instalado/mobile. A transcrição está disponível somente ao abrir o AdvOS em um navegador desktop.
+            </div>
           </div>
         </section>
       </div>

@@ -1,6 +1,6 @@
-# AdvOS v9.64
+# AdvOS v9.66
 
-Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.64.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.66.
 
 ## Destaques
 - Painel Marketing & Comercial com funil do lead ao pagamento, receita por Meta/Google/campanha/anúncio, conversão, CPL, CPA, ROI e ROAS.
@@ -25,6 +25,11 @@ Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporan
 
 Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indicada. Para esta versão, execute também `supabase/v9_58_comercial_marketing.sql`.
 
+
+## v9.66 — Transcrição gratuita no navegador
+
+A transcrição não usa mais OpenAI/Groq. No navegador desktop, o AdvOS baixa e executa localmente o Whisper Base multilíngue por Transformers.js; o áudio permanece no computador e apenas o texto final é salvo na mensagem. A opção fica oculta no PWA e em telas móveis. Não há nova migration: mantenha aplicada `supabase/v9_64_transcricao_audio_hotfix.sql`.
+
 ## v9.62 — Foto do cliente
 
 A ficha do cliente agora aceita foto privada. A imagem é otimizada automaticamente e aparece em Clientes e no WhatsApp. Execute `supabase/v9_62_foto_cliente.sql` antes de usar o recurso.
@@ -38,6 +43,6 @@ Mensagens de voz agora possuem a ação **Transcrever áudio**. O texto fica sal
 
 Corrige falhas genéricas de transcrição, melhora a preparação de OGG/Opus para WAV 16 kHz e passa a diferenciar erros de migration, API Key, permissão, cota/faturamento, formato e timeout. Execute `supabase/v9_64_transcricao_audio_hotfix.sql` mesmo que a migration v9.63 já tenha sido aplicada.
 
-## V9.65 — Transcrição de áudio
+## V9.65 — Transcrição de áudio (histórico)
 
-Em **Integrações → Transcrição de áudios**, deixe o status como **Ativada**, salve a OpenAI API Key (ou configure `OPENAI_API_KEY` na Vercel) e use **Testar transcrição**. O teste precisa retornar sucesso antes do uso no WhatsApp. Não há SQL novo na v9.65; mantenha aplicada a migration `supabase/v9_64_transcricao_audio_hotfix.sql`.
+A configuração por OpenAI API Key desta versão foi substituída na v9.66 pela transcrição gratuita diretamente no navegador.

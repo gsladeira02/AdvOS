@@ -31,6 +31,7 @@ import { WhatsappCallPanel } from '@/components/WhatsappCallPanel';
 import { WhatsappConversationControls } from '@/components/WhatsappConversationControls';
 import { WhatsappLocationCard } from '@/components/WhatsappLocationCard';
 import { ClientAvatar } from '@/components/ClientAvatar';
+import { isStandalonePwa, transcribeInBrowser } from '@/lib/browserWhisper';
 
 export type WhatsappTemplateOption = {
   id: string;
@@ -323,6 +324,38 @@ async function convertBlobToTranscriptionWav(blob: Blob, messageId: string) {
   }
 }
 
+async function decodeBlobToWhisperAudio(blob: Blob) {
+  const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextCtor) throw new Error('A transcrição local exige um navegador desktop atualizado, como Chrome ou Edge.');
+
+  const audioContext = new AudioContextCtor();
+  try {
+    const decoded: AudioBuffer = await audioContext.decodeAudioData((await blob.arrayBuffer()).slice(0));
+    const mono = mixToMono(decoded);
+    const resampled = resampleMono(mono, decoded.sampleRate, 16000);
+    if (!resampled.length) throw new Error('O áudio preparado ficou vazio.');
+    return resampled;
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    if (message.includes('navegador desktop') || message.includes('vazio')) throw error;
+    throw new Error('O navegador não conseguiu decodificar este áudio do WhatsApp. Use Chrome ou Edge atualizado no computador.');
+  } finally {
+    if (typeof audioContext.close === 'function') audioContext.close().catch(() => null);
+  }
+}
+
+function friendlyBrowserTranscriptionError(error: any) {
+  const raw = String(error?.message || '').trim();
+  if (!raw) return 'Não foi possível transcrever o áudio no navegador.';
+  if (/fetch|network|failed to fetch|load model|download/i.test(raw)) {
+    return 'Não foi possível baixar o modelo gratuito de transcrição. Verifique a internet e tente novamente.';
+  }
+  if (/memory|out of memory|allocation/i.test(raw)) {
+    return 'O computador ficou sem memória para executar a transcrição local. Feche outras abas e tente novamente.';
+  }
+  return raw;
+}
+
 function transcriptionMime(blob: Blob, message: any) {
   const blobMime = String(blob.type || '').toLowerCase().split(';')[0].trim();
   const messageMime = String(message?.mime_type || '').toLowerCase().split(';')[0].trim();
@@ -471,6 +504,7 @@ export function WhatsappThread({
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<string | null>(null);
   const [transcribingIds, setTranscribingIds] = useState<Set<string>>(() => new Set());
+  const [transcriptionProgressById, setTranscriptionProgressById] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const [recordedAudio, setRecordedAudio] = useState<RecordedAudioState | null>(null);
   const [recording, setRecording] = useState(false);
@@ -644,6 +678,7 @@ export function WhatsappThread({
     setFeedback(null);
     setReactionOpenId(null);
     setDeleteOpenId(null);
+    setTranscriptionProgressById({});
     if (conversationId && !conversation?.virtual) {
       window.setTimeout(() => refreshThreadMessages(true), 80);
       window.setTimeout(() => refreshThreadMessages(true), 650);
@@ -757,6 +792,10 @@ export function WhatsappThread({
 
   async function transcribeAudio(message: any) {
     const messageId = String(message?.id || '').trim();
+    if (isStandalonePwa()) {
+      setFeedback('A transcrição fica disponível apenas no navegador desktop.');
+      return;
+    }
     if (!messageId || messageId.startsWith('local-')) {
       setFeedback('Aguarde o áudio sincronizar antes de transcrever.');
       return;
@@ -764,6 +803,7 @@ export function WhatsappThread({
     if (String(message?.transcription_text || '').trim()) return;
 
     setTranscribingIds((current) => new Set(current).add(messageId));
+    setTranscriptionProgressById((current) => ({ ...current, [messageId]: 'Preparando áudio…' }));
     setItems((current) => current.map((item: any) => item.id === messageId ? { ...item, transcription_status: 'processing', transcription_error: null } : item));
     setFeedback(null);
 
@@ -775,51 +815,50 @@ export function WhatsappThread({
       if (!mediaResponse.ok) throw new Error('Não foi possível carregar o áudio para transcrição.');
       const blob = await mediaResponse.blob();
       if (!blob.size) throw new Error('O áudio está vazio.');
-      if (blob.size > 25 * 1024 * 1024) throw new Error('O áudio ultrapassa o limite de 25 MB para transcrição.');
 
-      const cleanMime = transcriptionMime(blob, message);
-      let preparedFile: File;
-      if (cleanMime === 'audio/mpeg' || cleanMime === 'audio/mp3') {
-        preparedFile = new File([blob], `audio-${messageId}.mp3`, { type: 'audio/mpeg' });
-      } else if (cleanMime === 'audio/mp4') {
-        preparedFile = new File([blob], `audio-${messageId}.mp4`, { type: 'audio/mp4' });
-      } else if (cleanMime === 'audio/m4a' || cleanMime === 'audio/x-m4a') {
-        preparedFile = new File([blob], `audio-${messageId}.m4a`, { type: 'audio/m4a' });
-      } else if (cleanMime === 'audio/webm') {
-        preparedFile = new File([blob], `audio-${messageId}.webm`, { type: 'audio/webm' });
-      } else if (cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav') {
-        preparedFile = new File([blob], `audio-${messageId}.wav`, { type: 'audio/wav' });
-      } else {
-        // Mensagens de voz do WhatsApp costumam chegar em OGG/Opus, que não está
-        // na lista de formatos aceitos pelo endpoint de arquivo. Preparamos WAV
-        // mono 16 kHz para reduzir tamanho e aumentar a compatibilidade.
-        preparedFile = await convertBlobToTranscriptionWav(blob, messageId);
-      }
+      setTranscriptionProgressById((current) => ({ ...current, [messageId]: 'Preparando áudio no navegador…' }));
+      const audio = await decodeBlobToWhisperAudio(blob);
+      const localResult = await transcribeInBrowser(audio, (status) => {
+        setTranscriptionProgressById((current) => ({ ...current, [messageId]: status }));
+      });
 
-      const form = new FormData();
-      form.set('messageId', messageId);
-      form.set('file', preparedFile);
-      const response = await fetch('/api/whatsapp/messages/transcribe', { method: 'POST', body: form });
+      if (!localResult.text) throw new Error('Nenhuma fala reconhecível foi encontrada neste áudio.');
+      setTranscriptionProgressById((current) => ({ ...current, [messageId]: 'Salvando transcrição…' }));
+
+      const response = await fetch('/api/whatsapp/messages/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          transcription: localResult.text,
+          model: `browser:${localResult.model}`,
+        }),
+      });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível transcrever o áudio.');
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'A transcrição foi concluída, mas não pôde ser salva.');
 
       setItems((current) => current.map((item: any) => item.id === messageId ? {
         ...item,
-        transcription_text: result.transcription || '',
+        transcription_text: result.transcription || localResult.text,
         transcription_status: 'completed',
-        transcription_model: result.model || item.transcription_model || null,
+        transcription_model: result.model || `browser:${localResult.model}`,
         transcription_error: null,
         transcribed_at: result.transcribed_at || new Date().toISOString(),
       } : item));
-      setFeedback(result?.cached ? 'Transcrição carregada.' : 'Áudio transcrito com sucesso.');
+      setFeedback(result?.cached ? 'Transcrição carregada.' : 'Áudio transcrito gratuitamente no navegador.');
     } catch (error: any) {
-      const errorMessage = error?.message || 'Não foi possível transcrever o áudio.';
+      const errorMessage = friendlyBrowserTranscriptionError(error);
       setItems((current) => current.map((item: any) => item.id === messageId ? { ...item, transcription_status: 'error', transcription_error: errorMessage } : item));
       setFeedback(errorMessage);
     } finally {
       setTranscribingIds((current) => {
         const next = new Set(current);
         next.delete(messageId);
+        return next;
+      });
+      setTranscriptionProgressById((current) => {
+        const next = { ...current };
+        delete next[messageId];
         return next;
       });
     }
@@ -1205,6 +1244,7 @@ export function WhatsappThread({
       const transcription = String(message?.transcription_text || '').trim();
       const isTranscribing = transcribingIds.has(messageId) || message?.transcription_status === 'processing';
       const transcriptionError = String(message?.transcription_error || '').trim();
+      const transcriptionProgress = transcriptionProgressById[messageId] || '';
       return (
         <div className="space-y-1.5">
           <div className="rounded-2xl bg-black/5 px-3 py-2">
@@ -1227,7 +1267,7 @@ export function WhatsappThread({
               <div className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed">{transcription}</div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="browser-only hidden flex-wrap items-center gap-2 md:flex">
               <button
                 type="button"
                 disabled={!mediaUrl || isTranscribing || messageId.startsWith('local-')}
@@ -1235,8 +1275,9 @@ export function WhatsappThread({
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-[#075e54] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Sparkles size={12} className={isTranscribing ? 'animate-pulse' : ''} />
-                {isTranscribing ? 'Transcrevendo...' : transcriptionError ? 'Tentar novamente' : 'Transcrever áudio'}
+                {isTranscribing ? (transcriptionProgress || 'Transcrevendo no navegador…') : transcriptionError ? 'Tentar novamente' : 'Transcrever áudio grátis'}
               </button>
+              {isTranscribing && transcriptionProgress && <span className="max-w-[280px] text-[9px] font-semibold leading-4 text-slate-500">Processamento local · sem envio para API externa</span>}
               {transcriptionError && !isTranscribing && <span className="max-w-[260px] text-[9px] font-semibold leading-4 text-red-600">{transcriptionError}</span>}
             </div>
           )}
