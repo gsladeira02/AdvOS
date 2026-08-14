@@ -1,4 +1,5 @@
 import './globals.css';
+import { headers } from 'next/headers';
 import { PWARegister } from '@/components/PWARegister';
 
 export const metadata = {
@@ -29,7 +30,13 @@ export const viewport = {
   themeColor: '#075e54',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const dynamic = 'force-dynamic';
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Ler headers força SSR por request. Isso é necessário para o nonce da CSP
+  // gerado no middleware ser aplicado aos scripts do Next/React.
+  await headers();
+
   return (
     <html lang="pt-BR">
       <body>

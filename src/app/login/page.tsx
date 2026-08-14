@@ -1,85 +1,31 @@
-'use client';
-
 import Link from 'next/link';
-import { useState } from 'react';
 
-const LOGIN_TIMEOUT_MS = 15000;
-
-type LoginResponse = {
-  ok?: boolean;
-  target?: string;
-  error?: string;
+type LoginPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (loading) return;
-
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !password) {
-      setError('Informe e-mail e senha.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
-
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        credentials: 'same-origin',
-        cache: 'no-store',
-        signal: controller.signal,
-        body: JSON.stringify({
-          email: cleanEmail,
-          password,
-        }),
-      });
-
-      let payload: LoginResponse = {};
-      try {
-        payload = (await response.json()) as LoginResponse;
-      } catch {
-        payload = {};
-      }
-
-      if (!response.ok || payload.ok !== true) {
-        setError(payload.error || 'Não foi possível entrar. Confira seus dados e tente novamente.');
-        return;
-      }
-
-      // Navegação completa para garantir que o próximo request já leia os
-      // cookies de autenticação gravados pelo servidor.
-      const target =
-        typeof payload.target === 'string' && payload.target.startsWith('/') && !payload.target.startsWith('//')
-          ? payload.target
-          : '/auth/mfa/setup';
-
-      window.location.assign(target);
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        setError('A autenticação demorou mais que o esperado. Tente novamente.');
-      } else {
-        setError('Não foi possível conectar ao servidor do AdvOS. Tente novamente.');
-      }
-    } finally {
-      window.clearTimeout(timeout);
-      setLoading(false);
-    }
+function errorMessage(code?: string) {
+  switch (code) {
+    case 'missing':
+      return 'Informe e-mail e senha.';
+    case 'invalid':
+      return 'E-mail ou senha inválidos.';
+    case 'origin':
+      return 'Não foi possível validar a origem da solicitação. Recarregue a página e tente novamente.';
+    case 'timeout':
+      return 'A autenticação demorou mais que o esperado. Tente novamente.';
+    case 'server':
+      return 'Não foi possível concluir a autenticação. Tente novamente.';
+    default:
+      return '';
   }
+}
+
+export default async function Login({ searchParams }: LoginPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const rawError = params?.error;
+  const errorCode = Array.isArray(rawError) ? rawError[0] : rawError;
+  const error = errorMessage(errorCode);
 
   return (
     <main className="grid min-h-[100dvh] place-items-center px-4 py-6 sm:px-6">
@@ -99,23 +45,18 @@ export default function Login() {
           Use seu e-mail e a senha cadastrados no AdvOS.
         </p>
 
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <form action="/api/auth/login" method="post" className="mt-6 space-y-4">
           <div>
             <label htmlFor="email" className="label">E-mail</label>
             <input
               id="email"
+              name="email"
               className="input mt-1"
               type="email"
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-                if (error) setError('');
-              }}
               required
               autoComplete="email"
               autoCapitalize="none"
               spellCheck={false}
-              disabled={loading}
             />
           </div>
 
@@ -123,16 +64,11 @@ export default function Login() {
             <label htmlFor="password" className="label">Senha</label>
             <input
               id="password"
+              name="password"
               className="input mt-1"
               type="password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                if (error) setError('');
-              }}
               required
               autoComplete="current-password"
-              disabled={loading}
             />
           </div>
 
@@ -142,8 +78,8 @@ export default function Login() {
             </p>
           ) : null}
 
-          <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-            {loading ? 'Autenticando...' : 'Entrar'}
+          <button type="submit" className="btn btn-primary w-full">
+            Entrar
           </button>
         </form>
 
