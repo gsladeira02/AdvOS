@@ -28,7 +28,7 @@ function verifiedTotpFactors(data: any) {
   const seen = new Set<string>();
   return candidates.filter((factor: any) => {
     const id = String(factor?.id || '');
-    const ok = id && String(factor?.factor_type || factor?.factorType || 'totp') === 'totp' && String(factor?.status || 'verified') === 'verified';
+    const ok = id && String(factor?.factor_type || 'totp') === 'totp' && String(factor?.status || 'verified') === 'verified';
     if (!ok || seen.has(id)) return false;
     seen.add(id);
     return true;
