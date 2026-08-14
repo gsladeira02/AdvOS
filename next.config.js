@@ -3,8 +3,9 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'no-referrer' },
   { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
-  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(self)' },
-  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), serial=(), bluetooth=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
 ];
 
@@ -19,10 +20,7 @@ const nextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
-      {
-        source: '/:path*',
-        headers: securityHeaders,
-      },
+      { source: '/:path*', headers: securityHeaders },
       {
         source: '/sw.js',
         headers: [
@@ -30,18 +28,10 @@ const nextConfig = {
           { key: 'Service-Worker-Allowed', value: '/' },
         ],
       },
-      {
-        source: '/manifest.json',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }],
-      },
-      {
-        source: '/app/:path*',
-        headers: noStoreHeaders,
-      },
-      {
-        source: '/api/:path*',
-        headers: noStoreHeaders,
-      },
+      { source: '/manifest.json', headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }] },
+      { source: '/app/:path*', headers: noStoreHeaders },
+      { source: '/auth/:path*', headers: noStoreHeaders },
+      { source: '/api/:path*', headers: noStoreHeaders },
     ];
   },
 };
