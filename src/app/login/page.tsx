@@ -4,9 +4,25 @@ import { createBrowserSupabase } from '@/lib/supabase/browser';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
+const AUTH_TIMEOUT_MS = 12000;
+
+async function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('AUTH_TIMEOUT')), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 async function secureTarget(supabase: any) {
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error) return '/login?erro=mfa';
+  const { data, error } = await withTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel());
+  if (error) throw error;
   if (data?.currentLevel === 'aal2') return pwaTarget();
   if (data?.nextLevel === 'aal2') return '/auth/mfa';
   return '/auth/mfa/setup';
@@ -28,38 +44,64 @@ export default function Login() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      if (data.session) {
-        secureTarget(supabase).then((target) => window.location.replace(target));
-        return;
-      }
-      setCheckingSession(false);
-    }).catch(() => setCheckingSession(false));
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-        secureTarget(supabase).then((target) => window.location.replace(target));
-      }
-    });
+    // IMPORTANTE: não consultamos MFA dentro de onAuthStateChange.
+    // supabase-js pode entrar em deadlock quando outra chamada Auth assíncrona
+    // é executada dentro desse callback. A verificação inicial acontece aqui,
+    // fora do listener, e o login faz a própria navegação após signInWithPassword.
+    (async () => {
+      try {
+        const { data, error: sessionError } = await withTimeout(supabase.auth.getSession());
+        if (!active) return;
 
-    return () => {
-      active = false;
-      listener.subscription.unsubscribe();
-    };
+        if (sessionError || !data.session) {
+          setCheckingSession(false);
+          return;
+        }
+
+        const target = await secureTarget(supabase);
+        if (active) window.location.replace(target);
+      } catch {
+        if (!active) return;
+        // Uma sessão local incompleta/stale não deve prender a tela de login.
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => null);
+        if (!active) return;
+        setCheckingSession(false);
+        setError('Não foi possível verificar a sessão. Entre novamente.');
+      }
+    })();
+
+    return () => { active = false; };
   }, [supabase]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading || checkingSession) return;
+
     setLoading(true);
     setError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      setError('E-mail ou senha inválidos.');
-      return;
+
+    try {
+      const { error: signInError } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: email.trim(), password })
+      );
+
+      if (signInError) {
+        setError('E-mail ou senha inválidos.');
+        return;
+      }
+
+      const target = await secureTarget(supabase);
+      window.location.replace(target);
+    } catch (err: any) {
+      if (String(err?.message || '') === 'AUTH_TIMEOUT') {
+        setError('A autenticação demorou mais que o esperado. Tente novamente.');
+      } else {
+        setError('Não foi possível concluir a autenticação. Tente novamente.');
+      }
+    } finally {
+      setLoading(false);
     }
-    window.location.replace(await secureTarget(supabase));
   }
 
   return (
@@ -77,18 +119,18 @@ export default function Login() {
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
             <label className="label">E-mail</label>
-            <input className="input mt-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className="input mt-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           </div>
           <div>
             <label className="label">Senha</label>
-            <input className="input mt-1" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input className="input mt-1" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
           </div>
           {error && <p className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
           <button className="btn btn-primary w-full" disabled={loading || checkingSession}>
             {checkingSession ? 'Verificando sessão...' : loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">Após a senha, o AdvOS exige um código do aplicativo autenticador.</p>
+        <p className="mt-4 text-center text-[11px] font-bold text-slate-500">Após a senha, o AdvOS solicita a autenticação em duas etapas.</p>
       </div>
     </main>
   );
