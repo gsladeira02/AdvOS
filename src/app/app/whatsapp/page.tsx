@@ -164,6 +164,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialLeadStages={whatsappSettings.stages || []}
         initialPreferences={whatsappSettings.preferences || {}}
         initialAutoReplies={whatsappSettings.autoReplies || []}
+        initialLeadTracking={whatsappSettings.leadTracking || null}
         initialView={initialView as any}
         initialSettingsSection={initialSettingsSection}
         canConfigure={canConfigure}

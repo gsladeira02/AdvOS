@@ -13,7 +13,7 @@ export function normalizeStageKey(value: any) {
 }
 
 export async function loadWhatsappSettings(admin: any, lawFirmId: string) {
-  const [{ data: tags, error: tagsError }, { data: stages, error: stagesError }, { data: preferences, error: preferencesError }, autoRepliesResult] = await Promise.all([
+  const [{ data: tags, error: tagsError }, { data: stages, error: stagesError }, { data: preferences, error: preferencesError }, autoRepliesResult, leadTrackingResult] = await Promise.all([
     admin
       .from('whatsapp_tags')
       .select('id,name,color,active,sort_order,created_at,updated_at')
@@ -40,6 +40,11 @@ export async function loadWhatsappSettings(admin: any, lawFirmId: string) {
       .order('active', { ascending: false })
       .order('sort_order')
       .order('created_at'),
+    admin
+      .from('lead_tracking_settings')
+      .select('law_firm_id,public_token,meta_tracking_enabled,google_tracking_enabled,auto_qualify_paid_leads,google_default_message,updated_at')
+      .eq('law_firm_id', lawFirmId)
+      .maybeSingle(),
   ]);
 
   if (tagsError) throw new Error(tagsError.message);
@@ -50,10 +55,16 @@ export async function loadWhatsappSettings(admin: any, lawFirmId: string) {
   const autoRepliesUnavailable = autoReplyErrorCode === '42P01' || autoReplyErrorCode === 'PGRST205' || String(autoRepliesError?.message || '').toLowerCase().includes('does not exist') || String(autoRepliesError?.message || '').toLowerCase().includes('schema cache');
   if (autoRepliesError && !autoRepliesUnavailable) throw new Error(autoRepliesError.message);
 
+  const leadTrackingError = leadTrackingResult?.error;
+  const leadTrackingErrorCode = String(leadTrackingError?.code || '');
+  const leadTrackingUnavailable = leadTrackingErrorCode === '42P01' || leadTrackingErrorCode === 'PGRST205' || String(leadTrackingError?.message || '').toLowerCase().includes('does not exist') || String(leadTrackingError?.message || '').toLowerCase().includes('schema cache');
+  if (leadTrackingError && !leadTrackingUnavailable) throw new Error(leadTrackingError.message);
+
   return {
     tags: tags || [],
     stages: stages || [],
     autoReplies: autoRepliesUnavailable ? [] : (autoRepliesResult?.data || []),
+    leadTracking: leadTrackingUnavailable ? null : (leadTrackingResult?.data || null),
     preferences: preferences || {
       law_firm_id: lawFirmId,
       lead_label_singular: 'Lead',

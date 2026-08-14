@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, Check, ChevronDown, RotateCcw, Tag, UserPlus, X } from 'lucide-react';
+import { Archive, Check, ChevronDown, Megaphone, RotateCcw, Tag, UserPlus, X } from 'lucide-react';
 import { WhatsappOperationsPanel } from '@/components/WhatsappOperationsPanel';
 
 const colorClasses: Record<string, string> = {
@@ -74,6 +74,12 @@ export function WhatsappConversationControls({
   const isLead = Boolean(!isClient && conversation?.lead);
   const department = conversation?.department || 'atendimento';
   const isClosed = Boolean(conversation?.closed_at);
+  const attributionLead = conversation?.lead || {};
+  const paidPlatform = attributionLead?.source_platform === 'meta' ? 'Meta Ads' : attributionLead?.source_platform === 'google' ? 'Google Ads' : '';
+  const attributionCampaign = attributionLead?.campaign_name || attributionLead?.utm_campaign || attributionLead?.campaign_id || '';
+  const attributionAdGroup = attributionLead?.adgroup_name || attributionLead?.adgroup_id || attributionLead?.adset_name || attributionLead?.adset_id || '';
+  const attributionAd = attributionLead?.ad_name || attributionLead?.referral_headline || attributionLead?.ad_id || attributionLead?.creative_id || '';
+  const attributionClick = attributionLead?.gclid || attributionLead?.gbraid || attributionLead?.wbraid || attributionLead?.click_id || '';
 
   async function action(payload: Record<string, any>) {
     setBusy(true); setFeedback(null);
@@ -154,6 +160,23 @@ export function WhatsappConversationControls({
           {isClient && <a href={`/app/clientes/${encodeURIComponent(String(conversation?.client_id || conversation?.clients?.id))}`} className="rounded-full bg-sky-50 px-2.5 py-1 text-[9px] font-black text-sky-700 hover:bg-sky-100">Abrir Pasta do Cliente</a>}
         </div>
 
+        {isLead && paidPlatform && (
+          <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm"><Megaphone size={10}/>{paidPlatform}</span>
+              {attributionLead?.qualified_automatically && <span className="rounded-full bg-emerald-700 px-2 py-1 text-[9px] font-black text-white">Qualificado automaticamente · {Number(attributionLead?.qualification_score || 0)}/100</span>}
+              {attributionLead?.service_interest && <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-slate-700">Área: {attributionLead.service_interest}</span>}
+            </div>
+            <div className="mt-1.5 grid gap-x-4 gap-y-1 text-[9px] font-semibold leading-relaxed text-slate-600 sm:grid-cols-2 xl:grid-cols-3">
+              {attributionCampaign && <p className="min-w-0 truncate" title={String(attributionCampaign)}><b className="text-slate-800">Campanha:</b> {attributionCampaign}</p>}
+              {attributionAdGroup && <p className="min-w-0 truncate" title={String(attributionAdGroup)}><b className="text-slate-800">Grupo/conjunto:</b> {attributionAdGroup}</p>}
+              {attributionAd && <p className="min-w-0 truncate" title={String(attributionAd)}><b className="text-slate-800">Anúncio:</b> {attributionAd}</p>}
+              {attributionLead?.utm_term && <p className="min-w-0 truncate" title={String(attributionLead.utm_term)}><b className="text-slate-800">Busca/termo:</b> {attributionLead.utm_term}</p>}
+              {attributionClick && <p className="min-w-0 truncate" title={String(attributionClick)}><b className="text-slate-800">Clique:</b> {attributionClick}</p>}
+            </div>
+          </div>
+        )}
+
         {!conversation?.virtual && (
           <div className="whatsapp-tag-row mt-2 flex flex-wrap items-center gap-1.5">
             {visibleSelectedTags.map((tag: any) => <span key={tag.id} className={`inline-flex max-w-[150px] items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${tagTone(tag.color)}`}><Tag size={10} className="shrink-0"/><span className="truncate">{tag.name}</span></span>)}
@@ -185,6 +208,7 @@ export function WhatsappConversationControls({
         <div className="fixed inset-0 z-[90] grid place-items-center bg-black/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setLeadModal(false); }}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black text-slate-950">Detalhes do {leadLabel.toLowerCase()}</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Qualifique o contato sem transformá-lo em cliente.</p></div><button type="button" onClick={() => setLeadModal(false)} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100"><X size={15}/></button></div>
+            {paidPlatform && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[10px] font-semibold leading-relaxed text-slate-700"><div className="flex flex-wrap items-center gap-2"><b className="text-emerald-900">Origem: {paidPlatform}</b>{attributionLead?.qualified_automatically && <span className="rounded-full bg-emerald-700 px-2 py-0.5 font-black text-white">Score {Number(attributionLead?.qualification_score || 0)}/100</span>}</div>{attributionCampaign && <p className="mt-1"><b>Campanha:</b> {attributionCampaign}</p>}{attributionAdGroup && <p><b>Grupo/conjunto:</b> {attributionAdGroup}</p>}{attributionAd && <p><b>Anúncio/criativo:</b> {attributionAd}</p>}{attributionLead?.referral_body && <p><b>Texto do anúncio:</b> {attributionLead.referral_body}</p>}{attributionLead?.utm_term && <p><b>Palavra-chave:</b> {attributionLead.utm_term}</p>}{attributionClick && <p className="break-all"><b>ID do clique:</b> {attributionClick}</p>}</div>}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label><span className="label">Etapa</span><select className="input mt-1" value={leadStage} onChange={(e) => setLeadStage(e.target.value)}>{selectableStages.map((stage:any)=><option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select></label>
               <label><span className="label">Nome</span><input className="input mt-1" value={leadName} onChange={(e) => setLeadName(e.target.value)} /></label>

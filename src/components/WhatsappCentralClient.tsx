@@ -90,7 +90,7 @@ function matchesSearch(item: any, query: string) {
   if (!term) return true;
   const tags = Array.isArray(item?.tags) ? item.tags.join(' ') : '';
   const lead = item?.lead || {};
-  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''} ${tags} ${lead?.stage || ''} ${lead?.service_interest || ''} ${item?.assigned_user?.full_name || ''}`);
+  const haystack = normalizeSearch(`${titleFor(item)} ${item?.phone || ''} ${item?.clients?.phone || ''} ${item?.clients?.whatsapp || ''} ${item?.last_message_body || ''} ${tags} ${lead?.stage || ''} ${lead?.service_interest || ''} ${lead?.source || ''} ${lead?.source_platform || ''} ${lead?.campaign_id || ''} ${lead?.campaign_name || ''} ${lead?.adgroup_id || ''} ${lead?.adgroup_name || ''} ${lead?.ad_id || ''} ${lead?.ad_name || ''} ${lead?.referral_headline || ''} ${lead?.utm_campaign || ''} ${lead?.utm_term || ''} ${item?.assigned_user?.full_name || ''}`);
   return haystack.includes(term);
 }
 
@@ -124,6 +124,7 @@ export function WhatsappCentralClient({
   initialLeadStages = [],
   initialPreferences = {},
   initialAutoReplies = [],
+  initialLeadTracking = null,
   initialView = 'atendimento',
   initialSettingsSection = 'tags',
   canConfigure = false,
@@ -141,6 +142,7 @@ export function WhatsappCentralClient({
   initialLeadStages?: any[];
   initialPreferences?: any;
   initialAutoReplies?: any[];
+  initialLeadTracking?: any;
   initialView?: WhatsappWorkspaceView;
   initialSettingsSection?: string;
   canConfigure?: boolean;
@@ -157,12 +159,14 @@ export function WhatsappCentralClient({
   const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'mine' | 'unassigned' | string>('all');
   const [tagFilter, setTagFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WhatsappWorkspaceView>(initialView || 'atendimento');
   const [tagCatalog, setTagCatalog] = useState<any[]>(initialTags || []);
   const [leadStages, setLeadStages] = useState<any[]>(initialLeadStages || []);
   const [preferences, setPreferences] = useState<any>(initialPreferences || {});
   const [autoReplies, setAutoReplies] = useState<any[]>(initialAutoReplies || []);
+  const [leadTracking, setLeadTracking] = useState<any>(initialLeadTracking || null);
   const [templateOptions, setTemplateOptions] = useState<WhatsappTemplateOption[]>(templates || []);
   const initialSelected = [...(initialConversations || []), ...(initialContacts || [])].find((item: any) => item?.id === initialSelectedId);
   const [activeDepartment, setActiveDepartment] = useState<WhatsappDepartment>(() => {
@@ -247,9 +251,10 @@ export function WhatsappCentralClient({
     if (assigneeFilter !== 'all' && assigneeFilter !== 'mine' && assigneeFilter !== 'unassigned' && String(conversation?.assigned_to || '') !== String(assigneeFilter)) return false;
     if (tagFilter && !(Array.isArray(conversation?.tag_ids) && conversation.tag_ids.map(String).includes(String(tagFilter)))) return false;
     if (stageFilter && String(conversation?.lead?.stage || '') !== String(stageFilter)) return false;
+    if (sourceFilter && String(conversation?.lead?.source_platform || '') !== String(sourceFilter)) return false;
     if (unreadOnly && Number(conversation?.unread_count || 0) <= 0) return false;
     return true;
-  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, unreadOnly]);
+  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, sourceFilter, unreadOnly]);
 
   const filteredConversations = useMemo(() => {
     return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
@@ -272,12 +277,13 @@ export function WhatsappCentralClient({
   const isSearching = Boolean(query.trim());
   const leadSingular = String(preferences?.lead_label_singular || 'Lead');
   const leadPlural = String(preferences?.lead_label_plural || 'Leads');
-  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (stageFilter ? 1 : 0) + (unreadOnly ? 1 : 0);
+  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (stageFilter ? 1 : 0) + (sourceFilter ? 1 : 0) + (unreadOnly ? 1 : 0);
 
   function clearOperationalFilters() {
     setAssigneeFilter('all');
     setTagFilter('');
     setStageFilter('');
+    setSourceFilter('');
     setUnreadOnly(false);
   }
 
@@ -584,6 +590,8 @@ export function WhatsappCentralClient({
                   <b className="min-w-0 flex-1 truncate text-[11px] text-slate-950">{title}</b>
                   {item?.closed_at && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[7px] font-black uppercase text-slate-600">{item?.closed_from_department === 'financeiro_juridico' ? 'Jur./Fin.' : 'Atendimento'}</span>}
                   {isLead && !item?.closed_at && <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[7px] font-black uppercase text-amber-700">{leadStageLabel(item?.lead?.stage, leadStages)}</span>}
+                  {isLead && item?.lead?.source_platform === 'meta' && <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[7px] font-black uppercase text-blue-700">Meta Ads</span>}
+                  {isLead && item?.lead?.source_platform === 'google' && <span className="shrink-0 rounded-full bg-red-50 px-1.5 py-0.5 text-[7px] font-black uppercase text-red-700">Google Ads</span>}
                 </div>
                 <span className={`shrink-0 text-[9px] font-bold ${Number(item.unread_count || 0) > 0 ? 'text-[#1fa855]' : 'text-slate-400'}`}>
                   {conversationListTime(item.closed_at || item.last_message_at)}
@@ -608,6 +616,12 @@ export function WhatsappCentralClient({
                 <UserCheck size={9} className="shrink-0" />
                 <span className={`truncate ${item?.assigned_user?.full_name ? 'text-slate-500' : 'text-amber-600'}`}>{item?.assigned_user?.full_name || 'Sem responsável'}</span>
               </div>
+              {isLead && item?.lead?.qualified_automatically && (
+                <div className="mt-1 flex min-w-0 items-center gap-1 text-[8px] font-black text-emerald-700">
+                  <span className="shrink-0">Qualificado {Number(item?.lead?.qualification_score || 0)}/100</span>
+                  {item?.lead?.service_interest && <span className="truncate font-bold text-slate-500">· {item.lead.service_interest}</span>}
+                </div>
+              )}
               {itemTags.length > 0 && (
                 <div className="mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {itemTags.map((tag: string) => <span key={tag} className="max-w-[88px] truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[7px] font-bold text-slate-600">#{tag}</span>)}
@@ -657,9 +671,10 @@ export function WhatsappCentralClient({
           stages={leadStages}
           preferences={preferences}
           autoReplies={autoReplies}
+          leadTracking={leadTracking}
           templates={templateOptions as any}
           initialSection={initialSettingsSection}
-          onSettingsChanged={(next) => { setTagCatalog(next.tags || []); setLeadStages(next.stages || []); setPreferences(next.preferences || {}); setAutoReplies(next.autoReplies || []); }}
+          onSettingsChanged={(next) => { setTagCatalog(next.tags || []); setLeadStages(next.stages || []); setPreferences(next.preferences || {}); setAutoReplies(next.autoReplies || []); setLeadTracking(next.leadTracking || null); }}
           onTemplatesChanged={(next) => setTemplateOptions(next as WhatsappTemplateOption[])}
         />
       ) : (
@@ -735,6 +750,7 @@ export function WhatsappCentralClient({
                   {(tagCatalog || []).filter((tag: any) => tag.active !== false).map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                 </select>
                 {activeTab === 'leads' && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
+                {activeTab === 'leads' && <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por origem do lead"><option value="">Todas as origens</option><option value="meta">Meta Ads</option><option value="google">Google Ads</option></select>}
                 <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[10px] font-bold text-slate-600"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} /> Somente não lidas</label>
               </div>
             </div>

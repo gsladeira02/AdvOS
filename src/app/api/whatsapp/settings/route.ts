@@ -51,6 +51,33 @@ export async function POST(req: Request) {
     const body = await readJsonBody(req, 256 * 1024);
     const action = text(body?.action, 50);
 
+    if (action === 'save_lead_tracking') {
+      const { data: existing, error: existingError } = await admin
+        .from('lead_tracking_settings')
+        .select('law_firm_id')
+        .eq('law_firm_id', profile.law_firm_id)
+        .maybeSingle();
+      if (existingError && ['42P01', 'PGRST205'].includes(String(existingError.code || ''))) {
+        throw new Error('Rode o SQL v9_57_lead_attribution_meta_google.sql no Supabase antes de ativar o rastreamento de leads.');
+      }
+      if (existingError) throw new Error(existingError.message);
+
+      const payload = {
+        law_firm_id: profile.law_firm_id,
+        meta_tracking_enabled: body?.metaTrackingEnabled !== false,
+        google_tracking_enabled: body?.googleTrackingEnabled !== false,
+        auto_qualify_paid_leads: body?.autoQualifyPaidLeads !== false,
+        google_default_message: messageText(body?.googleDefaultMessage, 600) || 'Olá! Gostaria de falar com um advogado.',
+        updated_at: new Date().toISOString(),
+      };
+      const query = existing?.law_firm_id
+        ? admin.from('lead_tracking_settings').update(payload).eq('law_firm_id', profile.law_firm_id)
+        : admin.from('lead_tracking_settings').insert(payload);
+      const { error } = await query;
+      if (error) throw new Error(error.message);
+      return await settingsResponse(admin, profile.law_firm_id);
+    }
+
     if (action === 'save_auto_reply') {
       const id = text(body?.id, 80);
       const name = text(body?.name, 80);

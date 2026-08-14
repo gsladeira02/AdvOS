@@ -7,6 +7,8 @@ import { assertSafeUploadedFile } from '@/lib/fileSecurity';
 import { attachWhatsappMediaToClientFolder, ensureWhatsappLead } from '@/lib/whatsappCRM';
 import { optimizeStoredDocument } from '@/lib/documentOptimization';
 import { sendLeadAutoReplies } from '@/lib/whatsappAutoReplies';
+import { googleAttributionFromInboundText, markTrackingClickMatched, metaAttributionFromMessage, stripTrackingReference } from '@/lib/leadAttribution';
+import { recordWhatsappEvent } from '@/lib/whatsappOperations';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -262,6 +264,12 @@ export async function POST(req: Request) {
           continue;
         }
 
+        const rawInboundText = firstTextFromInboundMessage(message);
+        const metaAttribution = metaAttributionFromMessage(message);
+        const googleAttribution = metaAttribution ? null : await googleAttributionFromInboundText(admin, lawFirmId, rawInboundText);
+        const leadAttribution = metaAttribution || googleAttribution;
+        const visibleInboundText = googleAttribution ? (stripTrackingReference(rawInboundText) || rawInboundText) : rawInboundText;
+
         const inboundMedia = message?.image || message?.document || message?.video || message?.audio || message?.sticker || null;
         const cachedMedia = inboundMedia ? await cacheInboundMedia(admin, lawFirmId, inboundMedia, message.type || 'media') : null;
 
@@ -275,7 +283,7 @@ export async function POST(req: Request) {
           client_id: client?.id || null,
           direction: 'inbound',
           message_type: message.type || 'text',
-          body: firstTextFromInboundMessage(message),
+          body: visibleInboundText,
           external_id: message.id,
           status: 'received',
           raw_payload: message,
@@ -296,7 +304,37 @@ export async function POST(req: Request) {
             phone,
             name: contact?.profile?.name || conversation.lead_name || null,
             contactedAt: messageCreatedAt,
+            firstMessage: visibleInboundText,
+            attribution: leadAttribution,
           });
+
+          if (leadAttribution && leadRecord?.source_platform === leadAttribution.source_platform) {
+            await markTrackingClickMatched(admin, leadAttribution, {
+              lawFirmId,
+              conversationId: conversation.id,
+              leadId: leadRecord?.id || null,
+            });
+
+            if (leadRecord?._wasCreated === true) {
+              const platformLabel = leadAttribution.source_platform === 'meta' ? 'Meta Ads' : 'Google Ads';
+              const adReference = leadAttribution.ad_name || leadAttribution.referral_headline || leadAttribution.ad_id || leadAttribution.creative_id || '';
+              await recordWhatsappEvent(admin, {
+                lawFirmId,
+                conversationId: conversation.id,
+                eventType: 'lead_attributed',
+                description: `Lead qualificado automaticamente via ${platformLabel}${adReference ? ` · Anúncio: ${adReference}` : ''}.`,
+                metadata: {
+                  platform: leadAttribution.source_platform,
+                  campaign_id: leadAttribution.campaign_id || null,
+                  ad_id: leadAttribution.ad_id || null,
+                  creative_id: leadAttribution.creative_id || null,
+                  click_id: leadAttribution.click_id || leadAttribution.gclid || leadAttribution.gbraid || leadAttribution.wbraid || null,
+                  qualification_score: leadRecord?.qualification_score || 0,
+                  service_interest: leadRecord?.service_interest || null,
+                },
+              });
+            }
+          }
         }
 
         // Quando a conversa já pertence a um cliente, qualquer mídia recebida
@@ -340,7 +378,7 @@ export async function POST(req: Request) {
             conversationId: conversation.id,
             phone,
             leadName: contact?.profile?.name || conversation.lead_name || null,
-            inboundText: firstTextFromInboundMessage(message),
+            inboundText: visibleInboundText,
             inboundMessageId: savedInboundMessage?.id || null,
             department: reopenedDepartment,
             isNewLead: leadRecord?._wasCreated === true,

@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Bot, Check, CheckCircle2, ChevronDown, ChevronUp, Plus, Power, PowerOff, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bot, Check, CheckCircle2, ChevronDown, ChevronUp, Copy, Link2, Megaphone, Plus, Power, PowerOff, Save, Settings2, Tag, Trash2, Users } from 'lucide-react';
 import { MessageTemplatesManager, type MessageTemplateRow } from '@/components/MessageTemplatesManager';
 
 const COLORS = [
@@ -63,6 +63,7 @@ export function WhatsappSettingsCenter({
   stages,
   preferences,
   autoReplies = [],
+  leadTracking = null,
   templates,
   onSettingsChanged,
   onTemplatesChanged,
@@ -72,21 +73,44 @@ export function WhatsappSettingsCenter({
   stages: any[];
   preferences: any;
   autoReplies?: any[];
+  leadTracking?: any;
   templates: MessageTemplateRow[];
-  onSettingsChanged?: (next: { tags: any[]; stages: any[]; preferences: any; autoReplies?: any[] }) => void;
+  onSettingsChanged?: (next: { tags: any[]; stages: any[]; preferences: any; autoReplies?: any[]; leadTracking?: any }) => void;
   onTemplatesChanged?: (next: MessageTemplateRow[]) => void;
   initialSection?: string;
 }) {
-  const [section, setSection] = useState(initialSection === 'modelos' ? 'modelos' : initialSection === 'leads' ? 'leads' : initialSection === 'automaticas' ? 'automaticas' : initialSection === 'geral' ? 'geral' : 'tags');
+  const [section, setSection] = useState(initialSection === 'modelos' ? 'modelos' : initialSection === 'leads' ? 'leads' : initialSection === 'automaticas' ? 'automaticas' : initialSection === 'rastreamento' ? 'rastreamento' : initialSection === 'geral' ? 'geral' : 'tags');
   const [localTags, setLocalTags] = useState<any[]>(tags || []);
   const [localStages, setLocalStages] = useState<any[]>(stages || []);
   const [localAutoReplies, setLocalAutoReplies] = useState<any[]>(autoReplies || []);
+  const [tracking, setTracking] = useState<any>(leadTracking || null);
+  const [appOrigin, setAppOrigin] = useState('');
   const [prefs, setPrefs] = useState<any>(preferences || {});
   const [autoDraft, setAutoDraft] = useState({ name: 'Boas-vindas para novos leads', trigger_type: 'new_lead', message: '', keywords: '', department: '', active: true });
   const [tagDraft, setTagDraft] = useState({ name: '', color: 'slate' });
   const [stageDraft, setStageDraft] = useState({ name: '', color: 'sky', outcome: 'open' });
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => { setAppOrigin(window.location.origin); }, []);
+
+  const googleTrackingUrl = useMemo(() => {
+    const token = String(tracking?.public_token || '').trim();
+    if (!appOrigin || !token) return '';
+    const params = new URLSearchParams({
+      token,
+      utm_source: 'google',
+      utm_medium: 'cpc',
+      campaignid: '{campaignid}',
+      adgroupid: '{adgroupid}',
+      creative: '{creative}',
+      keyword: '{keyword}',
+      matchtype: '{matchtype}',
+      network: '{network}',
+      device: '{device}',
+    });
+    return `${appOrigin}/r/whatsapp?${params.toString().replace(/%7B/g, '{').replace(/%7D/g, '}')}`;
+  }, [appOrigin, tracking?.public_token]);
 
   const openStages = useMemo(() => localStages.filter((stage: any) => stage.active !== false && stage.outcome === 'open'), [localStages]);
 
@@ -99,8 +123,9 @@ export function WhatsappSettingsCenter({
       setLocalTags(result.tags || []);
       setLocalStages(result.stages || []);
       setLocalAutoReplies(result.autoReplies || []);
+      setTracking(result.leadTracking || null);
       setPrefs(result.preferences || {});
-      onSettingsChanged?.({ tags: result.tags || [], stages: result.stages || [], preferences: result.preferences || {}, autoReplies: result.autoReplies || [] });
+      onSettingsChanged?.({ tags: result.tags || [], stages: result.stages || [], preferences: result.preferences || {}, autoReplies: result.autoReplies || [], leadTracking: result.leadTracking || null });
       return result;
     } catch (error: any) {
       setFeedback(error?.message || 'Não foi possível salvar.');
@@ -180,7 +205,7 @@ export function WhatsappSettingsCenter({
 
       <div className="flex flex-wrap gap-2 rounded-2xl border border-[#e6dccb] bg-white p-2 shadow-sm">
         {[
-          ['tags', 'Tags', Tag], ['leads', 'Funil de leads', Users], ['automaticas', 'Respostas automáticas', Bot], ['modelos', 'Modelos de mensagem', Save], ['geral', 'Geral', Settings2],
+          ['tags', 'Tags', Tag], ['leads', 'Funil de leads', Users], ['automaticas', 'Respostas automáticas', Bot], ['rastreamento', 'Rastreamento', Megaphone], ['modelos', 'Modelos de mensagem', Save], ['geral', 'Geral', Settings2],
         ].map(([key, label, Icon]: any) => (
           <button key={key} type="button" onClick={() => setSection(key)} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${section === key ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Icon size={14} />{label}</button>
         ))}
@@ -297,6 +322,37 @@ export function WhatsappSettingsCenter({
               {!localAutoReplies.length&&<p className="p-4 text-xs font-bold leading-relaxed text-slate-500">Nenhuma resposta automática cadastrada ainda. Rode a migration v9.56 no Supabase e cadastre a primeira automação acima.</p>}
             </div>
           </section>
+        </div>
+      )}
+
+      {section === 'rastreamento' && (
+        <div className="space-y-4">
+          {!tracking?.public_token && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold leading-relaxed text-amber-900">
+              Rode <b>supabase/v9_57_lead_attribution_meta_google.sql</b> no Supabase para ativar a atribuição de Meta Ads e Google Ads.
+            </div>
+          )}
+
+          <section className="panel p-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700"><Megaphone size={18}/></div>
+              <div className="min-w-0"><h3 className="text-sm font-black text-slate-950">Qualificação automática de mídia paga</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">Leads rastreados entram com origem, anúncio/campanha, identificador do clique, score e área jurídica provável. Quando a etapa <b>Qualificado</b> estiver ativa, o lead já entra nela automaticamente.</p></div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="flex items-start gap-3 rounded-xl border border-[#e6dccb] bg-[#fbf7ef] p-3"><input type="checkbox" checked={tracking?.meta_tracking_enabled !== false} disabled={!tracking} onChange={(e)=>setTracking((t:any)=>({...t,meta_tracking_enabled:e.target.checked}))} className="mt-0.5 h-4 w-4"/><span><b className="block text-xs text-slate-900">Meta Ads</b><span className="text-[10px] font-semibold leading-relaxed text-slate-500">Captura anúncios Click-to-WhatsApp diretamente do webhook da Meta.</span></span></label>
+              <label className="flex items-start gap-3 rounded-xl border border-[#e6dccb] bg-[#fbf7ef] p-3"><input type="checkbox" checked={tracking?.google_tracking_enabled !== false} disabled={!tracking} onChange={(e)=>setTracking((t:any)=>({...t,google_tracking_enabled:e.target.checked}))} className="mt-0.5 h-4 w-4"/><span><b className="block text-xs text-slate-900">Google Ads</b><span className="text-[10px] font-semibold leading-relaxed text-slate-500">Captura GCLID/GBRAID/WBRAID e parâmetros ValueTrack.</span></span></label>
+              <label className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><input type="checkbox" checked={tracking?.auto_qualify_paid_leads !== false} disabled={!tracking} onChange={(e)=>setTracking((t:any)=>({...t,auto_qualify_paid_leads:e.target.checked}))} className="mt-0.5 h-4 w-4"/><span><b className="block text-xs text-emerald-900">Entrar como qualificado</b><span className="text-[10px] font-semibold leading-relaxed text-emerald-700">Aplica score e move automaticamente o novo lead rastreado para Qualificado.</span></span></label>
+            </div>
+          </section>
+
+          <section className="panel p-4">
+            <div className="flex items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700"><Link2 size={18}/></div><div><h3 className="text-sm font-black text-slate-950">Google Ads → WhatsApp</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">Use esta URL no anúncio/campanha que leva ao WhatsApp. O AdvOS registra o clique e abre o WhatsApp com uma referência única que é vinculada ao lead quando a primeira mensagem chega.</p></div></div>
+            <label className="mt-4 block"><span className="label">Mensagem pré-preenchida</span><textarea className="input mt-1 min-h-[82px] resize-y" disabled={!tracking} value={tracking?.google_default_message || 'Olá! Gostaria de falar com um advogado.'} onChange={(e)=>setTracking((t:any)=>({...t,google_default_message:e.target.value}))} maxLength={600}/></label>
+            <div className="mt-3"><span className="label">URL de rastreamento com ValueTrack</span><div className="mt-1 flex min-w-0 gap-2"><input className="input min-w-0 flex-1 bg-slate-50 font-mono text-[10px]" readOnly value={googleTrackingUrl} placeholder="Disponível depois da migration v9.57"/><button type="button" disabled={!googleTrackingUrl} onClick={async()=>{ await navigator.clipboard.writeText(googleTrackingUrl); setFeedback('URL do Google Ads copiada.'); }} className="btn btn-secondary shrink-0"><Copy size={14}/>Copiar</button></div></div>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] font-semibold leading-relaxed text-slate-600">A URL inclui <b>{'{campaignid}'}</b>, <b>{'{adgroupid}'}</b>, <b>{'{creative}'}</b>, <b>{'{keyword}'}</b>, rede e dispositivo. Com a marcação automática do Google ativa, o <b>GCLID</b> também chega ao AdvOS.</div>
+          </section>
+
+          <div className="flex justify-end"><button type="button" disabled={busy || !tracking} onClick={async()=>{ const result=await api({ action:'save_lead_tracking', metaTrackingEnabled:tracking?.meta_tracking_enabled !== false, googleTrackingEnabled:tracking?.google_tracking_enabled !== false, autoQualifyPaidLeads:tracking?.auto_qualify_paid_leads !== false, googleDefaultMessage:tracking?.google_default_message || '' }); if(result) setFeedback('Rastreamento de leads salvo.'); }} className="btn"><Save size={14}/>Salvar rastreamento</button></div>
         </div>
       )}
 

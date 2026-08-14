@@ -1,5 +1,6 @@
 import 'server-only';
 import { defaultWhatsappLeadStage } from '@/lib/whatsappSettings';
+import { qualifyPaidLead, type LeadAttribution } from '@/lib/leadAttribution';
 
 function safeTitle(value?: string | null, fallback = 'Mídia recebida pelo WhatsApp') {
   const text = String(value || '').trim().replace(/[\r\n\t]+/g, ' ');
@@ -12,6 +13,8 @@ export async function ensureWhatsappLead(admin: any, input: {
   phone: string;
   name?: string | null;
   contactedAt?: string | null;
+  firstMessage?: string | null;
+  attribution?: LeadAttribution | null;
 }) {
   const now = new Date().toISOString();
   const { data: existing, error: lookupError } = await admin
@@ -23,6 +26,76 @@ export async function ensureWhatsappLead(admin: any, input: {
 
   if (lookupError) throw new Error(lookupError.message);
 
+  let effectiveAttribution = input.attribution || null;
+  let autoQualifyPaidLeads = true;
+  if (effectiveAttribution) {
+    const { data: trackingSettings, error: trackingSettingsError } = await admin
+      .from('lead_tracking_settings')
+      .select('meta_tracking_enabled,google_tracking_enabled,auto_qualify_paid_leads')
+      .eq('law_firm_id', input.lawFirmId)
+      .maybeSingle();
+    if (trackingSettingsError) {
+      const code = String(trackingSettingsError.code || '');
+      if (code === '42P01' || code === 'PGRST205' || String(trackingSettingsError.message || '').toLowerCase().includes('does not exist') || String(trackingSettingsError.message || '').toLowerCase().includes('schema cache')) {
+        effectiveAttribution = null;
+      }
+    } else if (trackingSettings) {
+      const platformEnabled = effectiveAttribution.source_platform === 'meta'
+        ? trackingSettings.meta_tracking_enabled !== false
+        : trackingSettings.google_tracking_enabled !== false;
+      if (!platformEnabled) effectiveAttribution = null;
+      autoQualifyPaidLeads = trackingSettings.auto_qualify_paid_leads !== false;
+    }
+  }
+
+  const detectedQualification = qualifyPaidLead({ attribution: effectiveAttribution, message: input.firstMessage, name: input.name });
+  const qualification = autoQualifyPaidLeads
+    ? detectedQualification
+    : { ...detectedQualification, qualified: false, reasons: detectedQualification.reasons.filter((reason) => !reason.toLowerCase().includes('qualific')) };
+  let paidLeadStage: string | null = null;
+  if (qualification.qualified) {
+    const { data: qualifiedStage } = await admin
+      .from('whatsapp_lead_stages')
+      .select('stage_key')
+      .eq('law_firm_id', input.lawFirmId)
+      .eq('stage_key', 'qualificado')
+      .eq('active', true)
+      .eq('outcome', 'open')
+      .maybeSingle();
+    paidLeadStage = qualifiedStage?.stage_key ? String(qualifiedStage.stage_key) : null;
+  }
+
+  const attributionPatch: any = effectiveAttribution ? {
+    source: effectiveAttribution.source,
+    source_platform: effectiveAttribution.source_platform,
+    source_channel: effectiveAttribution.source_channel,
+    campaign_id: effectiveAttribution.campaign_id || null,
+    campaign_name: effectiveAttribution.campaign_name || null,
+    adset_id: effectiveAttribution.adset_id || null,
+    adset_name: effectiveAttribution.adset_name || null,
+    adgroup_id: effectiveAttribution.adgroup_id || null,
+    adgroup_name: effectiveAttribution.adgroup_name || null,
+    ad_id: effectiveAttribution.ad_id || null,
+    ad_name: effectiveAttribution.ad_name || null,
+    creative_id: effectiveAttribution.creative_id || null,
+    click_id: effectiveAttribution.click_id || null,
+    gclid: effectiveAttribution.gclid || null,
+    gbraid: effectiveAttribution.gbraid || null,
+    wbraid: effectiveAttribution.wbraid || null,
+    utm_source: effectiveAttribution.utm_source || null,
+    utm_medium: effectiveAttribution.utm_medium || null,
+    utm_campaign: effectiveAttribution.utm_campaign || null,
+    utm_content: effectiveAttribution.utm_content || null,
+    utm_term: effectiveAttribution.utm_term || null,
+    source_url: effectiveAttribution.source_url || null,
+    referral_headline: effectiveAttribution.referral_headline || null,
+    referral_body: effectiveAttribution.referral_body || null,
+    qualification_score: qualification.score,
+    qualification_reasons: qualification.reasons,
+    qualified_automatically: qualification.qualified,
+    attribution_data: effectiveAttribution.raw || {},
+  } : {};
+
   if (existing) {
     if (existing.stage === 'convertido') return { ...existing, _wasCreated: false };
     const patch: any = {
@@ -30,6 +103,9 @@ export async function ensureWhatsappLead(admin: any, input: {
       updated_at: now,
     };
     if (input.name && (!existing.name || existing.name === existing.phone)) patch.name = input.name;
+    if (effectiveAttribution) Object.assign(patch, attributionPatch);
+    if (qualification.serviceInterest && !existing.service_interest) patch.service_interest = qualification.serviceInterest;
+    if (qualification.qualified && paidLeadStage && ['novo', 'em_atendimento'].includes(String(existing.stage || ''))) patch.stage = paidLeadStage;
     const { data, error } = await admin
       .from('whatsapp_leads')
       .update(patch)
@@ -49,9 +125,11 @@ export async function ensureWhatsappLead(admin: any, input: {
       conversation_id: input.conversationId,
       name: input.name || null,
       phone: input.phone,
-      stage: defaultStage,
-      source: 'whatsapp',
+      stage: qualification.qualified && paidLeadStage ? paidLeadStage : defaultStage,
+      source: effectiveAttribution?.source || 'whatsapp',
+      service_interest: qualification.serviceInterest || null,
       last_contact_at: input.contactedAt || now,
+      ...attributionPatch,
     })
     .select('*')
     .single();
