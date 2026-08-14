@@ -385,6 +385,8 @@ create index if not exists idx_financial_contracts_service_id on financial_contr
 create index if not exists idx_asaas_import_batches_firm_created on asaas_import_batches(law_firm_id, created_at desc);
 create index if not exists idx_financial_installments_import_batch on financial_installments(import_batch_id);
 create index if not exists idx_financial_installments_import_key on financial_installments(law_firm_id, import_key);
+create unique index if not exists uq_financial_installments_asaas_external on financial_installments(law_firm_id, external_id) where provider = 'asaas' and external_id is not null and btrim(external_id) <> '';
+create unique index if not exists uq_financial_installments_asaas_import_key on financial_installments(law_firm_id, import_key) where provider = 'asaas' and import_key is not null and btrim(import_key) <> '';
 
 -- AdvOS V8.6 - Modelos de mensagem para WhatsApp Web
 create table if not exists message_templates (

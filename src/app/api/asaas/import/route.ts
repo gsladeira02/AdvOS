@@ -194,6 +194,23 @@ function safeRedirect(req: Request, params: Record<string, string | number>) {
   return NextResponse.redirect(url, 303);
 }
 
+async function loadAllClients(admin: ReturnType<typeof createAdminSupabase>, lawFirmId: string) {
+  const result: ExistingClient[] = [];
+  const chunk = 1000;
+  for (let from = 0; ; from += chunk) {
+    const { data, error } = await admin
+      .from('clients')
+      .select('id,name,doc,email,phone,whatsapp,asaas_customer_id,service_id')
+      .eq('law_firm_id', lawFirmId)
+      .order('id', { ascending: true })
+      .range(from, from + chunk - 1);
+    if (error) throw error;
+    result.push(...((data || []) as ExistingClient[]));
+    if (!data || data.length < chunk) break;
+  }
+  return result;
+}
+
 export async function POST(req: Request) {
   const { session, profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
@@ -229,11 +246,10 @@ export async function POST(req: Request) {
     if (rows.length > MAX_IMPORT_ROWS) return safeRedirect(req, { erro: `A planilha excede o limite de ${MAX_IMPORT_ROWS.toLocaleString('pt-BR')} linhas.` });
     if (!rows.length) return safeRedirect(req, { erro: 'Nenhuma linha encontrada no arquivo.' });
 
-    const { data: existingRows } = await admin
-      .from('clients')
-      .select('id,name,doc,email,phone,whatsapp,asaas_customer_id,service_id')
-      .eq('law_firm_id', profile.law_firm_id);
-    const existingClients: ExistingClient[] = [...(existingRows || [])];
+    // O Supabase costuma limitar respostas a 1.000 linhas. Carregar em páginas
+    // evita que escritórios maiores criem um cliente duplicado só porque o
+    // cadastro original ficou fora da primeira página da consulta.
+    const existingClients = await loadAllClients(admin, profile.law_firm_id);
 
     let batchId: string | null = null;
     const batchInsert = await admin.from('asaas_import_batches').insert({
@@ -316,6 +332,13 @@ export async function POST(req: Request) {
           continue;
         }
 
+        const contractDescription = description || `Cobrança Asaas - ${client.name}`;
+        // A chave de importação precisa existir ANTES da consulta. Nas versões
+        // anteriores ela era salva, mas não era usada para procurar uma cobrança
+        // já importada quando o arquivo não trazia um external_id reconhecível.
+        // Isso fazia a mesma planilha criar novas cobranças em uma reimportação.
+        const importKey = paymentId || `${client.id}:${dueDate || 'sem-data'}:${paymentValue}:${normalizeText(contractDescription)}`;
+
         let existingInstallment: any = null;
         if (paymentId) {
           const { data } = await admin
@@ -324,11 +347,22 @@ export async function POST(req: Request) {
             .eq('law_firm_id', profile.law_firm_id)
             .eq('provider', 'asaas')
             .eq('external_id', paymentId)
+            .limit(1)
+            .maybeSingle();
+          existingInstallment = data;
+        }
+        if (!existingInstallment && importKey) {
+          const { data } = await admin
+            .from('financial_installments')
+            .select('id,contract_id')
+            .eq('law_firm_id', profile.law_firm_id)
+            .eq('provider', 'asaas')
+            .eq('import_key', importKey)
+            .limit(1)
             .maybeSingle();
           existingInstallment = data;
         }
 
-        const contractDescription = description || `Cobrança Asaas - ${client.name}`;
         if (existingInstallment) {
           const { error } = await admin.from('financial_installments').update({
             amount: paymentValue || 0,
@@ -357,7 +391,6 @@ export async function POST(req: Request) {
           }).select('id').single();
           if (contractError) throw contractError;
 
-          const importKey = paymentId || `${client.id}:${dueDate || 'sem-data'}:${paymentValue}:${normalizeText(contractDescription)}`;
           const { error: installmentError } = await admin.from('financial_installments').insert({
             law_firm_id: profile.law_firm_id,
             contract_id: contract.id,
@@ -376,8 +409,19 @@ export async function POST(req: Request) {
             import_batch_id: batchId,
             raw_payload: row,
           });
-          if (installmentError) throw installmentError;
-          stats.insertedPayments++;
+          if (installmentError) {
+            // Com os índices únicos da v9.53, duas importações simultâneas podem
+            // disputar a mesma cobrança. Nesse caso, removemos o contrato que
+            // acabou de ser criado e tratamos a linha como já existente.
+            if (installmentError.code === '23505') {
+              await admin.from('financial_contracts').delete().eq('id', contract.id).eq('law_firm_id', profile.law_firm_id);
+              stats.updatedPayments++;
+            } else {
+              throw installmentError;
+            }
+          } else {
+            stats.insertedPayments++;
+          }
         }
       } catch (error: any) {
         stats.skippedRows++;

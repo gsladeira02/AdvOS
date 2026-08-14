@@ -337,3 +337,30 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
   .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:32px!important;width:32px!important;min-width:32px!important}
   .whatsapp-message-scroll .group>div{max-width:91%!important}
 }
+
+/* V9.53 — tipografia sem recorte e alvos móveis mais estáveis */
+.btn{line-height:1.45}
+.label{line-height:1.5}
+.badge{line-height:1.45}
+.desktop-nav-link{height:auto!important;min-height:36px;line-height:1.35!important;padding-top:7px;padding-bottom:7px}
+.desktop-nav-link span{display:block;min-width:0;padding-block:1px;line-height:1.35}
+.mobile-more-panel>a{height:auto!important;min-height:38px;line-height:1.4;padding-top:8px;padding-bottom:8px}
+.table th,.table td,.spreadsheet th,.spreadsheet td,.professional-table th,.professional-table td{line-height:1.4!important}
+
+@media(max-width:760px){
+  /* Descendentes (g, p, q, ç) não ficam presos em caixas de linha apertadas. */
+  .page-header h1{line-height:1.35!important;padding-top:1px;padding-bottom:2px!important}
+  .mobile-pwa-top p,.brand-block p{line-height:1.35!important;padding-block:1px}
+  .mobile-bottom-nav-item{line-height:1.4!important;padding-top:6px!important;padding-bottom:7px!important}
+  .mobile-bottom-nav-item span{display:block!important;line-height:1.4!important;padding-block:1px!important;overflow:visible!important}
+  .btn{line-height:1.45!important;padding-top:.58rem!important;padding-bottom:.62rem!important}
+  .badge{line-height:1.45!important;padding-top:4px!important;padding-bottom:4px!important}
+  .label{line-height:1.5!important;padding-bottom:2px!important}
+  .mobile-record-main strong,.mobile-record-main span,.mobile-detail-grid b,.mobile-detail-grid span{line-height:1.4!important}
+  .whatsapp-workspace-nav>button,.whatsapp-control-row button,.whatsapp-control-row select,.whatsapp-operations-row button,.whatsapp-operations-row select{line-height:1.4!important}
+}
+.page-header-action .btn,.status-filter-chip,.mobile-status-dot{line-height:1.4!important}
+@media(max-width:760px){
+  .app-content h1,.app-content h2,.app-content h3{line-height:1.35!important;padding-bottom:1px}
+  .mobile-record-main strong,.mobile-record-main span{padding-bottom:1px}
+}

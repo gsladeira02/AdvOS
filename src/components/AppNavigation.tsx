@@ -51,7 +51,9 @@ const mobileItems = [
 ] as const;
 
 function isActive(pathname: string, href: string) {
-  if (href === '/app/dashboard') return pathname === href;
+  // Rotas que também são itens-pai não devem ficar selecionadas junto com
+  // uma opção filha explícita (ex.: Integrações + Importar Asaas).
+  if (href === '/app/dashboard' || href === '/app/integracoes') return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

@@ -7,6 +7,7 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { dateBR } from '@/lib/utils';
 import { ServerTablePagination } from '@/components/ServerTablePagination';
 import { parseServerPagination } from '@/lib/pagination';
+import { AsaasDeduplicateButton } from '@/components/AsaasDeduplicateButton';
 
 function qs(v?: string | string[]) {
   const value = Array.isArray(v) ? v[0] : v;
@@ -51,6 +52,20 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
       {query?.erro && (
         <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <b>Erro na importação:</b> {qs(query.erro)}
+        </section>
+      )}
+
+      {query?.limpeza && (
+        <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          <b>Limpeza concluída.</b>{' '}
+          Cobranças duplicadas removidas: {query.cobrancas_removidas || 0}. Contratos vazios removidos: {query.contratos_removidos || 0}. Clientes duplicados mesclados: {query.clientes_mesclados || 0}.
+          {Number(query.clientes_ignorados || 0) > 0 && <> {query.clientes_ignorados} cliente(s) foram preservados por terem conversa do WhatsApp vinculada.</>}
+        </section>
+      )}
+
+      {query?.erro_limpeza && (
+        <section className="card mb-6 border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <b>Erro na limpeza:</b> {qs(query.erro_limpeza)}
         </section>
       )}
 
@@ -124,9 +139,15 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <p>• cria clientes faltantes;</p>
               <p>• vincula clientes ao ID do Asaas;</p>
-              <p>• cria cobranças no financeiro;</p>
-              <p>• evita duplicar cobranças quando encontra ID externo;</p>
+              <p>• cria ou atualiza cobranças no financeiro;</p>
+              <p>• bloqueia reimportação da mesma cobrança por ID externo ou chave de importação;</p>
               <p>• salva links de pagamento quando existirem no arquivo.</p>
+            </div>
+            <div className="mt-4 border-t border-[#eee4d4] pt-4">
+              <p className="mb-3 text-xs font-semibold leading-relaxed text-slate-500">
+                Use uma vez para remover repetições já criadas por importações anteriores. Registros sem identidade forte não são apagados automaticamente.
+              </p>
+              <AsaasDeduplicateButton />
             </div>
           </section>
         </aside>
