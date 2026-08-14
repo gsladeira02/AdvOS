@@ -72,7 +72,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             {navigationItems.map(([href, label, Icon]) => (
               <Link key={href} href={href} title={label} aria-label={label} className="group flex h-8 items-center gap-2 rounded-xl px-2 text-[11px] font-black text-slate-600 transition hover:bg-[#fbf7ef] hover:text-slate-950">
                 <Icon size={14} className="shrink-0 text-slate-500 transition group-hover:text-slate-900" />
-                <span className="truncate leading-none">{label}</span>
+                <span className="truncate leading-[1.35]">{label}</span>
               </Link>
             ))}
           </nav>
@@ -88,7 +88,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <header className="mobile-pwa-top md:hidden">
           <Link href="/app/dashboard" className="flex items-center gap-2 font-black text-white">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15">A</span>
-            <span className="leading-none">AdvOS</span>
+            <span className="leading-[1.25]">AdvOS</span>
           </Link>
           <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0 text-right">
