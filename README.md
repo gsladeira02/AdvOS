@@ -1,6 +1,6 @@
-# AdvOS v9.60
+# AdvOS v9.61
 
-Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.60.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.61.
 
 ## Destaques
 - Painel Marketing & Comercial com funil do lead ao pagamento, receita por Meta/Google/campanha/anúncio, conversão, CPL, CPA, ROI e ROAS.
@@ -9,6 +9,7 @@ Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporan
 - Qualificação automática de leads vindos de Meta Ads e Google Ads, com origem, campanha/anúncio, identificadores de clique, score e área jurídica provável.
 - Rastreamento Google Ads → WhatsApp por URL própria com GCLID/GBRAID/WBRAID e ValueTrack.
 - Respostas automáticas para novos leads e palavras-chave no WhatsApp.
+- Filtros do WhatsApp por tipo de contato, etapa, origem e status de leitura (todas, lidas ou não lidas), com painel responsivo no PWA.
 - Senhas internas com mínimo de 6 caracteres alfanuméricos e gestão de administradores.
 - Compactação automática de documentos antes do armazenamento e opção de conversão para PDF nos formatos compatíveis.
 - Login interno por e-mail e senha, com usuários cadastrados/ativos, sessão controlada e trilha de segurança.

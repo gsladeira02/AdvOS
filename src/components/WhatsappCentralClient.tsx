@@ -163,7 +163,7 @@ export function WhatsappCentralClient({
   const [stageFilter, setStageFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [contactTypeFilter, setContactTypeFilter] = useState<'all' | 'leads' | 'clients' | 'unregistered'>('all');
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [readStatusFilter, setReadStatusFilter] = useState<'all' | 'read' | 'unread'>('all');
   const [workspaceView, setWorkspaceView] = useState<WhatsappWorkspaceView>(initialView || 'atendimento');
   const [tagCatalog, setTagCatalog] = useState<any[]>(initialTags || []);
   const [leadStages, setLeadStages] = useState<any[]>(initialLeadStages || []);
@@ -265,9 +265,11 @@ export function WhatsappCentralClient({
       if (contactTypeFilter === 'clients' && !isClient) return false;
       if (contactTypeFilter === 'unregistered' && (isOpenLead || isClient)) return false;
     }
-    if (unreadOnly && Number(conversation?.unread_count || 0) <= 0) return false;
+    const unreadCount = Number(conversation?.unread_count || 0);
+    if (readStatusFilter === 'unread' && unreadCount <= 0) return false;
+    if (readStatusFilter === 'read' && unreadCount > 0) return false;
     return true;
-  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, sourceFilter, contactTypeFilter, activeTab, leadStages, unreadOnly]);
+  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, sourceFilter, contactTypeFilter, activeTab, leadStages, readStatusFilter]);
 
   const filteredConversations = useMemo(() => {
     return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
@@ -291,7 +293,7 @@ export function WhatsappCentralClient({
   const leadSingular = String(preferences?.lead_label_singular || 'Lead');
   const leadPlural = String(preferences?.lead_label_plural || 'Leads');
   const leadFiltersVisible = activeTab === 'leads' || (activeTab === 'conversas' && contactTypeFilter === 'leads');
-  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (leadFiltersVisible && stageFilter ? 1 : 0) + (leadFiltersVisible && sourceFilter ? 1 : 0) + (activeTab === 'conversas' && contactTypeFilter !== 'all' ? 1 : 0) + (unreadOnly ? 1 : 0);
+  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (leadFiltersVisible && stageFilter ? 1 : 0) + (leadFiltersVisible && sourceFilter ? 1 : 0) + (activeTab === 'conversas' && contactTypeFilter !== 'all' ? 1 : 0) + (readStatusFilter !== 'all' ? 1 : 0);
 
   function clearOperationalFilters() {
     setAssigneeFilter('all');
@@ -299,7 +301,7 @@ export function WhatsappCentralClient({
     setStageFilter('');
     setSourceFilter('');
     setContactTypeFilter('all');
-    setUnreadOnly(false);
+    setReadStatusFilter('all');
   }
 
   const load = useCallback(async (targetId?: string, silent = true, searchTerm?: string) => {
@@ -768,7 +770,11 @@ export function WhatsappCentralClient({
                   </select>
                   {leadFiltersVisible && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
                   {leadFiltersVisible && <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por origem do lead"><option value="">Todas as origens</option><option value="meta">Meta Ads</option><option value="google">Google Ads</option></select>}
-                  <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold leading-normal text-slate-600"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} /> Somente não lidas</label>
+                  <select value={readStatusFilter} onChange={(event) => setReadStatusFilter(event.target.value as 'all' | 'read' | 'unread')} className="input whatsapp-filter-control" aria-label="Filtrar por status de leitura">
+                    <option value="all">Todas as mensagens</option>
+                    <option value="read">Lidas</option>
+                    <option value="unread">Não lidas</option>
+                  </select>
                 </div>
               </div>
             )}
