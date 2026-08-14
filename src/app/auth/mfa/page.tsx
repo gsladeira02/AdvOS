@@ -54,8 +54,7 @@ export default function MfaChallengePage() {
       if (assurance.data?.currentLevel === 'aal2') return window.location.replace('/app/dashboard');
       if (assurance.data?.nextLevel !== 'aal2') return window.location.replace('/auth/mfa/setup');
 
-      const mfa: any = supabase.auth.mfa;
-      const result = await withTimeout(mfa.listFactors());
+      const result = await withTimeout(supabase.auth.mfa.listFactors());
       const factors = verifiedTotpFactors(result?.data);
       if (!active) return;
       if (!factors.length) return window.location.replace('/auth/mfa/setup');

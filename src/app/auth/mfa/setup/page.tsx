@@ -68,8 +68,7 @@ export default function MfaSetupPage() {
     // Tentativas anteriores interrompidas podem deixar fatores TOTP não verificados.
     // Removemos apenas esses rascunhos antes de criar um novo QR Code.
     try {
-      const mfa: any = supabase.auth.mfa;
-      const listed = await withTimeout(mfa.listFactors());
+      const listed = await withTimeout(supabase.auth.mfa.listFactors());
       const candidates = [
         ...(Array.isArray(listed?.data?.totp) ? listed.data.totp : []),
         ...(Array.isArray(listed?.data?.all) ? listed.data.all : []),
@@ -81,7 +80,7 @@ export default function MfaSetupPage() {
         const status = String(factor?.status || '');
         if (id && type === 'totp' && status === 'unverified' && !ids.has(id)) {
           ids.add(id);
-          await mfa.unenroll({ factorId: id }).catch(() => null);
+          await supabase.auth.mfa.unenroll({ factorId: id }).catch(() => null);
         }
       }
     } catch {}
