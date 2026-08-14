@@ -162,6 +162,7 @@ export function WhatsappCentralClient({
   const [tagFilter, setTagFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [contactTypeFilter, setContactTypeFilter] = useState<'all' | 'leads' | 'clients' | 'unregistered'>('all');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<WhatsappWorkspaceView>(initialView || 'atendimento');
   const [tagCatalog, setTagCatalog] = useState<any[]>(initialTags || []);
@@ -253,11 +254,20 @@ export function WhatsappCentralClient({
     if (assigneeFilter === 'unassigned' && conversation?.assigned_to) return false;
     if (assigneeFilter !== 'all' && assigneeFilter !== 'mine' && assigneeFilter !== 'unassigned' && String(conversation?.assigned_to || '') !== String(assigneeFilter)) return false;
     if (tagFilter && !(Array.isArray(conversation?.tag_ids) && conversation.tag_ids.map(String).includes(String(tagFilter)))) return false;
-    if (stageFilter && String(conversation?.lead?.stage || '') !== String(stageFilter)) return false;
-    if (sourceFilter && String(conversation?.lead?.source_platform || '') !== String(sourceFilter)) return false;
+    const leadFiltersVisible = activeTab === 'leads' || (activeTab === 'conversas' && contactTypeFilter === 'leads');
+    if (leadFiltersVisible && stageFilter && String(conversation?.lead?.stage || '') !== String(stageFilter)) return false;
+    if (leadFiltersVisible && sourceFilter && String(conversation?.lead?.source_platform || '') !== String(sourceFilter)) return false;
+    if (activeTab === 'conversas' && contactTypeFilter !== 'all') {
+      const stageConfig = (leadStages || []).find((stage: any) => String(stage?.stage_key) === String(conversation?.lead?.stage || ''));
+      const isOpenLead = Boolean(conversation?.lead) && String(stageConfig?.outcome || 'open') !== 'won';
+      const isClient = Boolean(conversation?.client_id || conversation?.clients?.id);
+      if (contactTypeFilter === 'leads' && !isOpenLead) return false;
+      if (contactTypeFilter === 'clients' && !isClient) return false;
+      if (contactTypeFilter === 'unregistered' && (isOpenLead || isClient)) return false;
+    }
     if (unreadOnly && Number(conversation?.unread_count || 0) <= 0) return false;
     return true;
-  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, sourceFilter, unreadOnly]);
+  }, [assigneeFilter, currentUserId, tagFilter, stageFilter, sourceFilter, contactTypeFilter, activeTab, leadStages, unreadOnly]);
 
   const filteredConversations = useMemo(() => {
     return departmentConversations.filter((conversation: any) => matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
@@ -280,13 +290,15 @@ export function WhatsappCentralClient({
   const isSearching = Boolean(query.trim());
   const leadSingular = String(preferences?.lead_label_singular || 'Lead');
   const leadPlural = String(preferences?.lead_label_plural || 'Leads');
-  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (stageFilter ? 1 : 0) + (sourceFilter ? 1 : 0) + (unreadOnly ? 1 : 0);
+  const leadFiltersVisible = activeTab === 'leads' || (activeTab === 'conversas' && contactTypeFilter === 'leads');
+  const activeFilterCount = (assigneeFilter !== 'all' ? 1 : 0) + (tagFilter ? 1 : 0) + (leadFiltersVisible && stageFilter ? 1 : 0) + (leadFiltersVisible && sourceFilter ? 1 : 0) + (activeTab === 'conversas' && contactTypeFilter !== 'all' ? 1 : 0) + (unreadOnly ? 1 : 0);
 
   function clearOperationalFilters() {
     setAssigneeFilter('all');
     setTagFilter('');
     setStageFilter('');
     setSourceFilter('');
+    setContactTypeFilter('all');
     setUnreadOnly(false);
   }
 
@@ -719,45 +731,48 @@ export function WhatsappCentralClient({
             <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Conversas transferidas para acompanhamento jurídico ou financeiro.</div>
           )}
 
-          <div className="mt-2 flex items-center gap-1.5">
-            <div className="field-with-icon min-w-0 flex-1">
-              <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
-              <input
-                className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={workspaceView === 'encerrados' ? 'Pesquisar conversa encerrada ou tag' : activeTab === 'leads' ? `Pesquisar ${leadSingular.toLowerCase()} ou tag` : 'Pesquisar conversa, contato ou tag'}
-                aria-label="Pesquisar no WhatsApp"
-              />
+          <div className="relative mt-2">
+            <div className="flex items-center gap-1.5">
+              <div className="field-with-icon min-w-0 flex-1">
+                <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
+                <input
+                  className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={workspaceView === 'encerrados' ? 'Pesquisar conversa encerrada ou tag' : activeTab === 'leads' ? `Pesquisar ${leadSingular.toLowerCase()} ou tag` : 'Pesquisar conversa, contato ou tag'}
+                  aria-label="Pesquisar no WhatsApp"
+                />
+              </div>
+              {activeTab !== 'contatos' && (
+                <button type="button" onClick={() => setFilterOpen((value) => !value)} className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-sm ${filterOpen || activeFilterCount ? 'border-[#075e54] bg-[#e7f3ef] text-[#075e54]' : 'border-transparent bg-white text-slate-500'}`} title="Filtrar conversas" aria-label="Filtrar conversas">
+                  <Filter size={13} />
+                  {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#075e54] px-1 text-[8px] font-black text-white">{activeFilterCount}</span>}
+                </button>
+              )}
             </div>
-            {activeTab !== 'contatos' && (
-              <button type="button" onClick={() => setFilterOpen((value) => !value)} className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-sm ${filterOpen || activeFilterCount ? 'border-[#075e54] bg-[#e7f3ef] text-[#075e54]' : 'border-transparent bg-white text-slate-500'}`} title="Filtrar conversas" aria-label="Filtrar conversas">
-                <Filter size={13} />
-                {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#075e54] px-1 text-[8px] font-black text-white">{activeFilterCount}</span>}
-              </button>
+
+            {filterOpen && activeTab !== 'contatos' && (
+              <div className="whatsapp-filter-panel absolute right-0 top-[calc(100%+6px)] z-50 w-full rounded-xl border border-[#d6ddd6] bg-white p-2 shadow-xl">
+                <div className="mb-2 flex items-center justify-between gap-2"><b className="text-[9px] uppercase tracking-wide text-slate-500">Filtros</b><div className="flex items-center gap-2">{activeFilterCount > 0 && <button type="button" onClick={clearOperationalFilters} className="inline-flex items-center gap-1 text-[9px] font-black text-red-600 hover:text-red-700"><X size={9}/>Limpar</button>}<button type="button" onClick={() => setFilterOpen(false)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Fechar filtros"><X size={12}/></button></div></div>
+                <div className="grid gap-1.5">
+                  {activeTab === 'conversas' && <select value={contactTypeFilter} onChange={(event) => setContactTypeFilter(event.target.value as 'all' | 'leads' | 'clients' | 'unregistered')} className="input whatsapp-filter-control" aria-label="Filtrar por tipo de contato"><option value="all">Todos os contatos</option><option value="leads">Somente leads</option><option value="clients">Somente clientes</option><option value="unregistered">Sem cadastro</option></select>}
+                  <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por responsável">
+                    <option value="all">Todos os responsáveis</option>
+                    <option value="mine">Minhas conversas</option>
+                    <option value="unassigned">Sem responsável</option>
+                    {activeTeamUsers.map((user: any) => <option key={user.auth_user_id} value={user.auth_user_id}>{user.full_name || user.email}</option>)}
+                  </select>
+                  <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por tag">
+                    <option value="">Todas as tags</option>
+                    {(tagCatalog || []).filter((tag: any) => tag.active !== false).map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                  </select>
+                  {leadFiltersVisible && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
+                  {leadFiltersVisible && <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por origem do lead"><option value="">Todas as origens</option><option value="meta">Meta Ads</option><option value="google">Google Ads</option></select>}
+                  <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-[10px] font-bold leading-normal text-slate-600"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} /> Somente não lidas</label>
+                </div>
+              </div>
             )}
           </div>
-
-          {filterOpen && activeTab !== 'contatos' && (
-            <div className="mt-2 rounded-xl border border-[#d6ddd6] bg-white p-2 shadow-sm">
-              <div className="mb-2 flex items-center justify-between gap-2"><b className="text-[9px] uppercase tracking-wide text-slate-500">Filtros</b>{activeFilterCount > 0 && <button type="button" onClick={clearOperationalFilters} className="inline-flex items-center gap-1 text-[9px] font-black text-red-600 hover:text-red-700"><X size={9}/>Limpar</button>}</div>
-              <div className="grid gap-1.5">
-                <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por responsável">
-                  <option value="all">Todos os responsáveis</option>
-                  <option value="mine">Minhas conversas</option>
-                  <option value="unassigned">Sem responsável</option>
-                  {activeTeamUsers.map((user: any) => <option key={user.auth_user_id} value={user.auth_user_id}>{user.full_name || user.email}</option>)}
-                </select>
-                <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por tag">
-                  <option value="">Todas as tags</option>
-                  {(tagCatalog || []).filter((tag: any) => tag.active !== false).map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-                </select>
-                {activeTab === 'leads' && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
-                {activeTab === 'leads' && <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="input h-8 py-1 text-[10px]" aria-label="Filtrar por origem do lead"><option value="">Todas as origens</option><option value="meta">Meta Ads</option><option value="google">Google Ads</option></select>}
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[10px] font-bold text-slate-600"><input type="checkbox" checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)} /> Somente não lidas</label>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="whatsapp-list-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

@@ -364,3 +364,12 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
   .app-content h1,.app-content h2,.app-content h3{line-height:1.35!important;padding-bottom:1px}
   .mobile-record-main strong,.mobile-record-main span{padding-bottom:1px}
 }
+
+/* V9.60 — filtros do WhatsApp sem recorte + filtro por leads */
+.whatsapp-filter-panel{max-height:min(460px,calc(100dvh - 230px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.whatsapp-filter-control{height:auto!important;min-height:36px!important;padding-top:7px!important;padding-bottom:8px!important;line-height:1.4!important}
+@media(max-width:760px){
+  .whatsapp-filter-panel{left:0!important;right:0!important;width:100%!important;max-width:100%!important;max-height:min(420px,calc(100dvh - 210px))!important;padding:9px!important;border-radius:12px!important}
+  .whatsapp-filter-control{height:auto!important;min-height:42px!important;padding:8px 10px 9px!important;font-size:16px!important;line-height:1.35!important}
+  .whatsapp-filter-panel label{line-height:1.4!important}
+}
