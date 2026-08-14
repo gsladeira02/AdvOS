@@ -1,6 +1,6 @@
-# AdvOS v9.61
+# AdvOS v9.63
 
-Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.61.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.63.
 
 ## Destaques
 - Painel Marketing & Comercial com funil do lead ao pagamento, receita por Meta/Google/campanha/anúncio, conversão, CPL, CPA, ROI e ROAS.
@@ -28,3 +28,7 @@ Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indica
 ## v9.62 — Foto do cliente
 
 A ficha do cliente agora aceita foto privada. A imagem é otimizada automaticamente e aparece em Clientes e no WhatsApp. Execute `supabase/v9_62_foto_cliente.sql` antes de usar o recurso.
+
+## v9.63 — Transcrição de áudios do WhatsApp
+
+Mensagens de voz agora possuem a ação **Transcrever áudio**. O texto fica salvo na própria mensagem e não é processado novamente. Configure a chave em **Integrações → Transcrição de áudios** e execute `supabase/v9_63_whatsapp_transcricao_audio.sql` antes de usar o recurso.

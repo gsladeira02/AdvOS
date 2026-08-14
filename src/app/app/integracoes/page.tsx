@@ -36,13 +36,16 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
   const zapsign = (rows || []).find((r: any) => r.provider === 'zapsign');
   const asaas = (rows || []).find((r: any) => r.provider === 'asaas');
   const whatsapp = (rows || []).find((r: any) => r.provider === 'whatsapp');
+  const openai = (rows || []).find((r: any) => r.provider === 'openai');
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seu-dominio.vercel.app';
   const zapStatus = integrationStatus(zapsign);
   const asaasStatus = integrationStatus(asaas);
   const whatsappStatus = integrationStatus(whatsapp);
+  const openaiStatus = integrationStatus(openai);
   const asaasMsg = statusMessage('asaas', query?.asaas);
   const whatsappMsg = statusMessage('whatsapp', query?.whatsapp);
   const whatsappRaw = whatsapp?.raw_settings || {};
+  const openaiRaw = openai?.raw_settings || {};
 
   return (
     <div>
@@ -51,7 +54,7 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
       {asaasMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${asaasMsg.cls}`}>{asaasMsg.text}</section>}
       {whatsappMsg && <section className={`card mb-6 border p-4 text-sm font-bold ${whatsappMsg.cls}`}>{whatsappMsg.text}</section>}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -281,6 +284,54 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
           <div className="mt-4 rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-xs text-slate-600">
             <b>Atenção:</b> mensagens livres pela API funcionam dentro da janela de atendimento de 24h. Fora dela, a Meta pode exigir template oficial aprovado.
           </div>
+        </section>
+
+        <section className="card p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="label">Inteligência artificial</p>
+              <h2 className="mt-2 text-xl font-black">Transcrição de áudios</h2>
+              <p className="mt-2 text-sm text-slate-600">Transcreva mensagens de voz do WhatsApp dentro do AdvOS. A chave fica salva apenas no servidor e nunca é enviada ao navegador.</p>
+            </div>
+            <span className={`badge shrink-0 ${openaiStatus.cls}`}>{openaiStatus.label}</span>
+          </div>
+
+          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
+            <input type="hidden" name="provider" value="openai" />
+            <input type="hidden" name="environment" value="producao" />
+            <div>
+              <label className="label">Status</label>
+              <select name="enabled" defaultValue={openai?.enabled ? 'true' : 'false'} className="input mt-1">
+                <option value="false">Desativada</option>
+                <option value="true">Ativada</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label">OpenAI API Key</label>
+              <input name="api_token" type="password" className="input mt-1" placeholder={openai?.token_last4 ? `Chave salva terminando em ${openai.token_last4}` : 'Cole a sua OpenAI API Key'} />
+              <p className="mt-2 text-xs text-slate-500">Deixe vazio para manter a chave atual. Também é possível usar OPENAI_API_KEY na Vercel.</p>
+            </div>
+
+            <div>
+              <label className="label">Modelo de transcrição</label>
+              <select name="transcription_model" defaultValue={openaiRaw.transcription_model || 'gpt-transcribe'} className="input mt-1">
+                <option value="gpt-transcribe">GPT Transcribe — recomendado</option>
+                <option value="gpt-4o-mini-transcribe">GPT-4o mini Transcribe — econômico</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Base URL</label>
+              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value="https://api.openai.com/v1" />
+            </div>
+
+            <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs leading-relaxed text-slate-600">
+              A transcrição é feita somente quando alguém clica em <b>Transcrever áudio</b>. O resultado fica salvo na mensagem para não processar o mesmo áudio novamente.
+            </div>
+
+            <button className="btn btn-primary">Salvar transcrição</button>
+          </form>
         </section>
       </div>
     </div>

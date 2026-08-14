@@ -145,6 +145,12 @@ function mergeMessageRecord(current: MessageListItem, incoming: MessageListItem)
     mime_type: incoming?.mime_type || current?.mime_type || null,
     file_name: incoming?.file_name || current?.file_name || null,
     file_size: incoming?.file_size || current?.file_size || null,
+    transcription_text: incoming?.transcription_text ?? current?.transcription_text ?? null,
+    transcription_status: incoming?.transcription_status ?? current?.transcription_status ?? null,
+    transcription_model: incoming?.transcription_model ?? current?.transcription_model ?? null,
+    transcription_error: incoming?.transcription_error ?? current?.transcription_error ?? null,
+    transcribed_at: incoming?.transcribed_at ?? current?.transcribed_at ?? null,
+    transcribed_by: incoming?.transcribed_by ?? current?.transcribed_by ?? null,
   };
 
   if (incoming?.id && !String(incoming.id).startsWith('local-')) merged.optimistic = false;
@@ -389,6 +395,7 @@ export function WhatsappThread({
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<string | null>(null);
+  const [transcribingIds, setTranscribingIds] = useState<Set<string>>(() => new Set());
   const [file, setFile] = useState<File | null>(null);
   const [recordedAudio, setRecordedAudio] = useState<RecordedAudioState | null>(null);
   const [recording, setRecording] = useState(false);
@@ -671,6 +678,76 @@ export function WhatsappThread({
     setText((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${value}`);
     setShortcutOpen(false);
     window.setTimeout(() => textareaRef.current?.focus(), 0);
+  }
+
+  async function transcribeAudio(message: any) {
+    const messageId = String(message?.id || '').trim();
+    if (!messageId || messageId.startsWith('local-')) {
+      setFeedback('Aguarde o áudio sincronizar antes de transcrever.');
+      return;
+    }
+    if (String(message?.transcription_text || '').trim()) return;
+
+    setTranscribingIds((current) => new Set(current).add(messageId));
+    setItems((current) => current.map((item: any) => item.id === messageId ? { ...item, transcription_status: 'processing', transcription_error: null } : item));
+    setFeedback(null);
+
+    try {
+      const mediaUrl = mediaDisplayUrl(message);
+      if (!mediaUrl) throw new Error('O áudio ainda não está disponível para transcrição.');
+
+      const mediaResponse = await fetch(mediaUrl, { cache: 'no-store' });
+      if (!mediaResponse.ok) throw new Error('Não foi possível carregar o áudio para transcrição.');
+      const blob = await mediaResponse.blob();
+      if (!blob.size) throw new Error('O áudio está vazio.');
+      if (blob.size > 25 * 1024 * 1024) throw new Error('O áudio ultrapassa o limite de 25 MB para transcrição.');
+
+      const cleanMime = String(blob.type || message?.mime_type || '').toLowerCase().split(';')[0].trim();
+      let preparedFile: File;
+      if (cleanMime === 'audio/mpeg' || cleanMime === 'audio/mp3') {
+        preparedFile = new File([blob], `audio-${messageId}.mp3`, { type: 'audio/mpeg' });
+      } else if (cleanMime === 'audio/mp4') {
+        preparedFile = new File([blob], `audio-${messageId}.mp4`, { type: 'audio/mp4' });
+      } else if (cleanMime === 'audio/wav' || cleanMime === 'audio/x-wav') {
+        preparedFile = new File([blob], `audio-${messageId}.wav`, { type: 'audio/wav' });
+      } else {
+        // O WhatsApp normalmente entrega mensagens de voz como OGG/Opus. O endpoint
+        // de transcrição não lista OGG entre os formatos aceitos, então o navegador
+        // prepara um MP3 compatível antes de enviar ao servidor.
+        try {
+          preparedFile = await convertRecordedBlobToMp3File(blob);
+        } catch {
+          throw new Error('Não foi possível preparar este formato de áudio para transcrição neste navegador. Tente pelo Chrome ou Edge atualizado.');
+        }
+      }
+
+      const form = new FormData();
+      form.set('messageId', messageId);
+      form.set('file', preparedFile);
+      const response = await fetch('/api/whatsapp/messages/transcribe', { method: 'POST', body: form });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível transcrever o áudio.');
+
+      setItems((current) => current.map((item: any) => item.id === messageId ? {
+        ...item,
+        transcription_text: result.transcription || '',
+        transcription_status: 'completed',
+        transcription_model: result.model || item.transcription_model || null,
+        transcription_error: null,
+        transcribed_at: result.transcribed_at || new Date().toISOString(),
+      } : item));
+      setFeedback(result?.cached ? 'Transcrição carregada.' : 'Áudio transcrito com sucesso.');
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Não foi possível transcrever o áudio.';
+      setItems((current) => current.map((item: any) => item.id === messageId ? { ...item, transcription_status: 'error', transcription_error: errorMessage } : item));
+      setFeedback(errorMessage);
+    } finally {
+      setTranscribingIds((current) => {
+        const next = new Set(current);
+        next.delete(messageId);
+        return next;
+      });
+    }
   }
 
   async function deleteMessage(messageId: string, scope: 'for_me' | 'for_everyone') {
@@ -1049,6 +1126,10 @@ export function WhatsappThread({
     }
 
     if (kind === 'audio') {
+      const messageId = String(message?.id || '');
+      const transcription = String(message?.transcription_text || '').trim();
+      const isTranscribing = transcribingIds.has(messageId) || message?.transcription_status === 'processing';
+      const transcriptionError = String(message?.transcription_error || '').trim();
       return (
         <div className="space-y-1.5">
           <div className="rounded-2xl bg-black/5 px-3 py-2">
@@ -1064,6 +1145,27 @@ export function WhatsappThread({
               <div className="text-[11px] font-bold text-slate-500">Áudio recebido. Aguarde a mídia ficar disponível.</div>
             )}
           </div>
+
+          {transcription ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-slate-800">
+              <div className="mb-1 flex items-center gap-1 text-[9px] font-black uppercase tracking-wide text-emerald-700"><Sparkles size={11} /> Transcrição</div>
+              <div className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed">{transcription}</div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={!mediaUrl || isTranscribing || messageId.startsWith('local-')}
+                onClick={() => void transcribeAudio(message)}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-[#075e54] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles size={12} className={isTranscribing ? 'animate-pulse' : ''} />
+                {isTranscribing ? 'Transcrevendo...' : transcriptionError ? 'Tentar novamente' : 'Transcrever áudio'}
+              </button>
+              {transcriptionError && !isTranscribing && <span className="max-w-[260px] text-[9px] font-semibold leading-4 text-red-600">{transcriptionError}</span>}
+            </div>
+          )}
+
           {message.body && message.body !== '[Áudio recebido]' && <div className="whatsapp-message-body whitespace-pre-wrap leading-relaxed">{message.body}</div>}
           {downloadUrl && <a href={downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-[#075e54] hover:underline"><Download size={12} /> Salvar áudio</a>}
         </div>

@@ -1,6 +1,6 @@
 import { createAdminSupabase } from '@/lib/supabase/admin';
 
-export type Provider = 'zapsign' | 'asaas' | 'whatsapp';
+export type Provider = 'zapsign' | 'asaas' | 'whatsapp' | 'openai';
 
 type IntegrationRow = {
   provider: Provider;
@@ -24,6 +24,7 @@ export function defaultBaseUrl(provider: Provider, environment?: string | null) 
     return environment === 'producao' ? 'https://api.asaas.com/v3' : 'https://api-sandbox.asaas.com/v3';
   }
   if (provider === 'whatsapp') return 'https://graph.facebook.com/v26.0';
+  if (provider === 'openai') return 'https://api.openai.com/v1';
   return 'https://api.zapsign.com.br/api/v1';
 }
 
@@ -32,6 +33,17 @@ export function safeIntegrationBaseUrl(provider: Provider, environment?: string 
 
   if (provider === 'asaas') return defaultBaseUrl('asaas', env);
   if (provider === 'zapsign') return defaultBaseUrl('zapsign', env);
+  if (provider === 'openai') {
+    const fallback = defaultBaseUrl('openai', env);
+    const raw = normalizeBaseUrl(String(candidate || fallback).trim());
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'api.openai.com') return fallback;
+      return url.pathname === '/v1' || url.pathname === '/v1/' ? 'https://api.openai.com/v1' : fallback;
+    } catch {
+      return fallback;
+    }
+  }
 
   const fallback = defaultBaseUrl('whatsapp', env);
   const raw = normalizeBaseUrl(String(candidate || fallback).trim());
@@ -54,8 +66,20 @@ export async function getIntegrationConfig(lawFirmId: string, provider: Provider
     .eq('provider', provider)
     .maybeSingle();
 
-  const envToken = provider === 'zapsign' ? process.env.ZAPSIGN_API_TOKEN : provider === 'asaas' ? process.env.ASAAS_API_KEY : process.env.WHATSAPP_ACCESS_TOKEN;
-  const envBase = provider === 'zapsign' ? process.env.ZAPSIGN_API_BASE_URL : provider === 'asaas' ? process.env.ASAAS_API_BASE_URL : process.env.WHATSAPP_API_BASE_URL;
+  const envToken = provider === 'zapsign'
+    ? process.env.ZAPSIGN_API_TOKEN
+    : provider === 'asaas'
+      ? process.env.ASAAS_API_KEY
+      : provider === 'openai'
+        ? process.env.OPENAI_API_KEY
+        : process.env.WHATSAPP_ACCESS_TOKEN;
+  const envBase = provider === 'zapsign'
+    ? process.env.ZAPSIGN_API_BASE_URL
+    : provider === 'asaas'
+      ? process.env.ASAAS_API_BASE_URL
+      : provider === 'openai'
+        ? process.env.OPENAI_API_BASE_URL
+        : process.env.WHATSAPP_API_BASE_URL;
   const token = data?.api_token || envToken || '';
   const environment = data?.environment || 'sandbox';
   const baseUrl = safeIntegrationBaseUrl(provider, environment, data?.api_base_url || envBase || null);

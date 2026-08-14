@@ -13,9 +13,9 @@ function str(v: FormDataEntryValue | null) {
 export async function POST(req: Request) {
   const { session, profile } = await getCurrentAdminProfile();
   const f = await req.formData();
-  const provider = str(f.get('provider')) as 'zapsign' | 'asaas' | 'whatsapp';
+  const provider = str(f.get('provider')) as 'zapsign' | 'asaas' | 'whatsapp' | 'openai';
 
-  if (!['zapsign', 'asaas', 'whatsapp'].includes(provider)) {
+  if (!['zapsign', 'asaas', 'whatsapp', 'openai'].includes(provider)) {
     return NextResponse.json({ error: 'Integração inválida.' }, { status: 400 });
   }
 
@@ -39,6 +39,11 @@ export async function POST(req: Request) {
     .eq('provider', provider)
     .maybeSingle();
 
+  const requestedTranscriptionModel = str(f.get('transcription_model'));
+  const transcriptionModel = ['gpt-transcribe', 'gpt-4o-mini-transcribe'].includes(requestedTranscriptionModel)
+    ? requestedTranscriptionModel
+    : 'gpt-transcribe';
+
   const rawSettings: any = provider === 'whatsapp' ? {
     phone_number_id: str(f.get('phone_number_id')),
     waba_id: str(f.get('waba_id')),
@@ -46,6 +51,10 @@ export async function POST(req: Request) {
     graph_version: str(f.get('graph_version')) || 'v26.0',
     profile_display_name: str(f.get('profile_display_name')),
     profile_picture_note: str(f.get('profile_picture_note')),
+  } : provider === 'openai' ? {
+    ...(existing.data?.raw_settings || {}),
+    transcription_model: transcriptionModel,
+    transcription_language: 'pt',
   } : existing.data?.raw_settings || null;
 
   const zapsignSecret = provider === 'zapsign'

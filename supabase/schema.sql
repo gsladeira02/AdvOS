@@ -444,6 +444,12 @@ create table if not exists whatsapp_messages (
   delivered_at timestamptz,
   read_at timestamptz,
   error_message text,
+  transcription_text text,
+  transcription_status text,
+  transcription_model text,
+  transcription_error text,
+  transcribed_at timestamptz,
+  transcribed_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
