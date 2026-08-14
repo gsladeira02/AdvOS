@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { ChevronDown, Filter, Search } from 'lucide-react';
 import { FinanceWhatsappCharge, type ChargeTemplateOption } from '@/components/FinanceWhatsappCharge';
 import { dateBR, money } from '@/lib/utils';
 import { TablePagination } from '@/components/TablePagination';
@@ -179,162 +180,100 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
     setSortDir('asc');
   }
 
+  const statusButtons = (
+    <div className="status-filter-row" aria-label="Filtrar por status">
+      {[
+        ['atrasado', 'Em atraso'],
+        ['pendente', 'Aguardando'],
+        ['pago', 'Recebido'],
+      ].map(([value, label]) => {
+        const active = statusFilters.includes(value);
+        return (
+          <button key={value} type="button" onClick={() => toggleStatusFilter(value)} className={`status-filter-chip ${active ? 'is-active' : ''}`} aria-pressed={active}>
+            {active ? '✓ ' : ''}{label}
+          </button>
+        );
+      })}
+      {!statusFilters.length && <span className="px-1 text-[10px] font-bold text-slate-400">Todos</span>}
+    </div>
+  );
+
+  const advancedFilters = (
+    <>
+      <select className="input compact-input" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
+        <option value="">Todos os clientes</option>
+        {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
+      </select>
+      <input className="input compact-input" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} type="date" title="Data inicial" />
+      <input className="input compact-input" value={dateTo} onChange={(event) => setDateTo(event.target.value)} type="date" title="Data final" />
+      <button type="button" className="btn btn-ghost !min-h-0 !rounded-lg !px-3 !py-2 text-[11px]" onClick={clearFilters}>Limpar filtros</button>
+    </>
+  );
+
   return (
-    <section className="card mb-6 overflow-hidden">
-      <div className="border-b border-[#eee4d4] p-4">
-        <div className="flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-base font-black text-slate-950">Tabela financeira</h2>
-            <p className="text-xs text-slate-500">Filtre por cliente, status e período. Clique nas setas de vencimento ou valor para ordenar.</p>
-          </div>
-          <div className="text-xs font-bold text-slate-600">
-            {filteredInstallments.length} {filteredInstallments.length === 1 ? 'cobrança' : 'cobranças'} • {money(filteredTotal)}
-          </div>
+    <section className="card mb-5 overflow-hidden">
+      <div className="border-b border-[#eee8df] p-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><h2 className="text-[14px] font-black text-slate-950">Cobranças</h2><p className="hidden text-[10px] font-medium text-slate-500 md:block">Status, vencimento, valor e cobrança em uma linha.</p></div>
+          <div className="shrink-0 text-right"><p className="text-[10px] font-black text-slate-500">{filteredInstallments.length} cobrança(s)</p><p className="text-[11px] font-black text-slate-900">{money(filteredTotal)}</p></div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-4 xl:grid-cols-10">
-          <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
-            <option value="">Todos os clientes</option>
-            {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
-          </select>
-
-          <div className="md:col-span-2 xl:col-span-3">
-            <div className="flex min-h-[38px] flex-wrap items-center gap-1.5 rounded-lg border border-[#ded3c2] bg-white px-2 py-1.5" aria-label="Filtrar por status">
-              {[
-                ['atrasado', 'Em atraso'],
-                ['pendente', 'Aguardando pagamento'],
-                ['pago', 'Pagamento recebido'],
-              ].map(([value, label]) => {
-                const active = statusFilters.includes(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => toggleStatusFilter(value)}
-                    className={`rounded-md border px-2 py-1 text-[10px] font-black transition ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-[#e6dccb] bg-[#fbf7ef] text-slate-600 hover:border-slate-400'}`}
-                    aria-pressed={active}
-                  >
-                    {active ? '✓ ' : ''}{label}
-                  </button>
-                );
-              })}
-              {!statusFilters.length && <span className="px-1 text-[10px] font-bold text-slate-400">Todos os status</span>}
-            </div>
+        <div className="mt-2.5 flex items-center gap-2">
+          <div className="field-with-icon min-w-0 flex-1">
+            <Search className="field-with-icon__icon text-slate-400" size={14} />
+            <input className="input compact-input field-with-icon__input" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Buscar cliente ou cobrança" />
           </div>
-
-          <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} type="date" title="Data inicial" />
-          <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateTo} onChange={(event) => setDateTo(event.target.value)} type="date" title="Data final" />
-          <input
-            className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Buscar cliente ou parcela"
-          />
-          <button type="button" className="btn btn-ghost !rounded-lg !px-3 !py-2 text-xs" onClick={clearFilters}>Limpar</button>
+          <details className="mobile-filter-disclosure md:hidden">
+            <summary title="Filtros" aria-label="Filtros"><Filter size={16} /><span>Filtros</span><ChevronDown size={13} className="disclosure-chevron" /></summary>
+            <div className="mobile-filter-panel">{advancedFilters}</div>
+          </details>
         </div>
+        <div className="mt-2">{statusButtons}</div>
+        <div className="mt-2 hidden grid-cols-4 gap-2 md:grid">{advancedFilters}</div>
       </div>
 
       {statusError && <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-[11px] font-bold text-red-700">{statusError}</div>}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-[860px] w-full border-collapse bg-white text-xs">
-          <thead className="bg-[#fbf7ef] text-[10px] uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Cliente</th>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-left">
-                <SortButton label="Vencimento" active={sortKey === 'due_date'} dir={sortDir} onClick={() => toggleSort('due_date')} />
-              </th>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-left">
-                <SortButton label="Valor" active={sortKey === 'amount'} dir={sortDir} onClick={() => toggleSort('amount')} />
-              </th>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Parcela</th>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-left font-black">Status</th>
-              <th className="border-b border-[#eee4d4] px-3 py-2 text-center font-black">WhatsApp</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedInstallments.map((item: any) => {
-              const client = item.financial_contracts?.clients;
-              const label = installmentLabel(item);
-              const url = chargeUrl(item);
-              const phone = client?.whatsapp || client?.phone;
-
-              return (
-                <tr key={item.id} className="border-b border-[#f0e7d8] align-top hover:bg-[#fffaf2]">
-                  <td className="px-3 py-2">
-                    {client?.id ? (
-                      <Link
-                        href={`/app/clientes/${client.id}`}
-                        className="block max-w-[230px] truncate text-xs font-black text-slate-950 hover:text-blue-700 hover:underline"
-                        title={client?.name || ''}
-                      >
-                        {client?.name || '-'}
-                      </Link>
-                    ) : (
-                      <div className="max-w-[230px] truncate text-xs font-black text-slate-950" title={client?.name || ''}>{client?.name || '-'}</div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">{dateBR(item.due_date)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">{money(item.amount)}</td>
-                  <td className="px-3 py-2">
-                    <div className="max-w-[300px] truncate font-semibold text-slate-800" title={label}>{label}</div>
-                  </td>
-                  <td className="min-w-[190px] px-3 py-2">
-                    <select
-                      value={item.status || 'pendente'}
-                      disabled={statusUpdating === item.id}
-                      onChange={(event) => void changeStatus(String(item.id), event.target.value)}
-                      className={`w-full rounded-lg border px-2 py-1.5 text-[10px] font-black outline-none transition disabled:cursor-wait disabled:opacity-60 ${
-                        item.status === 'pago'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                          : item.status === 'atrasado'
-                            ? 'border-red-200 bg-red-50 text-red-800'
-                            : 'border-amber-200 bg-amber-50 text-amber-800'
-                      }`}
-                      aria-label={`Alterar status de ${client?.name || 'cobrança'}`}
-                    >
-                      <option value="pendente">Aguardando pagamento</option>
-                      <option value="atrasado">Em atraso</option>
-                      <option value="pago">Pagamento recebido</option>
-                    </select>
-                  </td>
-                  <td className="w-[88px] px-3 py-2 text-center">
-                    <FinanceWhatsappCharge
-                      paid={item.status === 'pago'}
-                      clientId={client?.id}
-                      clientName={client?.name}
-                      phone={phone}
-                      installmentLabel={label}
-                      amount={Number(item.amount || 0)}
-                      dueDate={item.due_date}
-                      asaasUrl={url}
-                      firmName={firmName}
-                      firmPhone={firmPhone}
-                      userName={userName}
-                      templates={templates}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="professional-table min-w-[820px] w-full">
+          <thead><tr><th>Cliente</th><th><SortButton label="Vencimento" active={sortKey === 'due_date'} dir={sortDir} onClick={() => toggleSort('due_date')} /></th><th><SortButton label="Valor" active={sortKey === 'amount'} dir={sortDir} onClick={() => toggleSort('amount')} /></th><th>Parcela</th><th>Status</th><th>Cobrar</th></tr></thead>
+          <tbody>{paginatedInstallments.map((item: any) => {
+            const client = item.financial_contracts?.clients;
+            const label = installmentLabel(item);
+            const url = chargeUrl(item);
+            const phone = client?.whatsapp || client?.phone;
+            return <tr key={item.id}>
+              <td>{client?.id ? <Link href={`/app/clientes/${client.id}`} className="table-primary-link" title={client?.name || ''}>{client?.name || '-'}</Link> : <span className="table-primary-link">{client?.name || '-'}</span>}</td>
+              <td>{dateBR(item.due_date)}</td><td className="font-black">{money(item.amount)}</td><td><span className="table-ellipsis max-w-[280px]" title={label}>{label}</span></td>
+              <td className="w-[180px]"><select value={item.status || 'pendente'} disabled={statusUpdating === item.id} onChange={(event) => void changeStatus(String(item.id), event.target.value)} className={`finance-status-select ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select></td>
+              <td className="w-[68px] text-center"><FinanceWhatsappCharge paid={item.status === 'pago'} clientId={client?.id} clientName={client?.name} phone={phone} installmentLabel={label} amount={Number(item.amount || 0)} dueDate={item.due_date} asaasUrl={url} firmName={firmName} firmPhone={firmPhone} userName={userName} templates={templates} /></td>
+            </tr>;
+          })}</tbody>
         </table>
       </div>
 
+      <div className="mobile-record-list md:hidden">
+        {paginatedInstallments.map((item: any) => {
+          const client = item.financial_contracts?.clients;
+          const label = installmentLabel(item);
+          const url = chargeUrl(item);
+          const phone = client?.whatsapp || client?.phone;
+          return <details className="mobile-record" key={item.id}>
+            <summary>
+              <div className="mobile-record-main"><strong>{client?.name || 'Cliente não vinculado'}</strong><span>Vence {dateBR(item.due_date)} · {label}</span></div>
+              <div className="mobile-record-side"><strong>{money(item.amount)}</strong><span className={`mobile-status-dot ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}>{item.status === 'pago' ? 'Recebido' : item.status === 'atrasado' ? 'Em atraso' : 'Aguardando'}</span><ChevronDown size={15} className="disclosure-chevron" /></div>
+            </summary>
+            <div className="mobile-record-details">
+              <div className="mobile-detail-grid"><div><span>Vencimento</span><b>{dateBR(item.due_date)}</b></div><div><span>Valor</span><b>{money(item.amount)}</b></div><div className="col-span-2"><span>Descrição</span><b>{label}</b></div></div>
+              <label className="mt-3 block"><span className="label mb-1">Status</span><select value={item.status || 'pendente'} disabled={statusUpdating === item.id} onChange={(event) => void changeStatus(String(item.id), event.target.value)} className={`finance-status-select ${item.status === 'pago' ? 'is-paid' : item.status === 'atrasado' ? 'is-overdue' : 'is-waiting'}`}><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select></label>
+              <div className="mobile-record-actions"><FinanceWhatsappCharge paid={item.status === 'pago'} clientId={client?.id} clientName={client?.name} phone={phone} installmentLabel={label} amount={Number(item.amount || 0)} dueDate={item.due_date} asaasUrl={url} firmName={firmName} firmPhone={firmPhone} userName={userName} templates={templates} />{client?.id && <Link href={`/app/clientes/${client.id}`} className="btn btn-secondary">Abrir cliente</Link>}</div>
+            </div>
+          </details>;
+        })}
+      </div>
 
-      {!!filteredInstallments.length && (
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={filteredInstallments.length}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-        />
-      )}
-
-      {!filteredInstallments.length && (
-        <div className="p-6 text-sm font-bold text-slate-500">Nenhuma cobrança encontrada.</div>
-      )}
+      {!!filteredInstallments.length && <TablePagination page={page} pageSize={pageSize} totalItems={filteredInstallments.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
+      {!filteredInstallments.length && <div className="p-5 text-[12px] font-bold text-slate-500">Nenhuma cobrança encontrada.</div>}
     </section>
   );
 }

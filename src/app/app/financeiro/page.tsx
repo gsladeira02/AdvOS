@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/PageHeader';
 import { FinanceiroSpreadsheet } from '@/components/FinanceiroSpreadsheet';
+import { ResponsiveFormSection } from '@/components/ResponsiveFormSection';
 import { getCurrentProfile } from '@/lib/current';
 import { money } from '@/lib/utils';
 import { createAdminSupabase } from '@/lib/supabase/admin';
@@ -63,27 +64,16 @@ export default async function Financeiro() {
         templates={chargeTemplates}
       />
 
-      <section className="card mb-6 p-5">
-        <div className="mb-4">
-          <h2 className="text-lg font-black text-slate-950">Cadastrar cobrança manual</h2>
-          <p className="text-sm text-slate-500">Use quando precisar lançar uma cobrança que ainda não veio do Asaas.</p>
-        </div>
-        <form action="/api/finance" method="post" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <select className="input" name="client_id">
-            <option value="">Cliente</option>
-            {clientsList.map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}
-          </select>
-          <input className="input" name="description" placeholder="Descrição" required />
-          <input className="input" name="amount" type="number" step="0.01" placeholder="Valor" required />
-          <input className="input" name="due_date" type="date" />
-          <select className="input" name="status">
-            <option value="pendente">Aguardando pagamento</option>
-            <option value="atrasado">Em atraso</option>
-            <option value="pago">Pagamento recebido</option>
-          </select>
+      <ResponsiveFormSection title="Nova cobrança" description="Lançamento manual para cobranças que ainda não vieram do Asaas.">
+        <form action="/api/finance" method="post" className="compact-form-grid grid gap-2.5 md:grid-cols-2 xl:grid-cols-5">
+          <select className="input compact-input" name="client_id"><option value="">Cliente</option>{clientsList.map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}</select>
+          <input className="input compact-input" name="description" placeholder="Descrição" required />
+          <input className="input compact-input" name="amount" type="number" step="0.01" placeholder="Valor" required />
+          <input className="input compact-input" name="due_date" type="date" />
+          <select className="input compact-input" name="status"><option value="pendente">Aguardando pagamento</option><option value="atrasado">Em atraso</option><option value="pago">Pagamento recebido</option></select>
           <button className="btn btn-primary md:col-span-2 xl:col-span-5">Cadastrar cobrança</button>
         </form>
-      </section>
+      </ResponsiveFormSection>
     </div>
   );
 }

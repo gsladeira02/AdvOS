@@ -117,21 +117,31 @@ export default async function Dashboard() {
         action={<Link href="/app/whatsapp" className="btn btn-secondary"><MessageCircle size={15} /> Abrir WhatsApp</Link>}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 md:gap-3 xl:grid-cols-4">
         <StatCard label="Leads em aberto" value={whatsappDashboard?.leads?.open || 0} detail={`${whatsappDashboard?.leads?.converted30d || 0} convertido(s) em 30 dias • ${whatsappDashboard?.leads?.conversionRate || 0}% conversão`} />
         <StatCard label="A receber" value={money(receivableValue)} detail={`${waitingRows.length + overdueRows.length} cobrança(s) em aberto`} />
         <StatCard label="Recebido no mês" value={money(receivedThisMonth)} detail="Pagamentos recebidos no mês atual" />
         <StatCard label="Em atraso" value={money(overdueValue)} detail={`${overdueRows.length} cobrança(s) vencida(s)`} />
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-3 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Clientes" value={clients.length} detail={`${clients.filter((client: any) => client.service_id).length} com serviço vinculado`} />
         <StatCard label="Serviços ativos" value={services.filter((service: any) => service.active !== false).length} detail={`${services.length} serviço(s) cadastrado(s)`} />
         <StatCard label="Processos ativos" value={activeCases} />
         <StatCard label="Conversas não lidas" value={whatsappDashboard?.conversations?.unreadMessages || 0} detail={`${whatsappDashboard?.conversations?.unreadConversations || 0} conversa(s)`} />
       </div>
 
-      <div className="mt-6">
+      <details className="mobile-disclosure card mt-2 md:hidden">
+        <summary className="mobile-disclosure-summary"><span className="text-[11px] font-black">Mais indicadores</span><span className="text-[9px] font-bold text-slate-500">Clientes · serviços · processos · WhatsApp</span></summary>
+        <div className="grid grid-cols-2 gap-2 border-t border-[#eee8df] p-2">
+          <StatCard label="Clientes" value={clients.length} />
+          <StatCard label="Serviços ativos" value={services.filter((service: any) => service.active !== false).length} />
+          <StatCard label="Processos ativos" value={activeCases} />
+          <StatCard label="Não lidas" value={whatsappDashboard?.conversations?.unreadMessages || 0} />
+        </div>
+      </details>
+
+      <div className="mt-4 hidden md:block">
         <OfficeDashboardCharts
           leadsByStage={leadsByStage}
           services={servicesChart}
@@ -141,7 +151,12 @@ export default async function Dashboard() {
         />
       </div>
 
-      <section className="card mt-6 p-5">
+      <details className="mobile-disclosure card mt-2 md:hidden">
+        <summary className="mobile-disclosure-summary"><span className="text-[11px] font-black">Gráficos do escritório</span><span className="text-[9px] font-bold text-slate-500">Toque para expandir</span></summary>
+        <div className="border-t border-[#eee8df] p-2"><OfficeDashboardCharts leadsByStage={leadsByStage} services={servicesChart} financeMonths={financeMonths} waitingValue={waitingValue} overdueValue={overdueValue} /></div>
+      </details>
+
+      <section className="card mt-4 hidden p-4 md:block">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-950">Operação do WhatsApp</h2>
@@ -157,15 +172,15 @@ export default async function Dashboard() {
         </div>
       </section>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <section className="card p-5">
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <section className="card p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black">Próximos prazos</h2>
+            <h2 className="text-[15px] font-black">Próximos prazos</h2>
             <Link href="/app/prazos" className="inline-flex items-center gap-1 text-xs font-black text-[#075e54] hover:underline">Ver todos <ArrowRight size={13} /></Link>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             {deadlines.map((deadline: any) => (
-              <div className="flex items-start justify-between gap-3 rounded-2xl border border-[#eee4d4] p-4" key={deadline.id}>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-[#eee4d4] px-3 py-2.5" key={deadline.id}>
                 <div className="min-w-0 flex-1">
                   <b className="break-safe">{deadline.title}</b>
                   <p className="text-sm text-slate-500">{dateBR(deadline.due_date)}</p>
@@ -177,14 +192,14 @@ export default async function Dashboard() {
           </div>
         </section>
 
-        <section className="card p-5">
+        <section className="card p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black">Tarefas pendentes</h2>
+            <h2 className="text-[15px] font-black">Tarefas pendentes</h2>
             <Link href="/app/tarefas" className="inline-flex items-center gap-1 text-xs font-black text-[#075e54] hover:underline">Ver todas <ArrowRight size={13} /></Link>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2">
             {tasks.map((task: any) => (
-              <div className="rounded-2xl border border-[#eee4d4] p-4" key={task.id}>
+              <div className="rounded-xl border border-[#eee4d4] px-3 py-2.5" key={task.id}>
                 <b className="break-safe">{task.title}</b>
                 <p className="text-sm text-slate-500">Prazo: {dateBR(task.due_date)}</p>
               </div>

@@ -23,7 +23,7 @@ export function TablePagination({
   const end = Math.min(totalItems, safePage * pageSize);
 
   return (
-    <div className="flex flex-col gap-3 border-t border-[#eee4d4] bg-[#fbf7ef] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="table-pagination flex flex-col gap-2 border-t border-[#eee8df] bg-[#faf8f4] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-600">
         <span>{totalItems ? `${start}–${end} de ${totalItems}` : '0 registros'}</span>
         <label className="inline-flex items-center gap-2">

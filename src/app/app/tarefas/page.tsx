@@ -1,86 +1,23 @@
 export const dynamic = 'force-dynamic';
 
+import { ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { ResponsiveFormSection } from '@/components/ResponsiveFormSection';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { ServerTablePagination } from '@/components/ServerTablePagination';
 import { parseServerPagination } from '@/lib/pagination';
 import { dateBR } from '@/lib/utils';
 
-function statusLabel(value?: string) {
-  const labels: Record<string, string> = { pendente: 'Pendente', 'em andamento': 'Em andamento', concluida: 'Concluída', concluido: 'Concluído' };
-  return labels[String(value || '')] || value || '-';
-}
+function statusLabel(value?:string){const labels:Record<string,string>={pendente:'Pendente','em andamento':'Em andamento',concluida:'Concluída',concluido:'Concluído'};return labels[String(value||'')]||value||'-'}
+function priorityLabel(value?:string){const labels:Record<string,string>={normal:'Normal',alta:'Alta',urgente:'Urgente'};return labels[String(value||'')]||value||'-'}
 
-function priorityLabel(value?: string) {
-  const labels: Record<string, string> = { normal: 'Normal', alta: 'Alta', urgente: 'Urgente' };
-  return labels[String(value || '')] || value || '-';
-}
-
-export default async function Tarefas({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  const { profile } = await getCurrentProfile();
-  const admin = createAdminSupabase();
-  const query = await searchParams;
-  const { page, pageSize, from, to } = parseServerPagination(query);
-  const [tasks, clients, cases] = await Promise.all([
-    admin.from('tasks').select('*, clients(name), cases(case_number)', { count: 'exact' }).eq('law_firm_id', profile.law_firm_id).order('due_date').range(from, to),
-    admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
-    admin.from('cases').select('id,case_number').eq('law_firm_id', profile.law_firm_id),
-  ]);
-
-  const rows = tasks.data || [];
-  const totalRows = tasks.count || 0;
-
-  return (
-    <div>
-      <PageHeader title="Tarefas" subtitle="Organize as atividades internas, responsáveis e datas de entrega." />
-
-      <section className="card mb-6 p-5">
-        <form action="/api/task" method="post" className="grid gap-4 md:grid-cols-4">
-          <input className="input" name="title" placeholder="Título da tarefa" required />
-          <input className="input" name="responsible" placeholder="Responsável" />
-          <input className="input" name="due_date" type="date" />
-          <select className="input" name="priority" defaultValue="normal">
-            <option value="normal">Normal</option>
-            <option value="alta">Alta</option>
-            <option value="urgente">Urgente</option>
-          </select>
-          <select className="input" name="client_id">
-            <option value="">Cliente</option>
-            {(clients.data || []).map((c: any) => <option value={c.id} key={c.id}>{c.name}</option>)}
-          </select>
-          <select className="input" name="case_id">
-            <option value="">Processo</option>
-            {(cases.data || []).map((c: any) => <option value={c.id} key={c.id}>{c.case_number || 'Sem número'}</option>)}
-          </select>
-          <select className="input" name="status" defaultValue="pendente">
-            <option value="pendente">Pendente</option>
-            <option value="em andamento">Em andamento</option>
-            <option value="concluida">Concluída</option>
-          </select>
-          <input className="input" name="description" placeholder="Descrição" />
-          <button className="btn btn-primary md:col-span-4">Cadastrar tarefa</button>
-        </form>
-      </section>
-
-      <div className="table-responsive">
-        <table className="table min-w-[720px]">
-          <thead><tr><th>Tarefa</th><th>Responsável</th><th>Prazo</th><th>Cliente</th><th>Status</th></tr></thead>
-          <tbody>
-            {rows.map((t: any) => (
-              <tr key={t.id}>
-                <td><b className="break-safe">{t.title}</b><p className="text-sm text-slate-500">{priorityLabel(t.priority)}</p></td>
-                <td>{t.responsible || '-'}</td>
-                <td>{dateBR(t.due_date)}</td>
-                <td>{t.clients?.name || '-'}</td>
-                <td><span className="badge badge-info">{statusLabel(t.status)}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <ServerTablePagination basePath="/app/tarefas" page={page} pageSize={pageSize} totalItems={totalRows} />
-      {!rows.length && <p className="mt-4 text-sm font-medium text-slate-500">Nenhuma tarefa cadastrada.</p>}
-    </div>
-  );
+export default async function Tarefas({searchParams}:{searchParams?:Promise<Record<string,string|string[]|undefined>>}){
+  const {profile}=await getCurrentProfile();const admin=createAdminSupabase();const query=await searchParams;const {page,pageSize,from,to}=parseServerPagination(query);
+  const [tasks,clients,cases]=await Promise.all([admin.from('tasks').select('*, clients(name), cases(case_number)',{count:'exact'}).eq('law_firm_id',profile.law_firm_id).order('due_date').range(from,to),admin.from('clients').select('id,name').eq('law_firm_id',profile.law_firm_id),admin.from('cases').select('id,case_number').eq('law_firm_id',profile.law_firm_id)]);const rows=tasks.data||[];const totalRows=tasks.count||0;
+  const form=<form action="/api/task" method="post" className="compact-form-grid grid gap-2.5 md:grid-cols-4"><input className="input compact-input" name="title" placeholder="Título da tarefa" required/><input className="input compact-input" name="responsible" placeholder="Responsável"/><input className="input compact-input" name="due_date" type="date"/><select className="input compact-input" name="priority" defaultValue="normal"><option value="normal">Normal</option><option value="alta">Alta</option><option value="urgente">Urgente</option></select><select className="input compact-input" name="client_id"><option value="">Cliente</option>{(clients.data||[]).map((c:any)=><option value={c.id} key={c.id}>{c.name}</option>)}</select><select className="input compact-input" name="case_id"><option value="">Processo</option>{(cases.data||[]).map((c:any)=><option value={c.id} key={c.id}>{c.case_number||'Sem número'}</option>)}</select><select className="input compact-input" name="status" defaultValue="pendente"><option value="pendente">Pendente</option><option value="em andamento">Em andamento</option><option value="concluida">Concluída</option></select><input className="input compact-input" name="description" placeholder="Descrição"/><button className="btn btn-primary md:col-span-4">Cadastrar tarefa</button></form>;
+  return <div><PageHeader title="Tarefas" subtitle="Atividades internas organizadas por prazo, responsável e prioridade."/><ResponsiveFormSection title="Nova tarefa" description="No PWA, abra somente quando precisar cadastrar.">{form}</ResponsiveFormSection>
+    <div className="hidden md:block table-responsive"><table className="table professional-table min-w-[760px]"><thead><tr><th>Tarefa</th><th>Responsável</th><th>Prazo</th><th>Cliente</th><th>Prioridade</th><th>Status</th></tr></thead><tbody>{rows.map((t:any)=><tr key={t.id}><td><b className="table-ellipsis max-w-[260px]">{t.title}</b></td><td>{t.responsible||'-'}</td><td>{dateBR(t.due_date)}</td><td><span className="table-ellipsis max-w-[190px]">{t.clients?.name||'-'}</span></td><td>{priorityLabel(t.priority)}</td><td><span className="badge badge-info">{statusLabel(t.status)}</span></td></tr>)}</tbody></table></div>
+    <div className="mobile-record-list md:hidden">{rows.map((t:any)=><details className="mobile-record" key={t.id}><summary><div className="mobile-record-main"><strong>{t.title}</strong><span>{t.responsible||'Sem responsável'} · {priorityLabel(t.priority)}</span></div><div className="mobile-record-side"><strong>{dateBR(t.due_date)}</strong><span className="mobile-status-dot">{statusLabel(t.status)}</span><ChevronDown size={15} className="disclosure-chevron"/></div></summary><div className="mobile-record-details"><div className="mobile-detail-grid"><div><span>Cliente</span><b>{t.clients?.name||'-'}</b></div><div><span>Processo</span><b>{t.cases?.case_number||'-'}</b></div><div><span>Responsável</span><b>{t.responsible||'-'}</b></div><div><span>Prioridade</span><b>{priorityLabel(t.priority)}</b></div>{t.description&&<div className="col-span-2"><span>Descrição</span><b>{t.description}</b></div>}</div></div></details>)}</div>
+    <ServerTablePagination basePath="/app/tarefas" page={page} pageSize={pageSize} totalItems={totalRows}/>{!rows.length&&<p className="empty-state">Nenhuma tarefa cadastrada.</p>}</div>;
 }
