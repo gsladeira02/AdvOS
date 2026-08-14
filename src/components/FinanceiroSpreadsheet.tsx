@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FinanceWhatsappCharge, type ChargeTemplateOption } from '@/components/FinanceWhatsappCharge';
 import { dateBR, money } from '@/lib/utils';
+import { TablePagination } from '@/components/TablePagination';
 
 type ClientOption = {
   id: string;
@@ -79,12 +80,14 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
   const [statusError, setStatusError] = useState('');
   const [clientFilter, setClientFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('atrasado');
+  const [statusFilters, setStatusFilters] = useState<string[]>(['atrasado']);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [searchText, setSearchText] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('due_date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     setRows(installments || []);
@@ -125,8 +128,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
         const due = String(i.due_date || '');
 
         if (clientFilter && client?.id !== clientFilter) return false;
-        if (statusFilter === 'em_aberto' && i.status === 'pago') return false;
-        if (statusFilter !== 'todos' && statusFilter !== 'em_aberto' && i.status !== statusFilter) return false;
+        if (statusFilters.length && !statusFilters.includes(String(i.status || 'pendente'))) return false;
         if (dateFrom && due < dateFrom) return false;
         if (dateTo && due > dateTo) return false;
         if (searchText && !haystack.includes(normalize(searchText))) return false;
@@ -139,11 +141,24 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
         if (sortKey === 'due_date') result = toTime(a.due_date) - toTime(b.due_date);
         return sortDir === 'asc' ? result : -result;
       });
-  }, [rows, clientFilter, statusFilter, dateFrom, dateTo, searchText, sortKey, sortDir]);
+  }, [rows, clientFilter, statusFilters, dateFrom, dateTo, searchText, sortKey, sortDir]);
 
   const filteredTotal = useMemo(() => {
     return filteredInstallments.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
   }, [filteredInstallments]);
+
+  const paginatedInstallments = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredInstallments.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+    return filteredInstallments.slice(start, start + pageSize);
+  }, [filteredInstallments, page, pageSize]);
+
+  useEffect(() => { setPage(1); }, [clientFilter, statusFilters, dateFrom, dateTo, searchText, sortKey, sortDir]);
+
+  function toggleStatusFilter(status: string) {
+    setStatusFilters((current) => current.includes(status) ? current.filter((item) => item !== status) : [...current, status]);
+  }
 
   function toggleSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
@@ -156,7 +171,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
 
   function clearFilters() {
     setClientFilter('');
-    setStatusFilter('atrasado');
+    setStatusFilters(['atrasado']);
     setDateFrom('');
     setDateTo('');
     setSearchText('');
@@ -177,19 +192,35 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-4 xl:grid-cols-8">
+        <div className="mt-3 grid gap-2 md:grid-cols-4 xl:grid-cols-10">
           <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}>
             <option value="">Todos os clientes</option>
             {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
           </select>
 
-          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} title="Filtrar por status">
-            <option value="atrasado">Em atraso</option>
-            <option value="em_aberto">Em aberto</option>
-            <option value="pendente">Aguardando pagamento</option>
-            <option value="pago">Pagamento recebido</option>
-            <option value="todos">Todas</option>
-          </select>
+          <div className="md:col-span-2 xl:col-span-3">
+            <div className="flex min-h-[38px] flex-wrap items-center gap-1.5 rounded-lg border border-[#ded3c2] bg-white px-2 py-1.5" aria-label="Filtrar por status">
+              {[
+                ['atrasado', 'Em atraso'],
+                ['pendente', 'Aguardando pagamento'],
+                ['pago', 'Pagamento recebido'],
+              ].map(([value, label]) => {
+                const active = statusFilters.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => toggleStatusFilter(value)}
+                    className={`rounded-md border px-2 py-1 text-[10px] font-black transition ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-[#e6dccb] bg-[#fbf7ef] text-slate-600 hover:border-slate-400'}`}
+                    aria-pressed={active}
+                  >
+                    {active ? '✓ ' : ''}{label}
+                  </button>
+                );
+              })}
+              {!statusFilters.length && <span className="px-1 text-[10px] font-bold text-slate-400">Todos os status</span>}
+            </div>
+          </div>
 
           <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} type="date" title="Data inicial" />
           <input className="input !rounded-lg !px-3 !py-2 text-xs" value={dateTo} onChange={(event) => setDateTo(event.target.value)} type="date" title="Data final" />
@@ -222,7 +253,7 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
             </tr>
           </thead>
           <tbody>
-            {filteredInstallments.map((item: any) => {
+            {paginatedInstallments.map((item: any) => {
               const client = item.financial_contracts?.clients;
               const label = installmentLabel(item);
               const url = chargeUrl(item);
@@ -289,6 +320,17 @@ export function FinanceiroSpreadsheet({ installments, clients, firmName, firmPho
           </tbody>
         </table>
       </div>
+
+
+      {!!filteredInstallments.length && (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={filteredInstallments.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
+      )}
 
       {!filteredInstallments.length && (
         <div className="p-6 text-sm font-bold text-slate-500">Nenhuma cobrança encontrada.</div>

@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 
 function when(value?: string | null) {
   if (!value) return '-';
@@ -14,13 +16,16 @@ function severityLabel(value?: string) {
   return value === 'critical' ? 'Crítico' : value === 'warning' ? 'Atenção' : 'Informativo';
 }
 
-export default async function SegurancaPage() {
+export default async function SegurancaPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
-  const [{ data: events, error }, { data: profiles }] = await Promise.all([
-    admin.from('security_events').select('*').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }).limit(200),
+  const query = await searchParams;
+  const { page, pageSize, from, to } = parseServerPagination(query);
+  const [{ data: events, error, count }, { data: profiles }] = await Promise.all([
+    admin.from('security_events').select('*', { count: 'exact' }).eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }).range(from, to),
     admin.from('profiles').select('auth_user_id,full_name,email').eq('law_firm_id', profile.law_firm_id),
   ]);
+  const totalRows = count || 0;
   const byUser = new Map((profiles || []).map((item: any) => [String(item.auth_user_id || ''), item]));
 
   return (
@@ -34,10 +39,11 @@ export default async function SegurancaPage() {
       </div>
 
       <section className="card p-5">
-        <div className="mb-4"><h2 className="text-lg font-black">Eventos de segurança</h2><p className="text-sm text-slate-500">Últimos 200 registros sensíveis. Senhas, tokens e conteúdo de documentos não são gravados aqui.</p></div>
+        <div className="mb-4"><h2 className="text-lg font-black">Eventos de segurança</h2><p className="text-sm text-slate-500">Histórico de registros sensíveis, paginado para carregamento mais rápido. Senhas, tokens e conteúdo de documentos não são gravados aqui.</p></div>
         {error ? (
           <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">A tabela de auditoria ainda não está disponível. Rode a migração de segurança da v9.39.</p>
         ) : (
+          <>
           <div className="table-responsive">
             <table className="table min-w-[880px]">
               <thead><tr><th>Data</th><th>Usuário</th><th>Evento</th><th>Nível</th><th>IP</th><th>Dispositivo</th></tr></thead>
@@ -56,6 +62,8 @@ export default async function SegurancaPage() {
               </tbody>
             </table>
           </div>
+          <ServerTablePagination basePath="/app/seguranca" page={page} pageSize={pageSize} totalItems={totalRows} />
+          </>
         )}
         {!error && !(events || []).length && <p className="text-sm font-bold text-slate-500">Nenhum evento registrado ainda.</p>}
       </section>

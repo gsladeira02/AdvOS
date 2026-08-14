@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
+import { TablePagination } from '@/components/TablePagination';
 
 export type ClientSpreadsheetRow = {
   id: string;
@@ -67,6 +68,8 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
   const [contactFilter, setContactFilter] = useState('todos');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const filteredClients = useMemo(() => {
     return [...(clients || [])]
@@ -99,7 +102,17 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
       });
   }, [clients, searchText, serviceFilter, typeFilter, contactFilter, sortKey, sortDir]);
 
+  const paginatedClients = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+    return filteredClients.slice(start, start + pageSize);
+  }, [filteredClients, page, pageSize]);
+
+  function resetPage() { setPage(1); }
+
   function toggleSort(nextKey: SortKey) {
+    setPage(1);
     if (sortKey === nextKey) {
       setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
       return;
@@ -115,6 +128,7 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
     setContactFilter('todos');
     setSortKey('name');
     setSortDir('asc');
+    setPage(1);
   }
 
   return (
@@ -134,22 +148,22 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
           <input
             className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2"
             value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event) => { setSearchText(event.target.value); resetPage(); }}
             placeholder="Buscar nome, CPF, telefone, e-mail"
           />
 
-          <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)}>
+          <select className="input !rounded-lg !px-3 !py-2 text-xs md:col-span-2" value={serviceFilter} onChange={(event) => { setServiceFilter(event.target.value); resetPage(); }}>
             <option value="">Todos os serviços</option>
             {services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}
           </select>
 
-          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); resetPage(); }}>
             <option value="todos">Todos os tipos</option>
             <option value="pessoa física">Pessoa física</option>
             <option value="pessoa jurídica">Pessoa jurídica</option>
           </select>
 
-          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={contactFilter} onChange={(event) => setContactFilter(event.target.value)}>
+          <select className="input !rounded-lg !px-3 !py-2 text-xs" value={contactFilter} onChange={(event) => { setContactFilter(event.target.value); resetPage(); }}>
             <option value="todos">Todos os contatos</option>
             <option value="com_whatsapp">Com WhatsApp</option>
             <option value="sem_whatsapp">Sem WhatsApp</option>
@@ -177,7 +191,7 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
             </tr>
           </thead>
           <tbody>
-            {filteredClients.map((client) => (
+            {paginatedClients.map((client) => (
               <tr key={client.id} className="border-b border-[#f0e7d8] align-top hover:bg-[#fffaf2]">
                 <td className="px-3 py-2">
                   <Link href={`/app/clientes/${client.id}`} className="block max-w-[260px] truncate text-xs font-black text-slate-950 hover:text-blue-700 hover:underline" title={client.name || ''}>
@@ -212,6 +226,16 @@ export function ClientsSpreadsheet({ clients, services }: { clients: ClientSprea
           </tbody>
         </table>
       </div>
+
+      {!!filteredClients.length && (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={filteredClients.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
+      )}
 
       {!filteredClients.length && <div className="p-6 text-sm font-bold text-slate-500">Nenhum cliente encontrado.</div>}
     </section>

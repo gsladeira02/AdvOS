@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 import { money } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -10,15 +12,18 @@ function statusLabel(value?: string) {
   return labels[String(value || '')] || value || '-';
 }
 
-export default async function Processos() {
+export default async function Processos({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
+  const query = await searchParams;
+  const { page, pageSize, from, to } = parseServerPagination(query);
   const [cases, clients] = await Promise.all([
-    admin.from('cases').select('*, clients(name)').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }),
+    admin.from('cases').select('*, clients(name)', { count: 'exact' }).eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }).range(from, to),
     admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
   ]);
 
   const rows = cases.data || [];
+  const totalRows = cases.count || 0;
 
   return (
     <div>
@@ -76,6 +81,7 @@ export default async function Processos() {
           </tbody>
         </table>
       </div>
+      <ServerTablePagination basePath="/app/processos" page={page} pageSize={pageSize} totalItems={totalRows} />
       {!rows.length && <p className="mt-4 text-sm font-medium text-slate-500">Nenhum processo cadastrado.</p>}
     </div>
   );

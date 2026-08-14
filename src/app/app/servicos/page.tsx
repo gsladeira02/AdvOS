@@ -3,17 +3,23 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 import { money } from '@/lib/utils';
 
-export default async function Servicos({ searchParams }: { searchParams?: Promise<Record<string, string>> }){
+export default async function Servicos({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }){
   const query = await searchParams;
   const {profile}=await getCurrentProfile();
   const admin = createAdminSupabase();
-  const {data,error}=await admin
+  const { page, pageSize, from, to } = parseServerPagination(query);
+  const {data,error,count}=await admin
     .from('legal_services')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('law_firm_id',profile.law_firm_id)
-    .order('created_at',{ascending:false});
+    .order('created_at',{ascending:false})
+    .range(from, to);
+
+  const totalRows = count || 0;
 
   return <div>
     <PageHeader title="Serviços" subtitle="Cadastre os serviços jurídicos prestados pelo escritório para vincular cada cliente ao serviço contratado."/>
@@ -46,6 +52,7 @@ export default async function Servicos({ searchParams }: { searchParams?: Promis
       </tr>)}</tbody>
     </table>
     </div>
+    <ServerTablePagination basePath="/app/servicos" page={page} pageSize={pageSize} totalItems={totalRows} />
     {!data?.length && !error && <p className="mt-4 text-sm text-slate-500">Nenhum serviço cadastrado ainda.</p>}
   </div>
 }

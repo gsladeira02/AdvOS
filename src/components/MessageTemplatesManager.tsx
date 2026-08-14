@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Copy, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { TablePagination } from '@/components/TablePagination';
 
 export type MessageTemplateRow = {
   id?: string;
@@ -79,6 +80,8 @@ export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }:
   const [category, setCategory] = useState('todos');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const filtered = useMemo(() => {
     const term = normalize(search);
@@ -89,6 +92,13 @@ export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }:
       return true;
     });
   }, [templates, search, category]);
+
+  const paginated = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   function patchTemplate(id: string | undefined, patch: Partial<MessageTemplateRow>) {
     setTemplates((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -235,9 +245,9 @@ export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }:
             <div className="grid w-full gap-2 md:w-auto md:grid-cols-[240px_180px]">
               <div className="field-with-icon">
                 <Search size={14} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
-                <input className="input compact-input field-with-icon__input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar modelo" aria-label="Buscar modelo" />
+                <input className="input compact-input field-with-icon__input" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar modelo" aria-label="Buscar modelo" />
               </div>
-              <select className="input compact-input" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select className="input compact-input" value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
                 <option value="todos">Todas as categorias</option>
                 {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
@@ -260,7 +270,7 @@ export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }:
               </tr>
             </thead>
             <tbody>
-              {filtered.map((template) => (
+              {paginated.map((template) => (
                 <tr key={template.id}>
                   <td className="w-[210px]"><input className="sheet-input font-black" value={template.name || ''} onChange={(event) => patchTemplate(template.id, { name: event.target.value })} /></td>
                   <td className="w-[150px]"><input className="sheet-input" value={template.shortcut || ''} onChange={(event) => patchTemplate(template.id, { shortcut: event.target.value })} /></td>
@@ -280,6 +290,17 @@ export function MessageTemplatesManager({ initialTemplates, onTemplatesChange }:
             </tbody>
           </table>
         </div>
+
+
+        {!!filtered.length && (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          />
+        )}
 
         {!filtered.length && <div className="p-5 text-xs font-bold text-slate-500">Nenhum modelo encontrado.</div>}
       </section>

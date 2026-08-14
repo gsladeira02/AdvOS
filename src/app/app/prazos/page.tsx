@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 import { dateBR, deadlineClass } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -20,16 +22,19 @@ function priorityLabel(value?: string) {
   return labels[String(value || '')] || value || '-';
 }
 
-export default async function Prazos() {
+export default async function Prazos({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { profile } = await getCurrentProfile();
   const admin = createAdminSupabase();
+  const query = await searchParams;
+  const { page, pageSize, from, to } = parseServerPagination(query);
   const [deadlines, clients, cases] = await Promise.all([
-    admin.from('deadlines').select('*, clients(name), cases(case_number)').eq('law_firm_id', profile.law_firm_id).order('due_date'),
+    admin.from('deadlines').select('*, clients(name), cases(case_number)', { count: 'exact' }).eq('law_firm_id', profile.law_firm_id).order('due_date').range(from, to),
     admin.from('clients').select('id,name').eq('law_firm_id', profile.law_firm_id),
     admin.from('cases').select('id,case_number').eq('law_firm_id', profile.law_firm_id),
   ]);
 
   const rows = deadlines.data || [];
+  const totalRows = deadlines.count || 0;
 
   return (
     <div>
@@ -79,6 +84,7 @@ export default async function Prazos() {
           </tbody>
         </table>
       </div>
+      <ServerTablePagination basePath="/app/prazos" page={page} pageSize={pageSize} totalItems={totalRows} />
       {!rows.length && <p className="mt-4 text-sm font-medium text-slate-500">Nenhum prazo cadastrado.</p>}
     </div>
   );

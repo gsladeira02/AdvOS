@@ -5,9 +5,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { dateBR } from '@/lib/utils';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 
-function qs(v?: string) {
-  return decodeURIComponent(v || '').replace(/\+/g, ' ');
+function qs(v?: string | string[]) {
+  const value = Array.isArray(v) ? v[0] : v;
+  return decodeURIComponent(value || '').replace(/\+/g, ' ');
 }
 
 function importTypeLabel(value?: string) {
@@ -15,19 +18,20 @@ function importTypeLabel(value?: string) {
   return labels[String(value || '')] || value || '-';
 }
 
-export default async function ImportarAsaas({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
+export default async function ImportarAsaas({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
   const { profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
+  const { page, pageSize, from, to } = parseServerPagination(query);
 
   const [servicesRes, batchesRes] = await Promise.all([
     admin.from('legal_services').select('id,name,active').eq('law_firm_id', profile.law_firm_id).order('name'),
     admin
       .from('asaas_import_batches')
-      .select('id,file_name,import_type,inserted_clients,updated_clients,inserted_payments,updated_payments,skipped_rows,errors,created_at')
+      .select('id,file_name,import_type,inserted_clients,updated_clients,inserted_payments,updated_payments,skipped_rows,errors,created_at', { count: 'exact' })
       .eq('law_firm_id', profile.law_firm_id)
       .order('created_at', { ascending: false })
-      .limit(8),
+      .range(from, to),
   ]);
 
   return (
@@ -163,6 +167,7 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
             </tbody>
           </table>
         </div>
+        <ServerTablePagination basePath="/app/integracoes/asaas/importar" page={page} pageSize={pageSize} totalItems={batchesRes.count || 0} />
       </section>
     </div>
   );

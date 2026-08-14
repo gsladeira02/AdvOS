@@ -3,17 +3,22 @@ export const dynamic = 'force-dynamic';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentAdminProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+import { ServerTablePagination } from '@/components/ServerTablePagination';
+import { parseServerPagination } from '@/lib/pagination';
 
 function statusLabel(value?: string) {
   const labels: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', suspenso: 'Suspenso' };
   return labels[String(value || '')] || value || '-';
 }
 
-export default async function Usuarios() {
+export default async function Usuarios({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { profile } = await getCurrentAdminProfile();
   const admin = createAdminSupabase();
-  const { data } = await admin.from('profiles').select('*').eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false });
+  const query = await searchParams;
+  const { page, pageSize, from, to } = parseServerPagination(query);
+  const { data, count } = await admin.from('profiles').select('*', { count: 'exact' }).eq('law_firm_id', profile.law_firm_id).order('created_at', { ascending: false }).range(from, to);
   const users = data || [];
+  const totalRows = count || 0;
 
   return (
     <div>
@@ -58,6 +63,7 @@ export default async function Usuarios() {
           </tbody>
         </table>
       </div>
+      <ServerTablePagination basePath="/app/usuarios" page={page} pageSize={pageSize} totalItems={totalRows} />
       {!users.length && <p className="mt-4 text-sm font-medium text-slate-500">Nenhum usuário cadastrado.</p>}
     </div>
   );
