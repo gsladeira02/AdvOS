@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { Archive, Check, ChevronDown, Megaphone, RotateCcw, Tag, UserPlus, X } from 'lucide-react';
 import { WhatsappOperationsPanel } from '@/components/WhatsappOperationsPanel';
 
+const LOSS_REASON_OPTIONS = [
+  ['sem_resposta', 'Não respondeu'],
+  ['sem_interesse', 'Sem interesse'],
+  ['sem_condicoes_financeiras', 'Sem condições financeiras'],
+  ['caso_inviavel', 'Caso inviável'],
+  ['contratou_outro', 'Contratou outro escritório'],
+  ['fora_area', 'Fora da área de atuação'],
+  ['contato_duplicado', 'Contato duplicado'],
+  ['outro', 'Outro'],
+] as const;
+
 const colorClasses: Record<string, string> = {
   slate: 'bg-slate-100 text-slate-700', sky: 'bg-sky-100 text-sky-700', emerald: 'bg-emerald-100 text-emerald-700', violet: 'bg-violet-100 text-violet-700', amber: 'bg-amber-100 text-amber-800', rose: 'bg-rose-100 text-rose-700', red: 'bg-red-100 text-red-700', green: 'bg-green-100 text-green-700', indigo: 'bg-indigo-100 text-indigo-700',
 };
@@ -50,6 +61,8 @@ export function WhatsappConversationControls({
   const [leadService, setLeadService] = useState(conversation?.lead?.service_interest || '');
   const [leadNotes, setLeadNotes] = useState(conversation?.lead?.notes || '');
   const [leadStage, setLeadStage] = useState(conversation?.lead?.stage || 'novo');
+  const [lossReason, setLossReason] = useState(conversation?.lead?.loss_reason || '');
+  const [lossNotes, setLossNotes] = useState(conversation?.lead?.loss_notes || '');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(Array.isArray(conversation?.tag_ids) ? conversation.tag_ids.map(String) : []);
   const [tagsOpen, setTagsOpen] = useState(false);
 
@@ -60,18 +73,21 @@ export function WhatsappConversationControls({
     const ids = Array.isArray(conversation?.tag_ids) ? conversation.tag_ids.map(String).filter((id: string) => activeTagIdSet.has(id)) : [];
     setSelectedTagIds(ids);
     setLeadStage(conversation?.lead?.stage || 'novo');
+    setLossReason(conversation?.lead?.loss_reason || '');
+    setLossNotes(conversation?.lead?.loss_notes || '');
     setTagsOpen(false);
     setLeadModal(false);
     setClientModal(false);
     setFeedback(null);
-  }, [conversation?.id, conversation?.tag_ids, conversation?.lead?.stage, activeTagIdSet]);
+  }, [conversation?.id, conversation?.tag_ids, conversation?.lead?.stage, conversation?.lead?.loss_reason, conversation?.lead?.loss_notes, activeTagIdSet]);
 
   const selectedTags = useMemo(() => activeTags.filter((tag: any) => selectedTagIds.includes(String(tag.id))), [activeTags, selectedTagIds]);
   const visibleSelectedTags = selectedTags.slice(0, 2);
-  const selectableStages = useMemo(() => (leadStages || []).filter((stage: any) => stage.active !== false && stage.outcome !== 'won'), [leadStages]);
+  const selectableStages = useMemo(() => (leadStages || []).filter((stage: any) => stage.active !== false), [leadStages]);
   const currentStage = leadStages.find((stage: any) => String(stage.stage_key) === String(conversation?.lead?.stage));
   const isClient = Boolean(conversation?.client_id || conversation?.clients?.id);
-  const isLead = Boolean(!isClient && conversation?.lead);
+  const isLead = Boolean(conversation?.lead);
+  const canConvertLead = isLead && !isClient;
   const department = conversation?.department || 'atendimento';
   const isClosed = Boolean(conversation?.closed_at);
   const attributionLead = conversation?.lead || {};
@@ -80,6 +96,8 @@ export function WhatsappConversationControls({
   const attributionAdGroup = attributionLead?.adgroup_name || attributionLead?.adgroup_id || attributionLead?.adset_name || attributionLead?.adset_id || '';
   const attributionAd = attributionLead?.ad_name || attributionLead?.referral_headline || attributionLead?.ad_id || attributionLead?.creative_id || '';
   const attributionClick = attributionLead?.gclid || attributionLead?.gbraid || attributionLead?.wbraid || attributionLead?.click_id || '';
+  const selectedStageConfig = leadStages.find((stage: any) => String(stage.stage_key) === String(leadStage));
+  const selectedStageIsLost = selectedStageConfig?.outcome === 'lost';
 
   async function action(payload: Record<string, any>) {
     setBusy(true); setFeedback(null);
@@ -114,11 +132,32 @@ export function WhatsappConversationControls({
   }
 
   function openLeadDetails() {
-    setLeadName(conversation?.lead?.name || conversation?.lead_name || ''); setLeadEmail(conversation?.lead?.email || ''); setLeadService(conversation?.lead?.service_interest || ''); setLeadNotes(conversation?.lead?.notes || ''); setLeadStage(conversation?.lead?.stage || 'novo'); setLeadModal(true);
+    setLeadName(conversation?.lead?.name || conversation?.lead_name || '');
+    setLeadEmail(conversation?.lead?.email || '');
+    setLeadService(conversation?.lead?.service_interest || '');
+    setLeadNotes(conversation?.lead?.notes || '');
+    setLeadStage(conversation?.lead?.stage || 'novo');
+    setLossReason(conversation?.lead?.loss_reason || '');
+    setLossNotes(conversation?.lead?.loss_notes || '');
+    setLeadModal(true);
+  }
+
+  async function handleQuickStageChange(stage: string) {
+    const config = leadStages.find((item: any) => String(item.stage_key) === String(stage));
+    if (config?.outcome === 'lost') {
+      setLeadStage(stage);
+      setLossReason(conversation?.lead?.loss_reason || '');
+      setLossNotes(conversation?.lead?.loss_notes || '');
+      setLeadModal(true);
+      return;
+    }
+    const result = await action({ action: 'update_lead', stage });
+    if (result?.lead) setLeadStage(result.lead.stage || stage);
   }
 
   async function saveLeadDetails() {
-    const result = await action({ action: 'update_lead', stage: leadStage, name: leadName, email: leadEmail, serviceInterest: leadService, notes: leadNotes });
+    if (selectedStageIsLost && !lossReason) { setFeedback('Selecione o motivo da perda.'); return; }
+    const result = await action({ action: 'update_lead', stage: leadStage, name: leadName, email: leadEmail, serviceInterest: leadService, notes: leadNotes, lossReason: selectedStageIsLost ? lossReason : null, lossNotes: selectedStageIsLost ? lossNotes : null });
     if (result) { setLeadModal(false); setFeedback(`${leadLabel} atualizado.`); }
   }
 
@@ -151,12 +190,12 @@ export function WhatsappConversationControls({
           )}
 
           {isLead && (
-            <select value={conversation?.lead?.stage || leadStage} disabled={busy} onChange={(event) => action({ action: 'update_lead', stage: event.target.value })} className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800 outline-none" title={`Etapa do ${leadLabel.toLowerCase()}`}>
+            <select value={conversation?.lead?.stage || leadStage} disabled={busy} onChange={(event) => void handleQuickStageChange(event.target.value)} className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800 outline-none" title={`Etapa do ${leadLabel.toLowerCase()}`}>
               {selectableStages.map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}
             </select>
           )}
           {isLead && <button type="button" disabled={busy} onClick={openLeadDetails} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[9px] font-black text-amber-800 hover:bg-amber-50 disabled:opacity-50">Detalhes do {leadLabel.toLowerCase()}</button>}
-          {isLead && <button type="button" disabled={busy} onClick={openClientRegistration} className="inline-flex items-center gap-1 rounded-full bg-[#075e54] px-2.5 py-1 text-[9px] font-black text-white hover:bg-[#064e47] disabled:opacity-50"><UserPlus size={11}/>Cadastrar como cliente</button>}
+          {canConvertLead && <button type="button" disabled={busy} onClick={openClientRegistration} className="inline-flex items-center gap-1 rounded-full bg-[#075e54] px-2.5 py-1 text-[9px] font-black text-white hover:bg-[#064e47] disabled:opacity-50"><UserPlus size={11}/>Cadastrar como cliente</button>}
           {isClient && <a href={`/app/clientes/${encodeURIComponent(String(conversation?.client_id || conversation?.clients?.id))}`} className="rounded-full bg-sky-50 px-2.5 py-1 text-[9px] font-black text-sky-700 hover:bg-sky-100">Abrir Pasta do Cliente</a>}
         </div>
 
@@ -200,18 +239,23 @@ export function WhatsappConversationControls({
         <WhatsappOperationsPanel conversation={conversation} teamUsers={teamUsers} currentUserId={currentUserId} canConfigure={canConfigure} onChanged={onChanged} />
 
         {isClosed && <p className="mt-1.5 text-[9px] font-bold text-slate-500">Encerrada em {closedAtLabel(conversation?.closed_at) || 'data não informada'}. O histórico permanece disponível.</p>}
-        {isLead && <p className="mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'} · só vira cliente após confirmação manual.</p>}
+        {isLead && <p className="mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'}{!isClient ? ' · só vira cliente após confirmação manual.' : ' · cliente vinculado ao funil comercial.'}</p>}
+        {isLead && currentStage?.outcome === 'lost' && conversation?.lead?.loss_reason && <p className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-[9px] font-bold text-red-700">Motivo da perda: {LOSS_REASON_OPTIONS.find(([key]) => key === conversation.lead.loss_reason)?.[1] || conversation.lead.loss_reason}{conversation?.lead?.loss_notes ? ` · ${conversation.lead.loss_notes}` : ''}</p>}
         {feedback && <p className="mt-1.5 text-[9px] font-bold text-slate-600">{feedback}</p>}
       </div>
 
       {leadModal && (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-black/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setLeadModal(false); }}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
-            <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black text-slate-950">Detalhes do {leadLabel.toLowerCase()}</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Qualifique o contato sem transformá-lo em cliente.</p></div><button type="button" onClick={() => setLeadModal(false)} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100"><X size={15}/></button></div>
+            <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black text-slate-950">Detalhes do {leadLabel.toLowerCase()}</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Atualize a etapa, a qualificação e os dados comerciais deste contato.</p></div><button type="button" onClick={() => setLeadModal(false)} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100"><X size={15}/></button></div>
             {paidPlatform && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[10px] font-semibold leading-relaxed text-slate-700"><div className="flex flex-wrap items-center gap-2"><b className="text-emerald-900">Origem: {paidPlatform}</b>{attributionLead?.qualified_automatically && <span className="rounded-full bg-emerald-700 px-2 py-0.5 font-black text-white">Score {Number(attributionLead?.qualification_score || 0)}/100</span>}</div>{attributionCampaign && <p className="mt-1"><b>Campanha:</b> {attributionCampaign}</p>}{attributionAdGroup && <p><b>Grupo/conjunto:</b> {attributionAdGroup}</p>}{attributionAd && <p><b>Anúncio/criativo:</b> {attributionAd}</p>}{attributionLead?.referral_body && <p><b>Texto do anúncio:</b> {attributionLead.referral_body}</p>}{attributionLead?.utm_term && <p><b>Palavra-chave:</b> {attributionLead.utm_term}</p>}{attributionClick && <p className="break-all"><b>ID do clique:</b> {attributionClick}</p>}</div>}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label><span className="label">Etapa</span><select className="input mt-1" value={leadStage} onChange={(e) => setLeadStage(e.target.value)}>{selectableStages.map((stage:any)=><option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select></label>
               <label><span className="label">Nome</span><input className="input mt-1" value={leadName} onChange={(e) => setLeadName(e.target.value)} /></label>
+              {selectedStageIsLost && <>
+                <label className="sm:col-span-2"><span className="label">Motivo da perda *</span><select className="input mt-1" value={lossReason} onChange={(e) => setLossReason(e.target.value)}><option value="">Selecione...</option>{LOSS_REASON_OPTIONS.map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                <label className="sm:col-span-2"><span className="label">Detalhes da perda</span><textarea className="input mt-1 min-h-20 resize-y" value={lossNotes} onChange={(e) => setLossNotes(e.target.value)} placeholder="Opcional: registre o contexto para análise comercial." /></label>
+              </>}
               <label className="sm:col-span-2"><span className="label">E-mail</span><input type="email" className="input mt-1" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} /></label>
               <label className="sm:col-span-2"><span className="label">Interesse / área jurídica</span><input className="input mt-1" value={leadService} onChange={(e) => setLeadService(e.target.value)} placeholder="Ex.: Trabalhista, Família, Empresarial..." /></label>
               <label className="sm:col-span-2"><span className="label">Observações</span><textarea className="input mt-1 min-h-28 resize-y" value={leadNotes} onChange={(e) => setLeadNotes(e.target.value)} /></label>

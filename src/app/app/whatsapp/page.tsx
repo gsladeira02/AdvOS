@@ -65,6 +65,8 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
   const initialDraft = String(query?.draft || query?.mensagem || '').trim();
   const requestedView = String(query?.view || '').trim();
   const initialSettingsSection = String(query?.section || 'tags').trim();
+  const requestedTab = String(query?.tab || '').trim();
+  const initialTab = requestedTab === 'leads' || requestedTab === 'contatos' || requestedTab === 'conversas' ? requestedTab : '';
 
   const [{ data: integration }, { data: clients }, { data: templates }, { data: teamProfiles }] = await Promise.all([
     admin.from('integration_settings').select('enabled,status,token_last4,raw_settings,webhook_secret,notes').eq('law_firm_id', profile.law_firm_id).eq('provider', 'whatsapp').maybeSingle(),
@@ -166,6 +168,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
         initialAutoReplies={whatsappSettings.autoReplies || []}
         initialLeadTracking={whatsappSettings.leadTracking || null}
         initialView={initialView as any}
+        initialTab={initialTab as any}
         initialSettingsSection={initialSettingsSection}
         canConfigure={canConfigure}
       />

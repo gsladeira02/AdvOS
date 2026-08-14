@@ -5,11 +5,13 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
 import { attachConversationMediaToClientFolder } from '@/lib/whatsappCRM';
 import { recordWhatsappEvent } from '@/lib/whatsappOperations';
+import { LOSS_REASON_LABELS } from '@/lib/marketingDashboard';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const DEPARTMENTS = new Set(['atendimento','financeiro_juridico']);
+const LOSS_REASONS = new Set(Object.keys(LOSS_REASON_LABELS));
 
 function text(value: any, max = 500) {
   return String(value ?? '').trim().slice(0, max);
@@ -249,16 +251,15 @@ export async function POST(req: Request) {
     }
 
     if (action === 'update_lead') {
-      if (conversation.client_id) return NextResponse.json({ ok: false, error: 'Essa conversa já pertence a um cliente.' }, { status: 400 });
       const stage = text(body?.stage, 48);
       const { data: validStage } = await admin
         .from('whatsapp_lead_stages')
-        .select('stage_key,outcome,active')
+        .select('stage_key,name,outcome,active')
         .eq('law_firm_id', profile.law_firm_id)
         .eq('stage_key', stage)
         .eq('active', true)
         .maybeSingle();
-      if (!validStage?.stage_key || validStage.outcome === 'won') return NextResponse.json({ ok: false, error: 'Etapa do lead inválida.' }, { status: 400 });
+      if (!validStage?.stage_key) return NextResponse.json({ ok: false, error: 'Etapa do lead inválida.' }, { status: 400 });
 
       const lead = await loadLead(admin, profile.law_firm_id, conversationId);
       if (!lead) return NextResponse.json({ ok: false, error: 'Lead não encontrado.' }, { status: 404 });
@@ -267,6 +268,25 @@ export async function POST(req: Request) {
       if (body?.email !== undefined) updates.email = text(body.email, 180) || null;
       if (body?.serviceInterest !== undefined) updates.service_interest = text(body.serviceInterest, 180) || null;
       if (body?.notes !== undefined) updates.notes = text(body.notes, 3000) || null;
+
+      if (validStage.outcome === 'lost') {
+        const lossReason = text(body?.lossReason, 80);
+        if (!LOSS_REASONS.has(lossReason)) {
+          return NextResponse.json({ ok: false, error: 'Informe o motivo da perda antes de marcar o lead como perdido.' }, { status: 400 });
+        }
+        updates.loss_reason = lossReason;
+        updates.loss_notes = text(body?.lossNotes, 1000) || null;
+        updates.lost_at = new Date().toISOString();
+      } else if (String(lead.stage || '') !== stage) {
+        updates.loss_reason = null;
+        updates.loss_notes = null;
+        updates.lost_at = null;
+      }
+
+      if (stage === 'qualificado' && !lead.qualified_at) updates.qualified_at = new Date().toISOString();
+      if (stage === 'proposta' && !lead.proposal_sent_at) updates.proposal_sent_at = new Date().toISOString();
+      if (validStage.outcome === 'won' && !lead.contracted_at) updates.contracted_at = new Date().toISOString();
+
       const { data, error } = await admin
         .from('whatsapp_leads')
         .update(updates)
@@ -275,7 +295,9 @@ export async function POST(req: Request) {
         .select('*')
         .single();
       if (error) throw new Error(error.message);
-      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'lead_updated', description: `Lead atualizado para a etapa ${stage}.`, metadata: { stage } });
+      const stageName = String(validStage.name || stage);
+      const lossDescription = validStage.outcome === 'lost' ? ` Motivo: ${LOSS_REASON_LABELS[updates.loss_reason] || updates.loss_reason}.` : '';
+      await recordWhatsappEvent(admin, { lawFirmId: profile.law_firm_id, conversationId, actorId: session.user.id, eventType: 'lead_stage_changed', description: `Lead movido para ${stageName}.${lossDescription}`, metadata: { previous_stage: lead.stage || null, stage, outcome: validStage.outcome, loss_reason: updates.loss_reason || null } });
       if (updates.name) {
         await admin
           .from('whatsapp_conversations')
@@ -329,21 +351,14 @@ export async function POST(req: Request) {
         .eq('conversation_id', conversationId);
 
       if (lead?.id) {
-        const { data: wonStage } = await admin
-          .from('whatsapp_lead_stages')
-          .select('stage_key')
-          .eq('law_firm_id', profile.law_firm_id)
-          .eq('outcome', 'won')
-          .eq('active', true)
-          .order('sort_order')
-          .limit(1)
-          .maybeSingle();
+        // Virar cliente e fechar contrato são marcos diferentes. O vínculo com o
+        // cliente é preservado aqui; a etapa "Contratado" é aplicada quando um
+        // contrato financeiro é criado (ou manualmente no funil).
         await admin
           .from('whatsapp_leads')
           .update({
-            stage: wonStage?.stage_key || 'convertido',
             converted_client_id: client.id,
-            converted_at: now,
+            converted_at: lead.converted_at || now,
             updated_at: now,
           })
           .eq('law_firm_id', profile.law_firm_id)

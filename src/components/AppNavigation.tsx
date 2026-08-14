@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  BarChart3,
   CalendarDays,
   CheckSquare,
   Home,
@@ -27,6 +28,7 @@ const primaryItems = [
   ['/app/prazos', 'Prazos', CalendarDays],
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
+  ['/app/marketing', 'Marketing', BarChart3],
   ['/app/tarefas', 'Tarefas', CheckSquare],
 ] as const;
 
@@ -108,7 +110,7 @@ export function MobileNavigation() {
 }
 
 export function MobileMoreMenu({ admin }: { admin: boolean }) {
-  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas'].includes(href)), ...regularManagementItems];
+  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/marketing'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/marketing'].includes(href)), ...regularManagementItems];
   return (
     <details className="mobile-more-menu md:hidden">
       <summary aria-label="Mais áreas" title="Mais áreas"><Menu size={18} /></summary>

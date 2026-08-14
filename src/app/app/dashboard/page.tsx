@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { ArrowRight, MessageCircle } from 'lucide-react';
+import { ArrowRight, BarChart3, MessageCircle } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { OfficeDashboardCharts } from '@/components/OfficeDashboardCharts';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { loadWhatsappDashboard } from '@/lib/whatsappDashboard';
+import { loadMarketingDashboard } from '@/lib/marketingDashboard';
 import { dateBR, deadlineClass, money } from '@/lib/utils';
 
 function statusLabel(value?: string) {
@@ -47,7 +48,7 @@ export default async function Dashboard() {
   const admin = createAdminSupabase();
   const lawFirmId = profile.law_firm_id;
 
-  const [clientsRes, casesRes, deadlinesRes, tasksRes, financeRes, servicesRes, whatsappResult] = await Promise.all([
+  const [clientsRes, casesRes, deadlinesRes, tasksRes, financeRes, servicesRes, whatsappResult, marketingResult] = await Promise.all([
     admin.from('clients').select('id,service_id,created_at').eq('law_firm_id', lawFirmId),
     admin.from('cases').select('id,status').eq('law_firm_id', lawFirmId),
     admin.from('deadlines').select('id,title,due_date,status').eq('law_firm_id', lawFirmId).order('due_date').limit(8),
@@ -56,6 +57,10 @@ export default async function Dashboard() {
     admin.from('legal_services').select('id,name,active').eq('law_firm_id', lawFirmId).order('name'),
     loadWhatsappDashboard(admin, lawFirmId).then((data) => ({ ok: true as const, data })).catch((error) => {
       console.error('Dashboard geral: não foi possível carregar métricas do WhatsApp:', error);
+      return { ok: false as const, data: null };
+    }),
+    loadMarketingDashboard(admin, lawFirmId, 30).then((data) => ({ ok: true as const, data })).catch((error) => {
+      console.error('Dashboard geral: painel comercial/marketing indisponível:', error);
       return { ok: false as const, data: null };
     }),
   ]);
@@ -67,6 +72,7 @@ export default async function Dashboard() {
   const finance = financeRes.data || [];
   const services = servicesRes.data || [];
   const whatsappDashboard = whatsappResult.data;
+  const marketingDashboard = marketingResult.data;
 
   const activeCases = cases.filter((row: any) => row.status !== 'arquivado').length;
   const waitingRows = finance.filter((item: any) => item.status === 'pendente');
@@ -155,6 +161,22 @@ export default async function Dashboard() {
         <summary className="mobile-disclosure-summary"><span className="text-[11px] font-black">Gráficos do escritório</span><span className="text-[9px] font-bold text-slate-500">Toque para expandir</span></summary>
         <div className="border-t border-[#eee8df] p-2"><OfficeDashboardCharts leadsByStage={leadsByStage} services={servicesChart} financeMonths={financeMonths} waitingValue={waitingValue} overdueValue={overdueValue} /></div>
       </details>
+
+      <section className="card mt-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-[15px] font-black text-slate-950"><BarChart3 size={16} className="text-[#075e54]"/>Marketing & Comercial</h2>
+            <p className="text-[10px] font-semibold text-slate-500">Últimos 30 dias: do lead rastreado ao contrato e pagamento.</p>
+          </div>
+          <Link href="/app/marketing" className="inline-flex items-center gap-1 text-xs font-black text-[#075e54] hover:underline">Abrir painel completo <ArrowRight size={13} /></Link>
+        </div>
+        {marketingDashboard ? <div className="mt-3 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+          <div className="rounded-xl bg-sky-50 p-3"><p className="text-[9px] font-black uppercase text-sky-700">Leads</p><p className="mt-1 text-xl font-black text-sky-950">{marketingDashboard.summary.leads}</p><p className="text-[9px] font-bold text-sky-700">{marketingDashboard.summary.qualified} qualificados</p></div>
+          <div className="rounded-xl bg-emerald-50 p-3"><p className="text-[9px] font-black uppercase text-emerald-700">Contratados</p><p className="mt-1 text-xl font-black text-emerald-950">{marketingDashboard.summary.contracted}</p><p className="text-[9px] font-bold text-emerald-700">{marketingDashboard.summary.conversionRate}% conversão</p></div>
+          <div className="rounded-xl bg-violet-50 p-3"><p className="text-[9px] font-black uppercase text-violet-700">Receita contratada</p><p className="mt-1 text-lg font-black text-violet-950">{money(marketingDashboard.summary.contractRevenue)}</p><p className="text-[9px] font-bold text-violet-700">{money(marketingDashboard.summary.receivedRevenue)} recebido</p></div>
+          <div className="rounded-xl bg-amber-50 p-3"><p className="text-[9px] font-black uppercase text-amber-700">Retorno da mídia</p><p className="mt-1 text-xl font-black text-amber-950">{marketingDashboard.summary.spend > 0 ? `${Number(marketingDashboard.summary.roas || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : '—'}</p><p className="text-[9px] font-bold text-amber-700">{marketingDashboard.summary.spend > 0 ? `ROAS · ROI ${Number(marketingDashboard.summary.roi || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : 'Informe custos no painel'}</p></div>
+        </div> : <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-800">Rode a migration v9.58 para ativar os indicadores comerciais.</p>}
+      </section>
 
       <section className="card mt-4 hidden p-4 md:block">
         <div className="flex flex-wrap items-center justify-between gap-3">

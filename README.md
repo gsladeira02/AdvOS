@@ -1,8 +1,11 @@
-# AdvOS v9.57
+# AdvOS v9.58
 
-Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.57.
+Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.58.
 
 ## Destaques
+- Painel Marketing & Comercial com funil do lead ao pagamento, receita por Meta/Google/campanha/anúncio, conversão, CPL, CPA, ROI e ROAS.
+- Motivo de perda obrigatório, histórico de etapas e tempo médio por etapa.
+- Vínculo automático entre lead, cliente, contrato financeiro e pagamentos para preservar a atribuição da origem.
 - Qualificação automática de leads vindos de Meta Ads e Google Ads, com origem, campanha/anúncio, identificadores de clique, score e área jurídica provável.
 - Rastreamento Google Ads → WhatsApp por URL própria com GCLID/GBRAID/WBRAID e ValueTrack.
 - Respostas automáticas para novos leads e palavras-chave no WhatsApp.
@@ -19,4 +22,4 @@ Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporan
 - Administração para ativar/desativar usuários.
 - Menos detalhes internos expostos em respostas de erro.
 
-Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indicada.
+Leia `SECURITY_SETUP_V9_39.md` antes do deploy e execute os SQLs na ordem indicada. Para esta versão, execute também `supabase/v9_58_comercial_marketing.sql`.

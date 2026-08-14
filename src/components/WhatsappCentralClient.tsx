@@ -126,6 +126,7 @@ export function WhatsappCentralClient({
   initialAutoReplies = [],
   initialLeadTracking = null,
   initialView = 'atendimento',
+  initialTab = '',
   initialSettingsSection = 'tags',
   canConfigure = false,
   teamUsers = [],
@@ -144,6 +145,7 @@ export function WhatsappCentralClient({
   initialAutoReplies?: any[];
   initialLeadTracking?: any;
   initialView?: WhatsappWorkspaceView;
+  initialTab?: WhatsappTab | '';
   initialSettingsSection?: string;
   canConfigure?: boolean;
   teamUsers?: any[];
@@ -175,6 +177,7 @@ export function WhatsappCentralClient({
     return initialSelected?.department === 'financeiro_juridico' ? 'financeiro_juridico' : 'atendimento';
   });
   const [activeTab, setActiveTab] = useState<WhatsappTab>(() => {
+    if (initialTab === 'leads' || initialTab === 'contatos' || initialTab === 'conversas') return initialTab;
     if (initialSelected?.contact || initialSelected?.virtual) return 'contatos';
     if (initialSelected?.lead && !initialSelected?.client_id) return 'leads';
     return 'conversas';
@@ -224,8 +227,8 @@ export function WhatsappCentralClient({
       setActiveTab('conversas');
       return;
     }
-    if (selected?.client_id && activeTab === 'leads') setActiveTab('conversas');
-  }, [workspaceView, activeTab, selected?.client_id]);
+    if (selected?.client_id && !selected?.lead && activeTab === 'leads') setActiveTab('conversas');
+  }, [workspaceView, activeTab, selected?.client_id, selected?.lead]);
 
   const activeConversations = useMemo(() => {
     return (conversations || []).filter((conversation: any) => !conversation?.closed_at);
@@ -262,7 +265,7 @@ export function WhatsappCentralClient({
 
   const filteredLeads = useMemo(() => {
     const outcomeByStage = new Map((leadStages || []).map((stage: any) => [String(stage.stage_key), String(stage.outcome || 'open')]));
-    return departmentConversations.filter((conversation: any) => !conversation?.client_id && conversation?.lead && outcomeByStage.get(String(conversation?.lead?.stage || '')) !== 'won' && matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
+    return departmentConversations.filter((conversation: any) => conversation?.lead && outcomeByStage.get(String(conversation?.lead?.stage || '')) !== 'won' && matchesSearch(conversation, query) && matchesOperationalFilters(conversation));
   }, [departmentConversations, query, leadStages, matchesOperationalFilters]);
 
   const filteredContacts = useMemo(() => {
