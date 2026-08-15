@@ -8,11 +8,13 @@ export default function SendWhatsAppApiButton({
   message,
   clientId,
   requiredLink,
+  generatedContractId,
 }: {
   phone: string;
   message: string;
   clientId?: string | null;
   requiredLink?: string | null;
+  generatedContractId?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -22,17 +24,31 @@ export default function SendWhatsAppApiButton({
     setBusy(true);
     setSent(false);
     setError('');
-    if (requiredLink !== undefined && !String(requiredLink || '').trim()) {
-      setError('O link de assinatura não foi encontrado. Crie uma nova solicitação de assinatura antes de enviar pelo WhatsApp.');
-      setBusy(false);
-      return;
-    }
     try {
+      let resolvedMessage = message;
+      if (generatedContractId) {
+        const ensure = await fetch('/api/signatures/ensure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ generatedContractId }),
+        });
+        const ensureData = await ensure.json().catch(() => ({}));
+        if (!ensure.ok || !ensureData?.ok || !ensureData?.signatureUrl) {
+          throw new Error(ensureData?.error || 'Não foi possível criar o link de assinatura.');
+        }
+        resolvedMessage = resolvedMessage.replace(/https?:\/\/[^\s]+/g, ensureData.signatureUrl);
+        if (!resolvedMessage.includes(ensureData.signatureUrl)) {
+          resolvedMessage += `\n\nAcesse o link seguro para visualizar e assinar:\n${ensureData.signatureUrl}`;
+        }
+      } else if (requiredLink !== undefined && !String(requiredLink || '').trim()) {
+        throw new Error('O link de assinatura não foi encontrado.');
+      }
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ phone, message, clientId }),
+        body: JSON.stringify({ phone, message: resolvedMessage, clientId }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.ok) {

@@ -408,7 +408,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
                 <b className="break-safe">{docLabel(g.document_type)}</b>
                 <p className="break-safe text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
-              {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} requiredLink={signatureUrl} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
+              {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} requiredLink={signatureUrl} generatedContractId={String(g.id)} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
               <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
