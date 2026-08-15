@@ -30,6 +30,11 @@ const primaryItems = [
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
   ['/app/marketing', 'Marketing', BarChart3],
   ['/app/tarefas', 'Tarefas', CheckSquare],
+  ['/app/atividades', 'Atividades', CheckSquare],
+  ['/app/agenda', 'Agenda', CalendarDays],
+  ['/app/assinaturas', 'Assinaturas', ShieldCheck],
+  ['/app/modelos-documentos', 'Modelos', ListChecks],
+  ['/app/crm', 'CRM', Users],
 ] as const;
 
 const adminItems = [
@@ -38,6 +43,7 @@ const adminItems = [
   ['/app/integracoes/asaas/importar', 'Importar Asaas', UploadCloud],
   ['/app/configuracoes', 'Configurações', Settings],
   ['/app/seguranca', 'Segurança', ShieldCheck],
+  ['/app/auditoria', 'Auditoria', ShieldCheck],
 ] as const;
 
 const regularManagementItems = [
@@ -110,7 +116,7 @@ export function MobileNavigation() {
 }
 
 export function MobileMoreMenu({ admin }: { admin: boolean }) {
-  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/marketing'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/marketing'].includes(href)), ...regularManagementItems];
+  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing'].includes(href)), ...regularManagementItems];
   return (
     <details className="mobile-more-menu md:hidden">
       <summary aria-label="Mais áreas" title="Mais áreas"><Menu size={18} /></summary>

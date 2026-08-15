@@ -1,0 +1,30 @@
+import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { createAdminSupabase } from '@/lib/supabase/admin';
+const sha256=(b:Buffer)=>crypto.createHash('sha256').update(b).digest('hex');
+export async function POST(req:Request){
+  const f=await req.formData(); const token=String(f.get('token')||'').trim(); const otp=String(f.get('otp')||'').trim(); const signature=f.get('signature');
+  if(!(signature instanceof File)) return NextResponse.json({ok:false,error:'Assinatura não recebida.'},{status:400});
+  const admin=createAdminSupabase();
+  const {data:r}=await admin.from('signature_requests').select('*').eq('public_token',token).maybeSingle();
+  if(!r) return NextResponse.json({ok:false,error:'Link inválido.'},{status:404});
+  if(r.expires_at && new Date(r.expires_at).getTime()<Date.now()) return NextResponse.json({ok:false,error:'Link expirado.'},{status:410});
+  const {data:s}=await admin.from('signature_signers').select('*').eq('request_id',r.id).order('created_at').limit(1).maybeSingle();
+  if(!s) return NextResponse.json({ok:false,error:'Signatário não encontrado.'},{status:404});
+  if(r.require_selfie && !s.selfie_path) return NextResponse.json({ok:false,error:'A selfie é obrigatória antes da assinatura.'},{status:400});
+  if(r.require_document_photo && !s.document_photo_path) return NextResponse.json({ok:false,error:'A foto do documento é obrigatória.'},{status:400});
+  if(r.require_otp){ if(!otp || !s.otp_hash || !s.otp_expires_at || new Date(s.otp_expires_at).getTime()<Date.now() || crypto.createHash('sha256').update(otp).digest('hex')!==s.otp_hash) return NextResponse.json({ok:false,error:'Código de autenticação inválido ou expirado.'},{status:400}); }
+  const {data:doc}=await admin.from('documents').select('*').eq('id',r.document_id).eq('law_firm_id',r.law_firm_id).maybeSingle(); if(!doc?.storage_path) return NextResponse.json({ok:false,error:'Documento original indisponível.'},{status:404});
+  const {data:file,error}=await admin.storage.from('documents').download(doc.storage_path); if(error||!file) return NextResponse.json({ok:false,error:'Não foi possível abrir o documento.'},{status:400});
+  const original=Buffer.from(await file.arrayBuffer()); const sigBuffer=Buffer.from(await signature.arrayBuffer()); const signaturePath=`${r.law_firm_id}/${r.id}/signature-${crypto.randomUUID()}.png`; const sigUpload=await admin.storage.from('signature-evidence').upload(signaturePath,sigBuffer,{contentType:'image/png',upsert:false}); if(sigUpload.error) return NextResponse.json({ok:false,error:'Não foi possível salvar a assinatura.'},{status:400}); const pdf=await PDFDocument.load(original); const page=pdf.addPage(); const font=await pdf.embedFont(StandardFonts.Helvetica); page.drawText('CERTIFICADO DE ASSINATURA ELETRÔNICA — AdvOS',{x:40,y:page.getHeight()-60,size:16,font,color:rgb(0.05,0.37,0.33)}); page.drawText(`Documento: ${String(doc.title||'').slice(0,100)}`,{x:40,y:page.getHeight()-95,size:10,font}); page.drawText(`Signatário: ${String(s.name).slice(0,100)}`,{x:40,y:page.getHeight()-115,size:10,font}); page.drawText(`Data/hora: ${new Date().toLocaleString('pt-BR')}`,{x:40,y:page.getHeight()-135,size:10,font}); page.drawText(`Autenticação: ${r.require_otp?'OTP WhatsApp + ':''}${r.require_selfie?'selfie':''}${r.require_document_photo?' + documento':''}`,{x:40,y:page.getHeight()-155,size:10,font});
+  const sig=await pdf.embedPng(sigBuffer); const originalPage=pdf.getPage(0); originalPage.drawImage(sig,{x:originalPage.getWidth()-220,y:45,width:180,height:90}); page.drawImage(sig,{x:40,y:page.getHeight()-330,width:260,height:130});
+  page.drawText('Este certificado registra evidências do processo de assinatura e não substitui uma assinatura qualificada ICP-Brasil quando esta for exigida.',{x:40,y:90,size:8,font,maxWidth:520});
+  const final=Buffer.from(await pdf.save()); const hash=sha256(final); const finalPath=`${r.law_firm_id}/${r.id}/assinado-${crypto.randomUUID()}.pdf`; const up=await admin.storage.from('documents').upload(finalPath,final,{contentType:'application/pdf',upsert:false}); if(up.error) return NextResponse.json({ok:false,error:'Não foi possível salvar o documento assinado.'},{status:400});
+  await admin.from('signature_signers').update({status:'assinado',signature_image_path:signaturePath,signed_at:new Date().toISOString()}).eq('id',s.id);
+  await admin.from('signature_requests').update({status:'assinado',signed_at:new Date().toISOString(),final_document_path:finalPath,final_document_hash:hash}).eq('id',r.id);
+  await admin.from('documents').update({signature_status:'assinado'}).eq('id',doc.id).eq('law_firm_id',r.law_firm_id);
+  await admin.from('document_signatures').insert({law_firm_id:r.law_firm_id,document_id:doc.id,provider:'advos',status:'assinado',external_id:r.public_token,signature_url:null,signed_document_url:finalPath,signer_name:s.name,signer_email:s.email,signer_phone:s.phone,signed_at:new Date().toISOString(),selfie_path:s.selfie_path,document_photo_path:s.document_photo_path,audit_metadata:{hash,require_selfie:r.require_selfie,require_document_photo:r.require_document_photo}});
+  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'documento_assinado',metadata:{hash}});
+  return NextResponse.json({ok:true,hash});
+}

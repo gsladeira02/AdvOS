@@ -120,7 +120,7 @@ export default async function Dashboard() {
       <PageHeader
         title="Painel geral"
         subtitle="Visão consolidada do escritório: leads, serviços, financeiro, processos e rotina operacional."
-        action={<Link href="/app/whatsapp" className="btn btn-secondary"><MessageCircle size={15} /> Abrir WhatsApp</Link>}
+        action={<div className="flex flex-wrap gap-2"><Link href="/app/atividades" className="btn btn-primary">Central de atividades</Link><Link href="/app/whatsapp" className="btn btn-secondary"><MessageCircle size={15} /> Abrir WhatsApp</Link></div>}
       />
 
       <div className="grid grid-cols-2 gap-2.5 md:gap-3 xl:grid-cols-4">
