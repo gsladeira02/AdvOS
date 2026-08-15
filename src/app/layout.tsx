@@ -27,7 +27,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#075e54',
+  themeColor: '#ffffff',
 };
 
 export const dynamic = 'force-dynamic';
