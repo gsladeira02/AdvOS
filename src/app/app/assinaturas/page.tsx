@@ -106,7 +106,7 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
       <div className="page-header">
         <div>
           <h1>Assinaturas</h1>
-          <p>Controle documentos pendentes, assinaturas do cliente e assinatura do escritório.</p>
+          <p>Gerencie documentos em assinatura e consulte os PDFs concluídos.</p>
         </div>
       </div>
 
@@ -155,6 +155,17 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
                   <p className="text-xs font-semibold text-slate-600">{normalizeStatus(daniel?.status) === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura do escritório'}</p>
                   {tab === 'pendentes' && daniel?.id && normalizeStatus(daniel?.status) !== 'assinado' && (
                     <Link href={`/app/assinaturas/${r.id}/assinar`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
+                  )}
+                  {tab === 'assinadas' && r.final_document_path && (
+                    <div className="mt-3 space-y-3">
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                        <iframe title={`Documento assinado - ${r.document_title}`} src={`/api/signatures/${r.id}/final`} className="h-[58vh] min-h-[430px] md:h-[620px] w-full border-0" />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a href={`/api/signatures/${r.id}/final`} target="_blank" rel="noreferrer" className="inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Abrir em nova janela</a>
+                        <a href={`/api/signatures/${r.id}/final?download=1`} className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700">Baixar PDF assinado</a>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

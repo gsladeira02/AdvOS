@@ -186,101 +186,42 @@ async function generatePdfBuffer(data: Record<string, string>) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.TimesRoman);
   const bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
-  const pageWidth = 595.28;
-  const pageHeight = 841.89;
-  const margin = 52;
-  const top = 92;
-  const footer = 42;
-  const colGap = 24;
-  const colWidth = (pageWidth - margin * 2 - colGap) / 2;
-  const fontSize = 10.5;
-  const lineHeight = 14.2;
+  const W = 595.28, H = 841.89;
+  const marginX = 66, topY = 748, bottomY = 62, contentW = W - marginX * 2;
+  const fontSize = 10.5, lineH = 15.3;
   const logoPath = join(process.cwd(), 'public', 'brand', 'ladeira-advogados.png');
   let logo: any = null;
   try { logo = await pdf.embedPng(readFileSync(logoPath)); } catch {}
   const docs = docsForType(data);
-  let page: any;
-  let col = 0;
-  let y = pageHeight - top;
-
+  let page: any = null, y = topY, pageNo = 0;
+  const green = rgb(0.03, 0.37, 0.31), gray = rgb(0.32,0.32,0.32), black = rgb(0,0,0);
   function newPage() {
-    page = pdf.addPage([pageWidth, pageHeight]);
-    col = 0;
-    y = pageHeight - top;
-    if (logo) {
-      const scaled = logo.scaleToFit(92, 62);
-      page.drawImage(logo, { x: pageWidth - margin - scaled.width, y: pageHeight - 74, width: scaled.width, height: scaled.height });
-    }
-    page.drawText('LADEIRA ADVOGADOS', { x: pageWidth - margin - 112, y: pageHeight - 83, size: 9, font: bold, color: rgb(0.18, 0.18, 0.18) });
-    page.drawText('Rod. do Sol, 2070. Ed. Royal Blue Corporate, sala 1008. Praia de Itaparica, Vila Velha - ES. Contato: (27) 99794-0089.', { x: margin, y: footer, size: 6.7, font: regular, color: rgb(0.25, 0.25, 0.25) });
+    page = pdf.addPage([W,H]); pageNo += 1; y = topY;
+    if (logo) { const s=logo.scaleToFit(96,52); page.drawImage(logo,{x:marginX,y:H-72,width:s.width,height:s.height}); }
+    page.drawText('LADEIRA ADVOGADOS',{x:W-marginX-150,y:H-58,size:9,font:bold,color:gray});
+    page.drawLine({start:{x:marginX,y:H-82},end:{x:W-marginX,y:H-82},thickness:0.8,color:rgb(.82,.82,.82)});
+    page.drawText(`Documento gerado pelo AdvOS · Página ${pageNo}`,{x:marginX,y:28,size:6.8,font:regular,color:gray});
+    page.drawText('Rod. do Sol, 2070 · Ed. Royal Blue Corporate · sala 1008 · Praia de Itaparica · Vila Velha/ES · (27) 99794-0089',{x:W-marginX-330,y:28,size:6.4,font:regular,color:gray});
   }
-  function nextColumn() {
-    if (col === 0) { col = 1; y = pageHeight - top; }
-    else newPage();
-  }
-  function ensure(space: number) {
-    if (y - space < footer + 10) nextColumn();
-  }
-  function drawLine(text: string, opts: {heading?: boolean} = {}) {
-    const font = opts.heading ? bold : regular;
-    const size = opts.heading ? 11 : fontSize;
-    const words = splitWords(text);
-    let line = '';
-    for (const word of words) {
-      const next = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(next, size) <= colWidth) line = next;
-      else {
-        if (line) { ensure(lineHeight); page.drawText(line, { x: margin + col * (colWidth + colGap), y, size, font, color: rgb(0,0,0) }); y -= lineHeight; }
-        line = word;
-      }
-    }
-    if (line) { ensure(lineHeight); page.drawText(line, { x: margin + col * (colWidth + colGap), y, size, font, color: rgb(0,0,0) }); y -= lineHeight; }
-    y -= opts.heading ? 4 : 2;
-  }
-  function drawParagraph(text: string, opts: {heading?: boolean} = {}) {
-    const chunks = String(text || '').split('\n');
-    for (const chunk of chunks) {
-      if (!chunk.trim()) { y -= lineHeight * 0.7; continue; }
-      drawLine(chunk, opts);
+  function ensure(h:number){ if(!page) newPage(); if(y-h<bottomY) newPage(); }
+  function wrap(text:string,font:any,size:number,max:number){ const out:string[]=[]; let line=''; for(const word of String(text||'').replace(/\s+/g,' ').trim().split(' ')){ const n=line?`${line} ${word}`:word; if(font.widthOfTextAtSize(n,size)<=max) line=n; else { if(line) out.push(line); line=word; } } if(line) out.push(line); return out; }
+  function para(text:string, opts:{heading?:boolean;center?:boolean}={}){
+    const f=opts.heading?bold:regular, sz=opts.heading?11.2:fontSize;
+    for(const chunk of String(text||'').split('\n')){
+      if(!chunk.trim()){ y-=lineH*.55; continue; }
+      const lines=wrap(chunk,f,sz,contentW);
+      for(const line of lines){ ensure(lineH); const x=opts.center?(W-f.widthOfTextAtSize(line,sz))/2:marginX; page.drawText(line,{x,y,size:sz,font:f,color:opts.heading?green:black}); y-=lineH; }
+      y-=opts.heading?4:2;
     }
   }
-  function drawTitle(text: string) {
-    if (col !== 0 || y > pageHeight - top + 2) { /* intentional */ }
-    ensure(42);
-    const w = bold.widthOfTextAtSize(text, 13);
-    page.drawText(text, { x: margin, y, size: 13, font: bold, color: rgb(0,0,0) });
-    y -= 22;
-    if (w > colWidth) drawLine(text, {heading:true});
-  }
-
-  for (let di = 0; di < docs.length; di++) {
-    if (!page) newPage(); else if (di > 0) newPage();
-    drawTitle(docs[di].title);
-    for (const section of docs[di].sections) {
-      if (section.heading) drawParagraph(section.heading, { heading: true });
-      drawParagraph(section.text);
-    }
+  for(let di=0;di<docs.length;di++){
+    newPage();
+    para(docs[di].title,{heading:true,center:true}); y-=5;
+    for(const section of docs[di].sections){ if(section.heading) para(section.heading,{heading:true}); para(section.text); }
+    if(di<docs.length-1){ y=bottomY+1; }
   }
   return Buffer.from(await pdf.save());
 }
-
-async function zapsignSend(lawFirmId: string, documentTitle: string, pdfBuffer: Buffer, data: Record<string, string>, documentId: string | null) {
-  const config = await getIntegrationConfig(lawFirmId, 'zapsign');
-  const basePayload = { law_firm_id: lawFirmId, document_id: documentId, provider: 'zapsign', signer_name: data.client_name, signer_email: data.email || null, signer_phone: data.phone || null, sent_at: new Date().toISOString() };
-  if (!config.configured) return { status: 'configuracao_pendente', payload: basePayload };
-  const clientPhone = cleanPhone(data.phone || '');
-  const danielPhone = cleanPhone('27997940089');
-  const signers: any[] = [
-    { name: data.client_name, email: data.email || undefined, phone_country: clientPhone ? '55' : undefined, phone_number: clientPhone || undefined, send_automatic_email: false, send_automatic_whatsapp: false },
-    { name: 'DANIEL COSTA LADEIRA', email: 'dladadeiradv@gmail.com', phone_country: danielPhone ? '55' : undefined, phone_number: danielPhone || undefined, send_automatic_email: false, send_automatic_whatsapp: false },
-  ];
-  const response = await fetch(`${config.baseUrl}/docs/`, { method:'POST', headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'}, body:JSON.stringify({name:documentTitle,base64_pdf:pdfBuffer.toString('base64'),signers}) });
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) return { status:'erro', error:json?.detail||json?.message||'Erro ao criar documento na ZapSign.', raw:json, payload:basePayload };
-  const signer = Array.isArray(json?.signers) ? json.signers[0] : null;
-  return { status:json?.status||'enviado', external_id:json?.token||json?.open_id||json?.id||null, signature_url:signer?.sign_url||json?.sign_url||null, signed_document_url:json?.signed_file||null, raw:json, payload:basePayload };
-}
-
 function mapAsaasStatus(status?: string) {
   const s = String(status || '').toUpperCase();
   if (['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(s)) return 'pago';
@@ -479,7 +420,7 @@ export async function POST(req: Request) {
     doc_type: data.document_type,
     storage_path: storagePath,
     notes: `PDF gerado automaticamente pela pasta do cliente no AdvOS e otimizado antes do armazenamento. Tamanho: ${optimizedPdf.storedBytes} bytes.`,
-    signature_status: 'preparando_zapsign',
+    signature_status: 'pendente',
   }).select('id').single();
 
   const { data: generated } = await admin.from('generated_contracts').insert({
@@ -512,7 +453,7 @@ export async function POST(req: Request) {
     pdf_filename: filename,
     pdf_storage_path: storagePath,
     document_id: doc?.id || null,
-    zapsign_status: 'preparando',
+    zapsign_status: 'pendente',
     asaas_status: 'preparando',
   }).select('id').single();
 
@@ -530,7 +471,7 @@ export async function POST(req: Request) {
     : [];
 
   // Cria a solicitação de assinatura nativa do AdvOS e envia o link diretamente pela API oficial do WhatsApp.
-  // O fluxo externo da ZapSign permanece disponível apenas como integração opcional, mas não é usado para o envio do link ao cliente.
+  // A assinatura é criada e enviada pelo fluxo nativo do AdvOS; nenhuma plataforma externa é usada para o link do cliente.
   const clientToken = crypto.randomBytes(28).toString('base64url');
   const danielToken = crypto.randomBytes(28).toString('base64url');
   const signatureExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
@@ -587,7 +528,10 @@ export async function POST(req: Request) {
     }).eq('id', doc.id).eq('law_firm_id', profile.law_firm_id);
   }
 
-  const signatureUrl = `${new URL(req.url).origin}/assinar/${clientToken}`;
+  const forwardedHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+    const forwardedProto = req.headers.get('x-forwarded-proto') || new URL(req.url).protocol.replace(':','');
+    const appOrigin = `${forwardedProto}://${forwardedHost}`.replace(/\/$/, '');
+  const signatureUrl = `${appOrigin}/assinar/${clientToken}`;
   let signatureWhatsappStatus = 'nao_enviado';
   try {
     const { sendWhatsAppText } = await import('@/lib/whatsappApi');
@@ -639,9 +583,9 @@ export async function POST(req: Request) {
     await admin.from('generated_contracts').update({
       financial_contract_id: financialContract?.id || null,
       asaas_status: asaasIds.length ? 'cobrancas_criadas' : 'sem_cobrancas_ou_configuracao_pendente',
-      zapsign_status: 'desativado_para_envio_nativo',
+      zapsign_status: 'pendente',
       zapsign_token: null,
-      zapsign_url: signatureUrl,
+      zapsign_url: null,
       raw_zapsign_payload: { provider: 'advos', signature_request_id: signatureRequest.id },
     }).eq('id', generated.id).eq('law_firm_id', profile.law_firm_id);
   }
@@ -649,7 +593,7 @@ export async function POST(req: Request) {
   await admin.from('activity_logs').insert({
     law_firm_id: profile.law_firm_id,
     auth_user_id: session.user.id,
-    action: 'gerou_pdf_zapsign_asaas',
+    action: 'gerou_documento_assinatura_asaas',
     entity: 'generated_contracts',
     entity_id: generated?.id || null,
     metadata: { signature_whatsapp_status: signatureWhatsappStatus },

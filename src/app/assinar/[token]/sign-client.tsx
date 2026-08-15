@@ -1,22 +1,266 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
-import {CheckCircle2,Camera,FileText,ShieldCheck,Send,Loader2,Eye} from 'lucide-react';
 
-export default function SignClient({token,requestId,signerId,title,signer,settings,status}:{token:string,requestId:string,signerId:string,title:string,signer:any,settings:any,status:string}){
- const videoRef=useRef<HTMLVideoElement>(null); const canvasRef=useRef<HTMLCanvasElement>(null);
- const [stream,setStream]=useState<MediaStream|null>(null); const [step,setStep]=useState(status==='assinado'?'done':'preview');
- const [otp,setOtp]=useState(''); const [sendingOtp,setSendingOtp]=useState(false); const [message,setMessage]=useState(''); const [busy,setBusy]=useState(false); const [consent,setConsent]=useState(false); const [selfie,setSelfie]=useState<Blob|null>(null); const [previewConfirmed,setPreviewConfirmed]=useState(false); const [nameConfirm,setNameConfirm]=useState('');
- useEffect(()=>()=>stream?.getTracks().forEach(t=>t.stop()),[stream]);
- const startCamera=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});setStream(s); if(videoRef.current) videoRef.current.srcObject=s;}catch{setMessage('Não foi possível acessar a câmera. Permita o acesso à câmera para continuar.')}};
- const capture=()=>{const v=videoRef.current,c=canvasRef.current;if(!v||!c)return; c.width=v.videoWidth||640;c.height=v.videoHeight||480;c.getContext('2d')?.drawImage(v,0,0,c.width,c.height); c.toBlob(b=>{if(b)setSelfie(b)},'image/jpeg',.86);};
- const markViewed=async()=>{setBusy(true);setMessage('');try{const res=await fetch('/api/signatures/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,requestId,signerId})});const j=await res.json();if(!res.ok||!j.ok)throw new Error(j.error||'Não foi possível registrar a visualização.');setPreviewConfirmed(true);setStep('identity');}catch(e:any){setMessage(e.message)}finally{setBusy(false)}};
- const sendOtp=async()=>{setSendingOtp(true);setMessage('');try{const res=await fetch('/api/signatures/otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,requestId,signerId})});const j=await res.json();if(!res.ok||!j.ok)throw new Error(j.error||'Falha ao enviar código');setMessage('Código enviado pelo WhatsApp do signatário.');}catch(e:any){setMessage(e.message)}finally{setSendingOtp(false)}};
- const submitEvidence=async()=>{if(!previewConfirmed){setMessage('Visualize o documento antes de continuar.');return} if(settings.requireSelfie&&!selfie){setMessage('Capture uma selfie antes de continuar.');return} if(settings.requireOtp&&!otp){await sendOtp();return} setBusy(true);try{if(settings.requireSelfie&&selfie){const fd=new FormData();fd.append('token',token);fd.append('requestId',requestId);fd.append('signerId',signerId);fd.append('selfie',selfie,'selfie.jpg');const res=await fetch('/api/signatures/selfie',{method:'POST',body:fd});const j=await res.json();if(!res.ok||!j.ok)throw new Error(j.error||'Falha ao salvar evidências');}setStep('confirm');}catch(e:any){setMessage(e.message)}finally{setBusy(false)}};
- const sign=async()=>{if(!previewConfirmed){setMessage('Visualize o documento antes de assinar.');return} if(!consent){setMessage('Confirme que leu e concorda com o documento.');return} if(nameConfirm.trim().toLowerCase()!==String(signer?.name||'').trim().toLowerCase()){setMessage('Digite seu nome completo exatamente como aparece no documento.');return} setBusy(true);try{const fd=new FormData();fd.append('token',token);fd.append('requestId',requestId);fd.append('signerId',signerId);fd.append('otp',otp);fd.append('confirmation_name',nameConfirm.trim());const res=await fetch('/api/signatures/sign',{method:'POST',body:fd});const j=await res.json();if(!res.ok||!j.ok)throw new Error(j.error||'Não foi possível assinar');setStep('done');setMessage(j.status==='aguardando_assinatura'?'Sua assinatura foi registrada. O documento agora aguarda a assinatura do escritório.':'Documento assinado com sucesso.');}catch(e:any){setMessage(e.message)}finally{setBusy(false)}};
- if(step==='done')return <main className="min-h-screen bg-slate-50 p-6"><div className="mx-auto max-w-2xl rounded-3xl bg-white p-8 shadow-sm text-center"><CheckCircle2 className="mx-auto text-emerald-600" size={52}/><h1 className="mt-4 text-2xl font-black">Assinatura registrada</h1><p className="mt-2 text-sm text-slate-600">Sua assinatura foi registrada com sucesso.</p><div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-left text-sm font-semibold text-emerald-900">O documento foi encaminhado para a próxima etapa. Você não precisa realizar nenhuma outra ação.</div></div></main>;
- return <main className="min-h-screen bg-[#f6f7f9] p-4 md:p-8"><div className="mx-auto max-w-5xl grid gap-4 lg:grid-cols-[1fr_380px]"><section className="rounded-3xl bg-white overflow-hidden shadow-sm"><div className="border-b p-5"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#0b6b5e] text-white"><ShieldCheck/></div><div><h1 className="text-lg font-black text-slate-950">Assinatura eletrônica</h1><p className="text-xs font-semibold text-slate-500">Ladeira Advogados · AdvOS</p></div></div></div><div className="aspect-[1/1.3] bg-slate-100"><iframe title="Documento" src={`/api/public/signatures/${token}/document`} className="h-full w-full border-0"/></div></section><aside className="rounded-3xl bg-white p-5 shadow-sm"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documento</p><h2 className="mt-1 text-lg font-black">{title}</h2><p className="mt-1 text-sm text-slate-500">Signatário: {signer?.name||'Cliente'}</p>{message&&<div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">{message}</div>}
- {step==='preview'&&<div className="mt-5 space-y-4"><div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-700"><div className="flex items-center gap-2 font-black text-slate-900"><Eye size={17}/> Visualização obrigatória</div><p className="mt-2">Leia e confira todo o documento no painel ao lado antes de continuar.</p></div><label className="flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} className="mt-0.5"/>Declaro que visualizei o documento e estou pronto(a) para continuar.</label><button className="btn btn-primary w-full" disabled={busy||!consent} onClick={markViewed}>{busy?<Loader2 className="animate-spin"/>:<FileText size={16}/>}Continuar</button></div>}
- {step==='identity'&&<div className="mt-5 space-y-4">{settings.requireSelfie&&<div className="rounded-2xl border p-4"><div className="flex items-center gap-2 font-black"><Camera size={17}/> Selfie obrigatória</div><div className="mt-3 overflow-hidden rounded-2xl bg-slate-900"><video ref={videoRef} autoPlay playsInline className="aspect-video w-full object-cover"/></div><canvas ref={canvasRef} className="hidden"/><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" className="btn btn-secondary" onClick={startCamera}>Abrir câmera</button><button type="button" className="btn btn-primary" onClick={capture}>Capturar selfie</button></div>{selfie&&<p className="mt-2 text-xs font-bold text-emerald-700">Selfie capturada ✓</p>}</div>}<label className="flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} className="mt-0.5"/>Autorizo o tratamento das evidências necessárias para comprovar minha identidade e assinatura.</label><button className="btn btn-primary w-full" disabled={busy} onClick={submitEvidence}>{busy?<Loader2 className="animate-spin"/>:<FileText size={16}/>}Continuar</button></div>}
- {step==='confirm'&&<div className="mt-5 space-y-4"><div className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-900"><p className="font-black">Documento visualizado</p><p className="mt-1">Sua identidade foi registrada. A assinatura será feita eletronicamente, sem desenho manual.</p></div>{settings.requireOtp&&<div className="rounded-2xl border p-4"><p className="text-sm font-black">Código de segurança</p><div className="mt-2 flex gap-2"><input className="input flex-1" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="6 dígitos"/><button className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp?'Enviando…':<Send size={15}/>}</button></div></div>}<div className="rounded-2xl border p-4"><p className="text-sm font-black">Confirmação da assinatura</p><input className="input mt-2" value={nameConfirm} onChange={e=>setNameConfirm(e.target.value)} placeholder={String(signer?.name||'Nome completo')}/><p className="mt-2 text-xs text-slate-500">Digite seu nome exatamente como aparece acima. Não é necessário desenhar a assinatura.</p></div><label className="flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} className="mt-0.5"/>Li o documento e concordo com sua assinatura eletrônica.</label><button className="btn btn-primary w-full" onClick={sign} disabled={busy}>{busy?<Loader2 className="animate-spin"/>:<CheckCircle2 size={16}/>}Assinar eletronicamente</button></div>}
- <div className="mt-4 rounded-xl bg-slate-50 p-3 text-[10px] font-semibold text-slate-500">O processo registra data/hora, IP, navegador, método de autenticação, hash do documento e as evidências capturadas.</div></aside></div></main>
+import { useEffect, useRef, useState } from 'react';
+import { Camera, CheckCircle2, Eye, FileCheck2, Loader2, Send, ShieldCheck } from 'lucide-react';
+
+type Props = {
+  token: string;
+  requestId: string;
+  signerId: string;
+  title: string;
+  signer: any;
+  settings: { requireSelfie: boolean; requireDocumentPhoto: boolean; requireOtp: boolean };
+  status: string;
+};
+
+type Step = 'preview' | 'identity' | 'confirm' | 'done';
+
+export default function SignClient({ token, requestId, signerId, title, signer, settings, status }: Props) {
+  const [step, setStep] = useState<Step>(status === 'assinado' ? 'done' : 'preview');
+  const [viewConfirmed, setViewConfirmed] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [selfie, setSelfie] = useState<Blob | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [otp, setOtp] = useState('');
+  const [nameConfirm, setNameConfirm] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => () => stream?.getTracks().forEach((track) => track.stop()), [stream]);
+
+  const startCamera = async () => {
+    setMessage('');
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      setStream(media);
+      if (videoRef.current) videoRef.current.srcObject = media;
+    } catch {
+      setMessage('Não foi possível acessar a câmera. Autorize a câmera para continuar.');
+    }
+  };
+
+  const captureSelfie = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => blob && setSelfie(blob), 'image/jpeg', 0.88);
+  };
+
+  const markViewed = async () => {
+    if (!consent) {
+      setMessage('Confirme que visualizou o documento completo.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/signatures/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, requestId, signerId }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível registrar a visualização.');
+      setViewConfirmed(true);
+      setConsent(false);
+      setStep('identity');
+    } catch (error: any) {
+      setMessage(error.message || 'Não foi possível registrar a visualização.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendOtp = async () => {
+    setSendingOtp(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/signatures/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, requestId, signerId }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível enviar o código.');
+      setMessage('Código de segurança enviado pelo WhatsApp.');
+    } catch (error: any) {
+      setMessage(error.message || 'Não foi possível enviar o código.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const continueIdentity = () => {
+    if (!settings.requireSelfie || selfie) {
+      setStep('confirm');
+      return;
+    }
+    setMessage('Capture a selfie para continuar.');
+  };
+
+  const sign = async () => {
+    if (!viewConfirmed) {
+      setMessage('Visualize o documento antes de assinar.');
+      return;
+    }
+    if (!consent) {
+      setMessage('Confirme que leu e concorda com o documento.');
+      return;
+    }
+    if (settings.requireSelfie && !selfie) {
+      setMessage('Capture a selfie antes de assinar.');
+      return;
+    }
+    if (settings.requireOtp && !otp) {
+      setMessage('Informe o código de segurança enviado por WhatsApp.');
+      return;
+    }
+    if (nameConfirm.trim().toLowerCase() !== String(signer?.name || '').trim().toLowerCase()) {
+      setMessage('Confirme seu nome completo exatamente como aparece no documento.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      if (settings.requireSelfie && selfie) {
+        const selfieForm = new FormData();
+        selfieForm.append('token', token);
+        selfieForm.append('requestId', requestId);
+        selfieForm.append('signerId', signerId);
+        selfieForm.append('selfie', selfie, 'selfie.jpg');
+        const selfieResponse = await fetch('/api/signatures/selfie', { method: 'POST', body: selfieForm });
+        const selfieJson = await selfieResponse.json();
+        if (!selfieResponse.ok || !selfieJson.ok) throw new Error(selfieJson.error || 'Não foi possível salvar a selfie.');
+      }
+      const form = new FormData();
+      form.append('token', token);
+      form.append('requestId', requestId);
+      form.append('signerId', signerId);
+      form.append('otp', otp);
+      form.append('confirmation_name', nameConfirm.trim());
+      const response = await fetch('/api/signatures/sign', { method: 'POST', body: form });
+      const json = await response.json();
+      if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível concluir a assinatura.');
+      setStep('done');
+      stream?.getTracks().forEach((track) => track.stop());
+      setMessage('Sua assinatura foi registrada.');
+    } catch (error: any) {
+      setMessage(error.message || 'Não foi possível concluir a assinatura.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (step === 'done') {
+    return (
+      <main className="min-h-screen bg-[#f6f7f9] p-4 md:p-8">
+        <section className="mx-auto max-w-2xl rounded-3xl bg-white p-10 text-center shadow-sm">
+          <CheckCircle2 className="mx-auto text-emerald-600" size={60} />
+          <h1 className="mt-4 text-2xl font-black text-slate-950">Assinatura registrada</h1>
+          <p className="mt-2 text-sm text-slate-600">O documento foi recebido pelo escritório e seguirá para a próxima etapa.</p>
+          <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-left text-sm font-semibold text-emerald-900">
+            Depois da sua assinatura, o processo seguirá internamente para o escritório.
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f6f7f9] p-4 md:p-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-4 flex items-center gap-3 rounded-3xl bg-white p-5 shadow-sm">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#075e54] text-white"><ShieldCheck size={22} /></div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ladeira Advogados · Assinatura eletrônica</p>
+            <h1 className="text-xl font-black text-slate-950">Assinatura eletrônica</h1>
+          </div>
+        </header>
+
+        {message && <div className="mb-4 rounded-2xl bg-amber-50 p-3 text-xs font-semibold text-amber-900">{message}</div>}
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
+            <div className="border-b px-5 py-4">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Documento para assinatura</p>
+              <h2 className="mt-1 text-lg font-black text-slate-950">{title}</h2>
+            </div>
+            <div className="h-[68vh] min-h-[520px] bg-slate-100">
+              <iframe title="Visualização do documento" src={`/api/public/signatures/${token}/document`} className="h-full w-full border-0" />
+            </div>
+          </section>
+
+          <aside className="rounded-3xl bg-white p-5 shadow-sm">
+            {step === 'preview' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="flex items-center gap-2 font-black text-emerald-950"><Eye size={17} /> 1. Visualize o documento</div>
+                  <p className="mt-2 text-xs font-semibold text-emerald-900">Leia o documento completo no painel ao lado. A assinatura somente será liberada depois dessa etapa.</p>
+                </div>
+                <label className="flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold">
+                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+                  Confirmo que visualizei o documento completo.
+                </label>
+                <button onClick={markViewed} disabled={!consent || busy} className="btn btn-primary w-full">
+                  {busy ? <Loader2 className="animate-spin" /> : <FileCheck2 size={16} />} Continuar
+                </button>
+              </div>
+            )}
+
+            {step === 'identity' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border p-4">
+                  <div className="flex items-center gap-2 font-black"><Camera size={17} /> 2. Confirme sua identidade</div>
+                  <p className="mt-1 text-xs text-slate-500">A selfie é usada como evidência do processo de assinatura.</p>
+                  {settings.requireSelfie && (
+                    <>
+                      <video ref={videoRef} id="advos-sign-camera" autoPlay playsInline className="mt-3 aspect-video w-full rounded-2xl bg-slate-900 object-cover" />
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button className="btn btn-secondary" onClick={startCamera}>Abrir câmera</button>
+                        <button className="btn btn-primary" onClick={captureSelfie}>Capturar selfie</button>
+                      </div>
+                      {selfie && <p className="mt-2 text-xs font-black text-emerald-700">Selfie capturada ✓</p>}
+                    </>
+                  )}
+                </div>
+                <button onClick={continueIdentity} disabled={settings.requireSelfie && !selfie} className="btn btn-primary w-full">Continuar</button>
+              </div>
+            )}
+
+            {step === 'confirm' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border p-4">
+                  <p className="text-sm font-black">3. Assinatura eletrônica</p>
+                  <p className="mt-1 text-xs text-slate-500">Não é necessário desenhar uma assinatura.</p>
+                  {settings.requireOtp && (
+                    <div className="mt-4">
+                      <label className="label">Código de segurança</label>
+                      <div className="mt-1 flex gap-2">
+                        <input className="input flex-1" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" />
+                        <button className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp ? 'Enviando…' : <Send size={15} />}</button>
+                      </div>
+                    </div>
+                  )}
+                  <label className="label mt-4">Nome completo</label>
+                  <input className="input mt-1" value={nameConfirm} onChange={(e) => setNameConfirm(e.target.value)} placeholder={String(signer?.name || '')} />
+                  <label className="mt-3 flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold">
+                    <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+                    Li e concordo com o documento e com a assinatura eletrônica.
+                  </label>
+                </div>
+                <button onClick={sign} disabled={busy || !consent} className="btn btn-primary w-full">
+                  {busy ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={16} />} Assinar documento
+                </button>
+              </div>
+            )}
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
 }

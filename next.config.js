@@ -1,6 +1,6 @@
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Referrer-Policy', value: 'no-referrer' },
   { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
   { key: 'X-DNS-Prefetch-Control', value: 'off' },

@@ -150,7 +150,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
     {query?.gerado && (
       <section className="card mb-6 border-green-200 bg-green-50 p-4 text-sm text-green-800">
-        Documento gerado em PDF. O AdvOS tentou enviar para a ZapSign, criar as cobranças no Asaas e salvar tudo na pasta deste cliente.
+        Documento gerado em PDF. O AdvOS criou a assinatura eletrônica nativa, as cobranças configuradas e salvou tudo na pasta deste cliente.
       </section>
     )}
 
@@ -306,9 +306,9 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <input className="input" name="rg" placeholder="RG" />
             <input className="input" name="rg_uf" placeholder="Órgão/UF do RG" />
             <input className="input" name="cpf" defaultValue={client.doc || ''} placeholder="CPF/CNPJ" />
-            <input className="input" name="phone" defaultValue={clientPhone || ''} placeholder="WhatsApp/telefone para ZapSign" />
+            <input className="input" name="phone" defaultValue={clientPhone || ''} placeholder="WhatsApp/telefone" />
             <input className="input md:col-span-3" name="address" defaultValue={client.address || ''} placeholder="Endereço completo" />
-            <input className="input" name="email" defaultValue={client.email || ''} placeholder="E-mail para ZapSign/Asaas" />
+            <input className="input" name="email" defaultValue={client.email || ''} placeholder="E-mail para assinatura/Asaas" />
           </div>
         </div>
 
@@ -377,7 +377,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
               </form>
             </td>
             <td>{d.cases?.case_number || d.cases?.action_type || '-'}</td>
-            <td>{d.document_signatures?.[0]?.signature_url ? <Link className="font-bold text-blue-700" href={d.document_signatures[0].signature_url} target="_blank" rel="noreferrer">ZapSign</Link> : (d.signature_status || '-')}</td>
+            <td>{d.document_signatures?.[0]?.signature_url ? <Link className="font-bold text-blue-700" href={d.document_signatures[0].signature_url} target="_blank" rel="noreferrer">Assinatura</Link> : (d.signature_status || '-')}</td>
             <td>{d.download_url ? <Link className="font-bold text-blue-700" href={d.download_url} target="_blank" rel="noreferrer">abrir arquivo</Link> : '-'}</td>
             <td>{dateBR(d.created_at)}</td>
             <td>
@@ -399,8 +399,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         {generated.map((g:any)=>{
           const charges = installmentsByContract.get(g.financial_contract_id) || [];
           const asaasLinks = charges.map((i:any, idx:number)=>({label:`Cobrança ${idx+1}`,amount:i.amount,dueDate:i.due_date,url:linkFromInstallment(i)})).filter((x:any)=>x.url);
-          const signatureUrl = signatureUrlByDocumentId.get(String(g.document_id || '')) || String(g.zapsign_url || '').trim();
-          const message = buildContractLinksMessage({clientName:client.name,zapsignUrl:signatureUrl,asaasLinks});
+          const signatureUrl = signatureUrlByDocumentId.get(String(g.document_id || '')).trim();
+          const message = buildContractLinksMessage({clientName:client.name,signatureUrl,asaasLinks});
           const targetPhone = client.whatsapp || client.phone || g.phone || '';
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -411,7 +411,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
               {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} requiredLink={signatureUrl} generatedContractId={String(g.id)} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-              <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
+              <p><b>Assinatura:</b> {signatureUrl ? <Link href={signatureUrl} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className="badge badge-warn">pendente</span>}</p>
               <p><b>Asaas:</b> {asaasLinks.length ? `${asaasLinks.length} ${asaasLinks.length === 1 ? 'link' : 'links'} de cobrança` : <span className={`badge ${statusClass(g.asaas_status)}`}>{g.asaas_status || 'pendente'}</span>}</p>
               <p><b>Data:</b> {dateBR(g.contract_date)}</p>
             </div>

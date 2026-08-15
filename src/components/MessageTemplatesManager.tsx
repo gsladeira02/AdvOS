@@ -36,7 +36,7 @@ const variables = [
   '{{valor}}',
   '{{vencimento}}',
   '{{link_asaas}}',
-  '{{link_zapsign}}',
+  '{{link_assinatura}}',
   '{{linha_link_asaas}}',
   '{{escritorio}}',
   '{{telefone_escritorio}}',

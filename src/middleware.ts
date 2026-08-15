@@ -80,14 +80,14 @@ function csp(nonce: string) {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${process.env.ADVOS_ALLOW_SAME_ORIGIN_FRAMES === 'true' ? "'self'" : "'none'"}`,
   ].join('; ') + upgrade;
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const nonce = btoa(crypto.randomUUID());
-  const policy = csp(nonce);
+  const policy = (pathname.startsWith('/assinar') || pathname.startsWith('/api/public/signatures')) ? csp(nonce).replace("frame-ancestors 'none'", "frame-ancestors 'self'") : csp(nonce);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', policy);

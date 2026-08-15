@@ -49,12 +49,10 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
     .select('provider,enabled,environment,token_last4,api_base_url,webhook_secret,default_billing_type,status,notes,updated_at,raw_settings')
     .eq('law_firm_id', profile.law_firm_id);
 
-  const zapsign = (rows || []).find((r: any) => r.provider === 'zapsign');
   const asaas = (rows || []).find((r: any) => r.provider === 'asaas');
   const whatsapp = (rows || []).find((r: any) => r.provider === 'whatsapp');
   const openai = (rows || []).find((r: any) => r.provider === 'openai');
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://seu-dominio.vercel.app';
-  const zapStatus = integrationStatus(zapsign);
   const asaasStatus = integrationStatus(asaas);
   const whatsappStatus = integrationStatus(whatsapp);
   const openaiHasEnvKey = Boolean(process.env.OPENAI_API_KEY);
@@ -85,60 +83,15 @@ export default async function Integracoes({ searchParams }: { searchParams?: Pro
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="label">Assinatura digital</p>
-              <h2 className="mt-2 text-xl font-black">ZapSign</h2>
-              <p className="mt-2 text-sm text-slate-600">Use para enviar procurações, contratos de honorários, acordos e documentos para assinatura.</p>
+              <h2 className="mt-2 text-xl font-black">Assinatura eletrônica AdvOS</h2>
+              <p className="mt-2 text-sm text-slate-600">Fluxo nativo do AdvOS: cliente visualiza o documento, confirma identidade e assina; depois Daniel Costa Ladeira assina internamente, sem token público e sem assinatura manual.</p>
             </div>
-            <span className={`badge shrink-0 ${zapStatus.cls}`}>{zapStatus.label}</span>
+            <span className="badge badge-ok shrink-0">ativa</span>
           </div>
-
-          <form action="/api/integrations" method="post" className="mt-4 space-y-3">
-            <input type="hidden" name="provider" value="zapsign" />
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="label">Ambiente</label>
-                <select name="environment" defaultValue={zapsign?.environment || 'sandbox'} className="input mt-1">
-                  <option value="sandbox">Sandbox/testes</option>
-                  <option value="producao">Produção</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Status</label>
-                <select name="enabled" defaultValue={zapsign?.enabled ? 'true' : 'false'} className="input mt-1">
-                  <option value="false">Desativada</option>
-                  <option value="true">Ativada</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Token da API</label>
-              <input name="api_token" type="password" className="input mt-1" placeholder={zapsign?.token_last4 ? `Chave salva terminando em ${zapsign.token_last4}` : 'Cole o token da ZapSign'} />
-              <p className="mt-2 text-xs text-slate-500">Deixe vazio para manter a chave atual.</p>
-            </div>
-
-            <div>
-              <label className="label">Base URL</label>
-              <input name="api_base_url" className="input mt-1 bg-slate-50" readOnly value="https://api.zapsign.com.br/api/v1" />
-            </div>
-
-            <div>
-              <label className="label">Webhook no ZapSign</label>
-              <input className="input mt-1 bg-slate-50" readOnly value={`${appUrl}/api/webhooks/zapsign`} />
-            </div>
-
-            {zapsign?.webhook_secret && (
-              <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-3 text-xs text-slate-600">
-                <p className="font-black text-slate-900">Autenticação do webhook ZapSign</p>
-                <p className="mt-1">Cadastre um cabeçalho personalizado no webhook da ZapSign:</p>
-                <div className="mt-2 grid gap-2">
-                  <input className="input bg-white" readOnly value="X-AdvOS-Webhook-Token" aria-label="Nome do cabeçalho do webhook ZapSign" />
-                  <input className="input bg-white font-mono text-xs" readOnly value={zapsign.webhook_secret} aria-label="Token do webhook ZapSign" />
-                </div>
-              </div>
-            )}
-
-            <button className="btn btn-primary">Salvar ZapSign</button>
-          </form>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border p-4"><p className="text-xs font-black">Cliente</p><p className="mt-1 text-sm text-slate-600">Visualização obrigatória + selfie + OTP + confirmação do nome.</p></div>
+            <div className="rounded-2xl border p-4"><p className="text-xs font-black">Daniel Costa Ladeira</p><p className="mt-1 text-sm text-slate-600">Assinatura interna autenticada, sem token, OTP, selfie ou desenho manual.</p></div>
+          </div>
         </section>
 
         <section className="card p-4">

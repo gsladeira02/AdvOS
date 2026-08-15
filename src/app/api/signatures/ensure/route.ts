@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const db = createAdminSupabase();
   const { data: generated, error: generatedError } = await db
     .from('generated_contracts')
-    .select('id,client_id,client_name,phone,email,document_id,pdf_filename,zapsign_url')
+    .select('id,client_id,client_name,phone,email,document_id,pdf_filename')
     .eq('id', generatedContractId)
     .eq('law_firm_id', profile.law_firm_id)
     .maybeSingle();
@@ -71,14 +71,18 @@ export async function POST(req: Request) {
     const { error: dErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: danielToken, signer_order: 2, name: DANIEL.name, email: DANIEL.email, phone: DANIEL.phone, role: DANIEL.role, status: 'pendente' });
     if (dErr) return NextResponse.json({ ok: false, error: dErr.message }, { status: 400 });
     await db.from('documents').update({ signature_request_id: requestRow.id, signature_status: 'pendente' }).eq('id', doc.id).eq('law_firm_id', profile.law_firm_id);
-    const signatureUrl = `${new URL(req.url).origin}/assinar/${clientToken}`;
+    const forwardedHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+    const forwardedProto = req.headers.get('x-forwarded-proto') || new URL(req.url).protocol.replace(':','');
+    const signatureUrl = `${forwardedProto}://${forwardedHost}/assinar/${clientToken}`;
     await db.from('document_signatures').upsert({ law_firm_id: profile.law_firm_id, document_id: doc.id, provider: 'advos', signer_name: generated.client_name, signer_email: generated.email || null, signer_phone: generated.phone || null, sent_at: new Date().toISOString(), status: 'pendente', external_id: requestRow.id, signature_url: signatureUrl, raw_payload: { provider: 'advos', signature_request_id: requestRow.id } }, { onConflict: 'document_id,provider' });
-    await db.from('generated_contracts').update({ zapsign_url: signatureUrl, zapsign_status: 'pendente' }).eq('id', generated.id).eq('law_firm_id', profile.law_firm_id);
+    await db.from('generated_contracts').update({ zapsign_status: 'pendente' }).eq('id', generated.id).eq('law_firm_id', profile.law_firm_id);
   }
 
   const { data: signer } = await db.from('signature_signers').select('signer_token,name,phone').eq('request_id', requestRow.id).eq('law_firm_id', profile.law_firm_id).eq('signer_order', 1).maybeSingle();
   const token = String(signer?.signer_token || requestRow.public_token || '').trim();
   if (!token) return NextResponse.json({ ok: false, error: 'Não foi possível obter o token do assinante.' }, { status: 500 });
-  const signatureUrl = `${new URL(req.url).origin}/assinar/${token}`;
+  const forwardedHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+  const forwardedProto = req.headers.get('x-forwarded-proto') || new URL(req.url).protocol.replace(':','');
+  const signatureUrl = `${forwardedProto}://${forwardedHost}/assinar/${token}`;
   return NextResponse.json({ ok: true, signatureUrl, requestId: requestRow.id, phone: cleanPhone(signer?.phone || generated.phone || '') });
 }

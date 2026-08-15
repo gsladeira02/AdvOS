@@ -16,13 +16,13 @@ export function whatsappUrl(phone?: string | null, message?: string) {
 
 export function buildContractLinksMessage(input: {
   clientName?: string | null;
-  zapsignUrl?: string | null;
+  signatureUrl?: string | null;
   asaasLinks?: Array<{ label?: string | null; amount?: number | string | null; dueDate?: string | null; url?: string | null }>;
 }) {
   const lines: string[] = [];
   lines.push(`Olá${input.clientName ? `, ${input.clientName}` : ''}!`);
   lines.push('Segue(m) o(s) link(s) referente(s) ao atendimento do escritório:');
-  if (input.zapsignUrl) lines.push(`\nAssinatura digital:\n${input.zapsignUrl}`);
+  if (input.signatureUrl) lines.push(`\nAssinatura digital:\n${input.signatureUrl}`);
   const charges = (input.asaasLinks || []).filter((l) => l.url);
   if (charges.length) {
     lines.push('\nCobrança(s) Asaas:');

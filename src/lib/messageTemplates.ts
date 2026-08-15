@@ -23,7 +23,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
     shortcut: '/contrato',
     category: 'contrato',
     active: true,
-    body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nSeguem os links referentes ao seu atendimento com o escritório:\n\nAssinatura do documento:\n{{link_zapsign}}\n\nPagamento:\n{{link_asaas}}\n\nApós a assinatura e confirmação do pagamento, daremos andamento ao serviço.`,
+    body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nSeguem os links referentes ao seu atendimento com o escritório:\n\nAssinatura do documento:\n{{link_assinatura}}\n\nPagamento:\n{{link_asaas}}\n\nApós a assinatura e confirmação do pagamento, daremos andamento ao serviço.`,
   },
   {
     name: 'Lembrete de assinatura',
@@ -31,7 +31,7 @@ export const DEFAULT_MESSAGE_TEMPLATES = [
     shortcut: '/assinatura',
     category: 'assinatura',
     active: true,
-    body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nEstamos passando para lembrar que o documento enviado para assinatura ainda está pendente.\n\nVocê pode assinar pelo link abaixo:\n{{link_zapsign}}\n\nQualquer dúvida, estamos à disposição.`,
+    body: `Olá, {{primeiro_nome}}. Tudo bem?\n\nEstamos passando para lembrar que o documento enviado para assinatura ainda está pendente.\n\nVocê pode assinar pelo link abaixo:\n{{link_assinatura}}\n\nQualquer dúvida, estamos à disposição.`,
   },
   {
     name: 'Pedido de documentos',
@@ -51,7 +51,7 @@ export function renderMessageTemplate(template: string, values: Record<string, a
   const clientName = String(values.cliente || '').trim();
   const userName = String(values.usuario || values.userName || values.nome_usuario || '').trim();
   const linkAsaas = String(values.link_asaas || '').trim();
-  const linkZapSign = String(values.link_zapsign || '').trim();
+  const linkAssinatura = String(values.link_assinatura || '').trim();
 
   const vars: Record<string, string> = {
     cliente: clientName,
@@ -63,7 +63,7 @@ export function renderMessageTemplate(template: string, values: Record<string, a
     valor: typeof values.valor === 'number' ? money(values.valor) : String(values.valor || '').trim(),
     vencimento: values.vencimento_iso ? dateBR(values.vencimento_iso) : String(values.vencimento || '').trim(),
     link_asaas: linkAsaas,
-    link_zapsign: linkZapSign,
+    link_assinatura: linkAssinatura,
     escritorio: String(values.escritorio || 'escritório').trim(),
     telefone_escritorio: String(values.telefone_escritorio || '').trim(),
     linha_link_asaas: linkAsaas ? `Você pode regularizar pelo link abaixo:\n${linkAsaas}` : 'Para regularizar, entre em contato conosco por este WhatsApp.',
