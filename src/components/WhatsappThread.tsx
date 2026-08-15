@@ -8,6 +8,8 @@ import {
   CheckCheck,
   ChevronDown,
   Download,
+  Forward,
+  Share2,
   FileText,
   Image as ImageIcon,
   Laugh,
@@ -89,6 +91,10 @@ function normalizeSearch(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
+}
+
+function titleForForward(item: any) {
+  return String(item?.clients?.name || item?.lead?.name || item?.lead_name || item?.name || item?.phone || item?.clients?.phone || 'Contato');
 }
 
 function firstName(name?: string | null) {
@@ -473,6 +479,7 @@ export function WhatsappThread({
   onSent,
   onBack,
   onConversationChanged,
+  forwardTargets = [],
 }: {
   conversation: any;
   messages: any[];
@@ -490,6 +497,7 @@ export function WhatsappThread({
   onSent?: (conversationId?: string) => void;
   onBack?: () => void;
   onConversationChanged?: (change?: any) => void;
+  forwardTargets?: any[];
 }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<MessageListItem[]>(messages || []);
@@ -503,6 +511,9 @@ export function WhatsappThread({
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<string | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<any | null>(null);
+  const [forwardTargetId, setForwardTargetId] = useState('');
+  const [forwardSending, setForwardSending] = useState(false);
   const [transcribingIds, setTranscribingIds] = useState<Set<string>>(() => new Set());
   const [transcriptionProgressById, setTranscriptionProgressById] = useState<Record<string, string>>({});
   const [file, setFile] = useState<File | null>(null);
@@ -861,6 +872,69 @@ export function WhatsappThread({
         delete next[messageId];
         return next;
       });
+    }
+  }
+
+  async function shareMessage(message: any) {
+    try {
+      const body = String(message?.body || '').trim();
+      const mediaUrl = mediaDisplayUrl(message);
+      if (navigator.share) {
+        if (mediaUrl && String(message?.message_type || '').toLowerCase() !== 'text') {
+          const response = await fetch(mediaUrl, { credentials: 'same-origin' });
+          if (!response.ok) throw new Error('Não foi possível preparar o arquivo para compartilhar.');
+          const blob = await response.blob();
+          const name = String(message?.file_name || `mensagem-${message?.id || Date.now()}`);
+          const sharedFile = new File([blob], name, { type: blob.type || message?.mime_type || 'application/octet-stream' });
+          const shareData: any = { files: [sharedFile] };
+          if (body && !/^\[?(imagem|vídeo|audio|áudio|documento|figurinha)/i.test(body)) shareData.text = body;
+          if (!navigator.canShare || navigator.canShare(shareData)) {
+            await navigator.share(shareData);
+          } else {
+            await navigator.share({ text: body || name });
+          }
+        } else {
+          await navigator.share({ text: body || 'Mensagem do WhatsApp' });
+        }
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(body || '');
+        setFeedback('Mensagem copiada. Seu navegador não suporta compartilhamento direto.');
+      } else {
+        throw new Error('Este navegador não suporta compartilhamento.');
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') setFeedback(error?.message || 'Não foi possível compartilhar a mensagem.');
+    }
+  }
+
+  async function forwardSelectedMessage() {
+    const message = forwardMessage;
+    if (!message || !forwardTargetId) return;
+    const target = (forwardTargets || []).find((item: any) => String(item?.id || item?.conversation_id || '') === String(forwardTargetId));
+    const phone = String(target?.phone || target?.clients?.whatsapp || target?.clients?.phone || '').trim();
+    if (!phone) { setFeedback('O contato escolhido não possui WhatsApp válido.'); return; }
+    setForwardSending(true);
+    try {
+      const response = await fetch('/api/whatsapp/messages/forward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId: message.id,
+          targetPhone: phone,
+          targetClientId: target?.client_id || target?.clients?.id || null,
+          caption: String(message?.body || '').trim(),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível encaminhar a mensagem.');
+      setFeedback('Mensagem encaminhada com sucesso.');
+      setForwardMessage(null);
+      setForwardTargetId('');
+      onSent?.(result.conversationId);
+    } catch (error: any) {
+      setFeedback(error?.message || 'Não foi possível encaminhar a mensagem.');
+    } finally {
+      setForwardSending(false);
     }
   }
 
@@ -1385,6 +1459,7 @@ export function WhatsappThread({
                 <div key={message.id || stableMessageKey(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'}`}>
                   <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'}`}>
                     <div className={`absolute top-1 flex items-center gap-1 md:hidden md:group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
+                      {!outbound && <><button type="button" onClick={() => { setForwardMessage(message); setForwardTargetId(''); setDeleteOpenId(null); setReactionOpenId(null); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Encaminhar mensagem"><Forward size={12} /></button><button type="button" onClick={() => void shareMessage(message)} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Compartilhar mensagem"><Share2 size={12} /></button></>}
                       <button type="button" onClick={() => setReactionOpenId(reactionOpenId === message.id ? null : String(message.id))} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Reagir">
                         <Smile size={12} />
                       </button>
@@ -1439,6 +1514,19 @@ export function WhatsappThread({
           </button>
         )}
       </div>
+
+      {forwardMessage && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Encaminhar mensagem">
+          <div className="w-full max-w-md rounded-2xl border border-[#e6dccb] bg-white p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-900">Encaminhar mensagem</h3><p className="text-[10px] text-slate-500">Escolha o contato que receberá uma cópia.</p></div><button type="button" onClick={() => setForwardMessage(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={15}/></button></div>
+            <select value={forwardTargetId} onChange={(e) => setForwardTargetId(e.target.value)} className="input w-full">
+              <option value="">Selecione um contato</option>
+              {(forwardTargets || []).filter((item: any) => String(item?.id || '') !== String(conversation?.id) && String(item?.phone || item?.clients?.whatsapp || item?.clients?.phone || '')).map((item: any) => { const id=String(item?.id || item?.conversation_id || ''); const name=titleForForward(item); return <option key={id} value={id}>{name} · {item?.phone || item?.clients?.whatsapp || item?.clients?.phone}</option>; })}
+            </select>
+            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setForwardMessage(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" disabled={!forwardTargetId || forwardSending} onClick={() => void forwardSelectedMessage()} className="rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50">{forwardSending ? 'Encaminhando...' : 'Encaminhar'}</button></div>
+          </div>
+        </div>
+      )}
 
       {isClosed ? (
         <div className="shrink-0 border-t border-[#d7ded4] bg-[#f0f2f5] p-3">
