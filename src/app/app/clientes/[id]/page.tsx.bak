@@ -48,44 +48,36 @@ export default async function PastaCliente({ params, searchParams }: { params: P
 
   if (!client) notFound();
 
-  // Client details must remain resilient even when an optional relationship/table migration is unavailable.
-  // Query each resource independently and fall back to empty data instead of letting one relation break the whole page.
-  const safeQuery = async <T,>(factory: () => PromiseLike<{ data: T | null; error: any }>, fallback: T) => {
-    try {
-      const result = await factory();
-      return result?.data ?? fallback;
-    } catch {
-      return fallback;
-    }
-  };
-
-  const [docsBase, generatedData, casesData, profilesData, servicesData] = await Promise.all([
-    safeQuery(() => admin.from('documents').select('*').eq('law_firm_id', profile.law_firm_id).eq('client_id', id).order('created_at', { ascending: false }), [] as any[]),
-    safeQuery(() => admin.from('generated_contracts').select('*').eq('law_firm_id', profile.law_firm_id).eq('client_id', id).order('created_at', { ascending: false }), [] as any[]),
-    safeQuery(() => admin.from('cases').select('*').eq('law_firm_id', profile.law_firm_id).eq('client_id', id).order('created_at', { ascending: false }), [] as any[]),
-    safeQuery(() => admin.from('profiles').select('full_name,email,phone,oab_number').eq('law_firm_id', profile.law_firm_id).order('full_name'), [] as any[]),
-    safeQuery(() => admin.from('legal_services').select('*').eq('law_firm_id', profile.law_firm_id).order('name'), [] as any[]),
+  const [docsRes, generatedRes, casesRes, profilesRes, servicesRes] = await Promise.all([
+    admin
+      .from('documents')
+      .select('*, cases(case_number,area,action_type), document_signatures(signature_url,status)')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('client_id', id)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('generated_contracts')
+      .select('*')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('client_id', id)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('cases')
+      .select('*')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('client_id', id)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('profiles')
+      .select('full_name,email,phone,oab_number')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('full_name'),
+    admin
+      .from('legal_services')
+      .select('*')
+      .eq('law_firm_id', profile.law_firm_id)
+      .order('name'),
   ]);
-
-  const docIds = docsBase.map((d:any) => d.id).filter(Boolean);
-  const signatureRows = docIds.length
-    ? await safeQuery(() => admin.from('document_signatures').select('document_id,signature_url,status').eq('law_firm_id', profile.law_firm_id).in('document_id', docIds), [] as any[])
-    : [];
-  const signatureByDoc = new Map<string, any>();
-  for (const row of signatureRows) signatureByDoc.set(String(row.document_id), row);
-
-  const caseIds = docsBase.map((d:any) => d.case_id).filter(Boolean);
-  const caseRows = caseIds.length
-    ? await safeQuery(() => admin.from('cases').select('id,case_number,area,action_type,status').eq('law_firm_id', profile.law_firm_id).in('id', caseIds), [] as any[])
-    : [];
-  const caseById = new Map<string, any>(caseRows.map((c:any) => [String(c.id), c]));
-
-  const docsData = docsBase.map((d:any) => ({ ...d, document_signatures: signatureByDoc.get(String(d.id)) ? [signatureByDoc.get(String(d.id))] : [], cases: d.case_id ? (caseById.get(String(d.case_id)) || null) : null }));
-  const docsRes = { data: docsData };
-  const generatedRes = { data: generatedData };
-  const casesRes = { data: casesData };
-  const profilesRes = { data: profilesData };
-  const servicesRes = { data: servicesData };
 
   const clientFinancialContractsRes = await admin
     .from('financial_contracts')
@@ -115,9 +107,17 @@ export default async function PastaCliente({ params, searchParams }: { params: P
   // This is the source of truth for the link sent to the client.
   const generatedDocumentIds = generated.map((row:any) => row.document_id).filter(Boolean);
   const signatureUrlByDocumentId = new Map<string, string>();
-  for (const documentId of generatedDocumentIds) {
-    const persisted = signatureByDoc.get(String(documentId))?.signature_url;
-    if (persisted) signatureUrlByDocumentId.set(String(documentId), String(persisted));
+  if (generatedDocumentIds.length) {
+    const { data: signatureDocs } = await admin
+      .from('documents')
+      .select('id,document_signatures(signature_url,status)')
+      .eq('law_firm_id', profile.law_firm_id)
+      .in('id', generatedDocumentIds);
+
+    for (const row of (signatureDocs || []) as any[]) {
+      const persisted = (row.document_signatures || []).find((item:any) => item?.signature_url)?.signature_url;
+      if (persisted) signatureUrlByDocumentId.set(String(row.id), String(persisted));
+    }
   }
 
   const financialIds = generated.map((g: any) => g.financial_contract_id).filter(Boolean);
