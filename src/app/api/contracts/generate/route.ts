@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { safeInternalPath } from '@/lib/security';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { optimizeStoredDocument } from '@/lib/documentOptimization';
@@ -80,47 +82,66 @@ function qualification(data: Record<string, string>) {
 }
 
 function contractSections(data: Record<string, string>) {
-  const installments = Number(data.installment_count || 0);
-  const paymentText = installments > 0
-    ? `O pagamento será efetuado mediante entrada no valor de ${money(data.entry_amount)}, com vencimento em ${dateBR(data.entry_date)}, e ${installments} parcela(s) no valor de ${money(data.installment_amount)} cada, com vencimento todo dia ${data.due_day || '-'} de cada mês, até a quitação integral do saldo contratado.`
-    : `O pagamento será efetuado mediante entrada no valor de ${money(data.entry_amount)}, com vencimento em ${dateBR(data.entry_date)}, observadas as condições de pagamento ajustadas entre as partes.`;
-
-  const sections: { heading?: string; text: string }[] = [
-    { text: `CONTRATANTE: ${qualification(data)}.` },
-    { text: `CONTRATADO(S): ${data.attorneys || 'advogado(s) e/ou escritório de advocacia indicado(s) pelo contratante'}, doravante denominado(s) CONTRATADO(S).` },
-    { heading: 'DO OBJETO DO CONTRATO', text: `O presente contrato tem como objeto a prestação de serviços advocatícios visando ${data.object || 'atuação administrativa e/ou judicial de interesse do(a) CONTRATANTE'}.` },
-    { heading: 'DAS ATIVIDADES', text: 'O(s) CONTRATADO(S) deverá(ão) praticar todos os atos relacionados ao exercício da advocacia, obrigações tipicamente de meio, especialmente aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, bem como os atos especificados na procuração outorgada.' },
-    { heading: 'DOS ATOS PROCESSUAIS', text: 'A gestão do procedimento administrativo e/ou judicial correrá por conta e responsabilidade do(s) CONTRATADO(S), podendo, quando necessário, substabelecer os poderes conferidos pelo(a) CONTRATANTE a outro advogado.' },
-    { heading: 'DAS DESPESAS', text: 'Caberá ao(à) CONTRATANTE, quando necessário, o pagamento de custas, taxas, emolumentos, diligências, deslocamentos, cópias, autenticações e demais despesas necessárias ao andamento do serviço, salvo ajuste escrito em sentido diverso.' },
-    { heading: 'DOS HONORÁRIOS', text: `Como contraprestação pelos serviços prestados, o(a) CONTRATANTE concorda em remunerar o(s) CONTRATADO(S) no valor total de ${money(data.total_amount)}. ${paymentText}` },
-    { text: data.payment_notes ? `Observações de pagamento: ${data.payment_notes}.` : 'O pagamento poderá ser realizado por PIX, boleto bancário ou outro meio previamente pactuado entre as partes.' },
-    { text: 'Os eventuais honorários de sucumbência pertencem ao(s) CONTRATADO(S) e não se confundem com os honorários contratuais aqui tratados.' },
-    { text: 'Havendo acordo, desistência ou encerramento antecipado por iniciativa do(a) CONTRATANTE, tal fato não prejudicará o recebimento dos honorários contratados e das despesas já realizadas.' },
-    { text: 'O atraso no pagamento dos honorários poderá ensejar multa de 10% sobre o valor devido, além de juros de mora e atualização monetária, conforme pactuado entre as partes.' },
-    { heading: 'DA VIGÊNCIA E DA RESCISÃO', text: 'Este contrato tem vigência até o adimplemento das obrigações ajustadas e pode ser rescindido por qualquer das partes, mediante comunicação por escrito, sem prejuízo da cobrança de honorários vencidos, despesas realizadas e serviços já prestados.' },
-    { heading: 'DA RESPONSABILIDADE', text: 'O(s) CONTRATADO(S) não será(ão) responsabilizado(s) por quaisquer danos que sobrevierem da demanda patrocinada, cabendo-lhe(s) tão somente o emprego diligente de seus conhecimentos, meios e técnicas para a defesa dos interesses do(a) CONTRATANTE, inexistindo garantia de resultado.' },
-    { text: 'É obrigação do(a) CONTRATANTE entregar documentos, provas, informações e subsídios necessários em tempo hábil, mantendo atualizados seus dados de contato e informações relevantes.' },
-    { heading: 'DA SUSPENSÃO DOS SERVIÇOS', text: 'Em caso de inadimplemento, fica facultado ao(s) CONTRATADO(S) suspender a prestação dos serviços em andamento até a regularização, observadas as regras éticas e legais aplicáveis à advocacia.' },
-    { heading: 'DO FORO', text: `Para dirimir controvérsias oriundas deste contrato, as partes elegem o foro da comarca de ${data.forum || data.local || 'Vila Velha/ES'}, salvo regra legal de competência absoluta.` },
-    { text: `Por estarem assim justos e contratados, firmam o presente instrumento.\n\n${data.local || 'Vila Velha/ES'}, ${dateBR(data.contract_date)}.\n\n\n__________________________________________\n${data.client_name}\nCONTRATANTE\n\n\n__________________________________________\n${data.attorneys || 'CONTRATADO(S)'}\nCONTRATADO(S)` },
+  const total = money(data.total_amount);
+  const entry = money(data.entry_amount);
+  const installmentCount = Number(data.installment_count || 0);
+  const installment = money(data.installment_amount);
+  const paymentText = installmentCount > 0
+    ? `O pagamento será efetuado da seguinte forma: uma entrada via ${paymentMethodLabel(data.billing_type)} no valor de ${entry}, a ser efetuado até a data de ${dateBR(data.entry_date)}, seguida por ${installmentCount} parcela(s) no valor de ${installment} cada, com vencimento conforme as datas e condições ajustadas entre as partes, totalizando o valor de ${total}. O pagamento poderá ser realizado por meio de transferência via CHAVE PIX CNPJ 57.377.637/0001-19, caso seja previamente pactuado entre as partes, ou, em caso de atraso, por meio de boleto bancário.`
+    : `O pagamento será efetuado no valor total de ${total}, observadas as datas e condições previamente pactuadas entre as partes. O pagamento poderá ser realizado por meio de transferência via CHAVE PIX CNPJ 57.377.637/0001-19, caso seja previamente pactuado entre as partes, ou, em caso de atraso, por meio de boleto bancário.`;
+  const successText = data.success_fee ? `Caso haja eventual benefício econômico decorrente de danos morais, o CONTRATADO será remunerado com um percentual correspondente a ${data.success_fee}% do benefício econômico auferido.` : 'Caso haja eventual benefício econômico decorrente de danos morais, o CONTRATADO será remunerado com um percentual correspondente a 30% do benefício econômico auferido.';
+  return [
+    { text: `CONTRATANTE: ${qualification(data)}` },
+    { text: `CONTRATADO: ${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA, pessoa jurídica de direito privado, inscrita na OAB sob o CNPJ 57.377.637/0001-19, com endereço profissional na Rodovia do Sol, Edifício Royal Blue Corporate, nº 2070, sala 1008, Praia de Itaparica, Vila Velha/ES, representada por Dr. DANIEL COSTA LADEIRA, OAB/ES nº 23.416, e-mail dladadeiradv@gmail.com.'}` },
+    { text: 'As partes acima identificadas têm, entre si, justo e acertado o presente Contrato de Honorários Advocatícios, que se regerá pelas cláusulas e pelas condições a seguir descritas.' },
+    { heading: 'DO OBJETO DO CONTRATO', text: `Cláusula 1ª. O presente contrato tem como objeto a prestação de serviços advocatícios visando ${data.object || 'a prestação de serviços jurídicos conforme a demanda informada pelo(a) CONTRATANTE'}.` },
+    { heading: 'DAS ATIVIDADES', text: 'Cláusula 2ª. O CONTRATADO deverá praticar todos os atos relacionados ao exercício da advocacia, obrigações tipicamente de meio, particularmente aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, assim como o que for especificado na outorga da procuração, com a diligência habitual que se presume da atuação profissional.' },
+    { heading: 'DOS ATOS PROCESSUAIS', text: 'Cláusula 3ª. A gestão do processo correrá por conta e responsabilidade do CONTRATADO, podendo, se necessário, substabelecer os poderes que lhe foram conferidos pelo CONTRATANTE a outro advogado.' },
+    { heading: 'DAS DESPESAS', text: 'Cláusula 4ª. Ao CONTRATANTE caberá ainda, se necessário, o pagamento das custas judiciais, em caso de indeferimento do benefício da AJG.' },
+    { heading: 'DOS HONORÁRIOS', text: `Cláusula 5ª. O CONTRATANTE, como contraprestação pelos serviços prestados, concorda em remunerar o CONTRATADO no valor total de ${total}. ${paymentText}` },
+    { text: 'Parágrafo primeiro. O adimplemento dos valores ajustados na presente cláusula será feito exclusivamente através de boleto bancário ou PIX a ser expedido diretamente pelo CONTRATANTE.' },
+    { text: successText },
+    { text: 'Cláusula 6ª. Os eventuais honorários de sucumbência pertencem ao CONTRATADO e não se confundem com os honorários contratuais aqui tratados.' },
+    { text: 'Parágrafo único. Caso haja morte ou incapacidade civil do CONTRATADO, seus sucessores ou representante legal receberão os honorários na proporção do trabalho realizado.' },
+    { text: 'Cláusula 7ª. Havendo acordo entre o CONTRATANTE e a parte contrária ou desistência pelo CONTRATANTE, este fato não prejudicará o recebimento de todos os honorários contratados e da sucumbência, se houver, pelo CONTRATADO.' },
+    { text: 'Cláusula 8ª. O atraso no pagamento dos honorários ensejará multa no valor de 10% (dez por cento) sobre o valor devido e serão cobrados juros de mora na proporção de 5% (cinco por cento) ao mês, devidamente atualizados pelo IGPM + 1%.' },
+    { text: 'Parágrafo primeiro. Caso a mora seja superior a 30 (trinta) dias, serão consideradas vencidas as demais obrigações vincendas, que serão exigidas de imediato.' },
+    { text: 'Parágrafo segundo. Na hipótese do parágrafo anterior, se houver a liberalidade do CONTRATADO, este contrato poderá ser rescindido de pleno direito, independentemente de qualquer medida judicial ou extrajudicial.' },
+    { text: 'Parágrafo terceiro. Havendo a necessidade de propor-se ação judicial para cobrança dos honorários aqui estabelecidos, o valor principal será atualizado monetariamente pelo IGPM, com acréscimo de juros de 5% ao mês, multa de 10% sobre o valor a ser executado e honorários advocatícios na execução no percentual de 20% sobre o valor cobrado naquela demanda.' },
+    { heading: 'DA VIGÊNCIA E DA RESCISÃO', text: 'Cláusula 9ª. Este contrato tem vigência até o adimplemento das obrigações ajustadas e pode ser rescindido a qualquer tempo por qualquer das partes, mediante aviso prévio de 30 (trinta) dias, por escrito e com comprovante de entrega.' },
+    { text: 'Parágrafo primeiro. Na hipótese de rescisão antecipada pelo CONTRATANTE, este deverá pagar multa contratual, bem como, para os valores pro êxito, um percentual correspondente à parcela do serviço que foi executada pelo CONTRATADO, observado o que tiver sido pactuado.' },
+    { text: 'Parágrafo segundo. Na hipótese de rescisão antecipada pelo CONTRATADO, haverá cobrança de honorários proporcionais aos serviços prestados.' },
+    { text: 'Parágrafo terceiro. A prestação do serviço será iniciada após o efetivo pagamento do valor de entrada pactuado na Cláusula 5ª.' },
+    { text: 'O CONTRATADO poderá, a seu critério, realizar diligências prévias necessárias antes da efetivação do pagamento da entrada supramencionada, contudo as eventuais despesas destas diligências deverão ser previamente depositadas pelo CONTRATANTE.' },
+    { heading: 'DA RESPONSABILIDADE', text: 'Cláusula 10ª. O CONTRATADO não será responsabilizado por quaisquer danos que sobrevierem das demandas que patrocinar, cabendo-lhe tão somente o emprego diligente de seus conhecimentos, meios e técnicas para a defesa dos interesses do CONTRATANTE, inexistente qualquer garantia de resultado.' },
+    { text: 'Cláusula 11ª. O CONTRATADO não será responsabilizado acaso resultem danos por não tomar conhecimento de informações e documentos substanciais para a sua atividade ou em decorrência da impossibilidade de contato com o CONTRATANTE, que deverá manter atualizadas quaisquer informações relevantes para a demanda, bem como as informações cadastrais fornecidas por aquele.' },
+    { text: 'Cláusula 12ª. É obrigação do CONTRATANTE, sempre que solicitada, entregar, fornecer ou disponibilizar ao CONTRATADO todos os documentos necessários, provas, informações e subsídios, em tempo hábil, para que este possa cumprir o objeto do presente contrato. Qualquer omissão ou negligência por parte do CONTRATANTE será de sua inteira responsabilidade, caso advenha qualquer prejuízo a seus interesses.' },
+    { heading: 'DA SUSPENSÃO DOS SERVIÇOS', text: 'Cláusula 13ª. Em caso de não pagamento das parcelas dentro do prazo estipulado, fica ao contratado o direito de suspender, automaticamente, a prestação dos serviços em andamento, até que a situação seja regularizada, observadas as regras legais e éticas aplicáveis.' },
+    { text: 'Parágrafo primeiro. Na hipótese de ocorrência do previsto na cláusula acima, o CONTRATANTE estará sujeito às consequências previstas neste contrato e na legislação aplicável.' },
+    { heading: 'DO FORO', text: `Cláusula 14ª. Para dirimir quaisquer controvérsias oriundas deste contrato, as partes elegem o foro da comarca de ${data.forum || data.local || 'Vila Velha/ES'}.` },
+    { text: `Por estarem assim justos e contratados, firmam o presente instrumento, em duas vias de igual teor.\n\n${data.local || 'Vila Velha/ES'}, ${dateBR(data.contract_date)}.\n\n\n__________________________________________\n${data.client_name}\nCONTRATANTE\n\n\n__________________________________________\n${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA'}\nCONTRATADO` },
   ];
-  return sections;
+}
+
+function paymentMethodLabel(type?: string) {
+  const map: Record<string,string> = { PIX: 'PIX', BOLETO: 'boleto bancário', CREDIT_CARD: 'cartão de crédito', UNDEFINED: 'forma de pagamento escolhida pelo cliente' };
+  return map[String(type || '').toUpperCase()] || 'forma de pagamento previamente ajustada';
 }
 
 function powerSections(data: Record<string, string>, withHipossuficiencia: boolean) {
   const sections: { heading?: string; text: string }[] = [
-    { heading: 'OUTORGANTE', text: `${qualification(data)}.` },
-    { heading: 'OUTORGADOS', text: `${data.attorneys || 'advogado(s) e/ou escritório de advocacia indicado(s) pelo outorgante'}.` },
-    { heading: 'PODERES', text: `O(a) OUTORGANTE nomeia e constitui o(s) OUTORGADO(S) seu(s) bastante(s) procurador(es), conferindo-lhe(s) poderes para representá-lo(a), em juízo ou fora dele, perante órgãos públicos, autarquias, repartições administrativas, DETRAN, CIRETRAN, JARI, CETRAN, DAER, DER, DNIT, PRF, prefeituras municipais, Poder Judiciário, Ministério Público, Defensoria Pública e demais órgãos competentes, especialmente para ${data.object || 'atuação administrativa e/ou judicial de interesse do(a) outorgante'}.` },
-    { text: 'Os poderes abrangem requerer, protocolar, acompanhar processos, apresentar defesas e recursos, juntar e retirar documentos, solicitar cópias, obter informações, assinar requerimentos, receber intimações e notificações, transigir, desistir, reconvir, discordar, ratificar, retificar, receber quantias, dar quitação, substabelecer com ou sem reserva de poderes e praticar todos os demais atos necessários ao integral cumprimento do mandato.' },
+    { text: `OUTORGANTE: ${qualification(data)}.` },
+    { text: `OUTORGADOS: ${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA, pessoa jurídica de direito privado, inscrita na OAB sob o CNPJ 57.377.637/0001-19, representada por Dr. DANIEL COSTA LADEIRA, OAB/ES nº 23.416.'}` },
+    { heading: 'PODERES', text: `O OUTORGANTE nomeia e constitui o OUTORGADO seu procurador; onde este se apresentar, outorgando-lhe os necessários poderes para representá-lo, em juízo ou fora dele, junto à ação em que é réu, podendo, nesta ação, e tudo praticar, requerer, assinar, com poderes para transigir, desistir, reconvir, discordar, ratificar, retificar, receber quantias e intimações, dar quitação, propor contraposição, acompanhar quaisquer recursos em todos os termos ou instâncias, responder perante qualquer repartição pública ou privada, autarquia ou órgão federal, estadual ou municipal no que se refere a esta ação em específico, e ainda praticar todos os demais atos que se fizerem necessários ao integral cumprimento do presente mandato, para o que confere os mais amplos poderes, bem como os contidos na cláusula “ad judicia”, podendo, ainda, substabelecer, no todo ou em parte, com ou sem reserva, os poderes ora conferidos, que se destinam especialmente para fim de representação do outorgante na ${data.object || 'ação judicial e/ou atuação administrativa relacionada ao caso do outorgante'}, bem como para interpor recursos administrativos contra DETRAN, DAER, DER, DNIT, PRF e Prefeituras Municipais, quando cabível.` },
   ];
   if (withHipossuficiencia) {
     sections.push(
-      { heading: 'DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA', text: 'Sob as penas da lei e para que produza seus jurídicos e legais efeitos, o(a) OUTORGANTE declara que não dispõe de rendimentos suficientes que lhe permitam arcar com custas processuais, honorários advocatícios, valores de depósito recursal e demais despesas processuais sem prejuízo de seu sustento próprio e/ou de sua família, requerendo, quando cabível, os benefícios da gratuidade da justiça.' },
-      { text: 'Declara estar ciente de que a veracidade das informações prestadas poderá ser analisada pela autoridade competente e que documentos adicionais poderão ser solicitados.' }
+      { heading: 'DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA', text: 'Sob as penas da lei e para que produza seus jurídicos e legais efeitos, atendendo ao disposto na legislação aplicável, DECLARO que não disponho de rendimentos suficientes que me permitam pagar custas processuais, honorários advocatícios e valores de depósito recursal, para postular em meu nome no Juízo desta comarca, sendo desta forma considerado juridicamente necessitado, requerendo, portanto, o deferimento do benefício da gratuidade de justiça.' },
+      { text: `Por ser esta a expressão da verdade, assino a presente.\n\n${String(data.local || 'Vila Velha/ES').toUpperCase()}, ${dateBR(data.contract_date)}\n\n\n__________________________________________\n${data.client_name}\nOUTORGANTE` },
     );
+  } else {
+    sections.push({ text: `Por ser esta a expressão da verdade, assino a presente.\n\n${String(data.local || 'Vila Velha/ES').toUpperCase()}, ${dateBR(data.contract_date)}\n\n\n__________________________________________\n${data.client_name}\nOUTORGANTE` });
   }
-  sections.push({ text: `Por ser esta a expressão da verdade, assina a presente.\n\n${data.local || 'Vila Velha/ES'}, ${dateBR(data.contract_date)}.\n\n\n__________________________________________\n${data.client_name}\nOUTORGANTE` });
   return sections;
 }
 
@@ -166,71 +187,80 @@ async function generatePdfBuffer(data: Record<string, string>) {
   const bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
   const pageWidth = 595.28;
   const pageHeight = 841.89;
-  const margin = 62;
-  const maxWidth = pageWidth - margin * 2;
-  const fontSize = 11;
-  const lineHeight = 15;
+  const margin = 52;
+  const top = 92;
+  const footer = 42;
+  const colGap = 24;
+  const colWidth = (pageWidth - margin * 2 - colGap) / 2;
+  const fontSize = 10.5;
+  const lineHeight = 14.2;
+  const logoPath = join(process.cwd(), 'public', 'brand', 'ladeira-advogados.png');
+  let logo: any = null;
+  try { logo = await pdf.embedPng(readFileSync(logoPath)); } catch {}
   const docs = docsForType(data);
   let page: any;
-  let y = 0;
+  let col = 0;
+  let y = pageHeight - top;
 
   function newPage() {
     page = pdf.addPage([pageWidth, pageHeight]);
-    y = pageHeight - margin;
-    page.drawText('LADEIRA ADVOGADOS', { x: pageWidth - margin - 128, y: pageHeight - 45, size: 10, font: bold, color: rgb(0.18, 0.18, 0.18) });
-    page.drawText('Rod. do Sol, 2070. Ed. Royal Blue Corporate, sala 1008. Praia de Itaparica, Vila Velha - ES. Contato: (27) 99794-0089.', {
-      x: margin,
-      y: 36,
-      size: 7.5,
-      font: regular,
-      color: rgb(0.25, 0.25, 0.25),
-    });
+    col = 0;
+    y = pageHeight - top;
+    if (logo) {
+      const scaled = logo.scaleToFit(92, 62);
+      page.drawImage(logo, { x: pageWidth - margin - scaled.width, y: pageHeight - 74, width: scaled.width, height: scaled.height });
+    }
+    page.drawText('LADEIRA ADVOGADOS', { x: pageWidth - margin - 112, y: pageHeight - 83, size: 9, font: bold, color: rgb(0.18, 0.18, 0.18) });
+    page.drawText('Rod. do Sol, 2070. Ed. Royal Blue Corporate, sala 1008. Praia de Itaparica, Vila Velha - ES. Contato: (27) 99794-0089.', { x: margin, y: footer, size: 6.7, font: regular, color: rgb(0.25, 0.25, 0.25) });
   }
-
+  function nextColumn() {
+    if (col === 0) { col = 1; y = pageHeight - top; }
+    else newPage();
+  }
   function ensure(space: number) {
-    if (y - space < 64) newPage();
+    if (y - space < footer + 10) nextColumn();
   }
-
-  function drawCentered(text: string, size = 14) {
-    ensure(size + 22);
-    const w = bold.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: (pageWidth - w) / 2, y, size, font: bold, color: rgb(0, 0, 0) });
-    y -= size + 22;
+  function drawLine(text: string, opts: {heading?: boolean} = {}) {
+    const font = opts.heading ? bold : regular;
+    const size = opts.heading ? 11 : fontSize;
+    const words = splitWords(text);
+    let line = '';
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(next, size) <= colWidth) line = next;
+      else {
+        if (line) { ensure(lineHeight); page.drawText(line, { x: margin + col * (colWidth + colGap), y, size, font, color: rgb(0,0,0) }); y -= lineHeight; }
+        line = word;
+      }
+    }
+    if (line) { ensure(lineHeight); page.drawText(line, { x: margin + col * (colWidth + colGap), y, size, font, color: rgb(0,0,0) }); y -= lineHeight; }
+    y -= opts.heading ? 4 : 2;
   }
-
-  function drawParagraph(text: string, opts: { heading?: boolean } = {}) {
+  function drawParagraph(text: string, opts: {heading?: boolean} = {}) {
     const chunks = String(text || '').split('\n');
     for (const chunk of chunks) {
-      if (!chunk.trim()) {
-        y -= lineHeight;
-        continue;
-      }
-      const font = opts.heading ? bold : regular;
-      const size = opts.heading ? 11.5 : fontSize;
-      const lines = wrapLine(chunk, font, size, maxWidth);
-      ensure(lines.length * lineHeight + 8);
-      for (const line of lines) {
-        page.drawText(line, { x: margin, y, size, font, color: rgb(0, 0, 0) });
-        y -= lineHeight;
-      }
-      y -= opts.heading ? 3 : 6;
+      if (!chunk.trim()) { y -= lineHeight * 0.7; continue; }
+      drawLine(chunk, opts);
     }
   }
+  function drawTitle(text: string) {
+    if (col !== 0 || y > pageHeight - top + 2) { /* intentional */ }
+    ensure(42);
+    const w = bold.widthOfTextAtSize(text, 13);
+    page.drawText(text, { x: margin, y, size: 13, font: bold, color: rgb(0,0,0) });
+    y -= 22;
+    if (w > colWidth) drawLine(text, {heading:true});
+  }
 
-  docs.forEach((doc, index) => {
-    newPage();
-    drawCentered(doc.title, 14);
-    doc.sections.forEach((s) => {
-      if (s.heading) drawParagraph(s.heading, { heading: true });
-      drawParagraph(s.text);
-    });
-    if (index < docs.length - 1) {
-      // próxima iteração cria página nova
+  for (let di = 0; di < docs.length; di++) {
+    if (!page) newPage(); else if (di > 0) newPage();
+    drawTitle(docs[di].title);
+    for (const section of docs[di].sections) {
+      if (section.heading) drawParagraph(section.heading, { heading: true });
+      drawParagraph(section.text);
     }
-  });
-
-  const bytes = await pdf.save();
-  return Buffer.from(bytes);
+  }
+  return Buffer.from(await pdf.save());
 }
 
 async function zapsignSend(lawFirmId: string, documentTitle: string, pdfBuffer: Buffer, data: Record<string, string>, documentId: string | null) {

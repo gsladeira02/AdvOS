@@ -251,11 +251,11 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           <div>
             <label className="label">Tipo de documento</label>
             <select className="input mt-1" name="document_type" defaultValue="kit_hipossuficiencia">
-              <option value="contrato_honorarios">Contrato de honorários</option>
-              <option value="procuracao_simples">Procuração sem hipossuficiência</option>
-              <option value="procuracao_hipossuficiencia">Procuração com hipossuficiência econômica</option>
-              <option value="kit_simples">Kit: contrato + procuração sem hipossuficiência</option>
-              <option value="kit_hipossuficiencia">Kit: contrato + procuração com hipossuficiência</option>
+              <option value="contrato_honorarios">Contrato de honorários - modelo oficial Ladeira</option>
+              <option value="procuracao_simples">Procuração - modelo oficial Ladeira</option>
+              <option value="procuracao_hipossuficiencia">Procuração + hipossuficiência - modelo oficial Ladeira</option>
+              <option value="kit_simples">Kit oficial: contrato + procuração</option>
+              <option value="kit_hipossuficiencia">Kit oficial: contrato + procuração + hipossuficiência</option>
             </select>
           </div>
           <div>
@@ -321,7 +321,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <input className="input" name="entry_date" type="date" placeholder="Data da entrada" />
             <input className="input" name="installment_count" type="number" placeholder="Nº parcelas" />
             <input className="input" name="installment_amount" type="number" step="0.01" placeholder="Valor parcela" />
-            <input className="input md:col-span-3 xl:col-span-6" name="payment_notes" placeholder="Observações do pagamento" />
+            <input className="input" name="success_fee" type="number" min="0" max="100" step="0.01" defaultValue="30" placeholder="% honorários de êxito" /><input className="input md:col-span-2 xl:col-span-5" name="payment_notes" placeholder="Observações do pagamento" />
           </div>
           <p className="mt-2 text-xs text-slate-500">Ao gerar, a entrada e as parcelas serão cadastradas no financeiro e enviadas ao Asaas se a integração estiver configurada.</p>
         </div>
