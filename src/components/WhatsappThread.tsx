@@ -74,6 +74,30 @@ function messageTime(value?: string) {
   }
 }
 
+function messageDayKey(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function messageDayLabel(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startToday.getTime() - startDate.getTime()) / 86400000);
+
+  if (diffDays === 0) return 'Hoje';
+  if (diffDays === 1) return 'Ontem';
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+  }
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function normalizeShortcut(value: string) {
   return String(value || '')
     .trim()
@@ -1505,11 +1529,22 @@ export function WhatsappThread({
         <div ref={scrollRef} onScroll={handleMessageScroll} className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2">
           {!visibleItems.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
           <div className="space-y-1.5 pb-2">
-            {visibleItems.map((message: any) => {
+            {visibleItems.map((message: any, index: number) => {
               const outbound = message.direction === 'outbound';
+              const currentDayKey = messageDayKey(message.created_at);
+              const previousDayKey = index > 0 ? messageDayKey(visibleItems[index - 1]?.created_at) : '';
+              const showDaySeparator = Boolean(currentDayKey) && currentDayKey !== previousDayKey;
               const bubbleReaction = outbound ? message.client_reaction_emoji || message.reaction_emoji : message.reaction_emoji || message.client_reaction_emoji;
               return (
-                <div key={message.id || stableMessageKey(message)} onClick={() => forwardSelectionMode && toggleForwardSelection(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'} ${forwardSelectionMode ? 'cursor-pointer' : ''}`}>
+                <Fragment key={message.id || stableMessageKey(message)}>
+                  {showDaySeparator && (
+                    <div className="flex justify-center py-2" aria-label={`Mensagens de ${messageDayLabel(message.created_at)}`}>
+                      <span className="rounded-full border border-black/5 bg-[#efe7dd] px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                        {messageDayLabel(message.created_at)}
+                      </span>
+                    </div>
+                  )}
+                  <div onClick={() => forwardSelectionMode && toggleForwardSelection(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'} ${forwardSelectionMode ? 'cursor-pointer' : ''}`}>
                   <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'} ${selectedForwardIds.has(String(message.id)) ? 'ring-2 ring-[#075e54] ring-offset-1' : ''}`}>
                     {forwardSelectionMode && (
                       <div className="absolute -left-7 top-2 z-30 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-white shadow">
@@ -1562,7 +1597,8 @@ export function WhatsappThread({
                       </div>
                     )}
                   </div>
-                </div>
+                  </div>
+                </Fragment>
               );
             })}
             <div ref={bottomRef} />
