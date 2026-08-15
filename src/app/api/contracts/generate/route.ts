@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import crypto from 'node:crypto';
 import { safeInternalPath } from '@/lib/security';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { optimizeStoredDocument } from '@/lib/documentOptimization';
@@ -528,47 +529,120 @@ export async function POST(req: Request) {
     ? await createAsaasCharges(admin, profile, financialContract.id, data, clientRow)
     : [];
 
-  const zap = await zapsignSend(profile.law_firm_id, filename, pdfBuffer, data, doc?.id || null);
-  let signatureWhatsappStatus = 'nao_enviado';
-  if ((zap as any).signature_url && data.phone) {
-    try {
-      const { sendWhatsAppText } = await import('@/lib/whatsappApi');
-      await sendWhatsAppText({
-        lawFirmId: profile.law_firm_id,
-        to: cleanPhone(data.phone),
-        clientId: data.client_id || null,
-        sentBy: session.user.id,
-        message: `Olá, ${data.client_name}! O Ladeira Advogados enviou o documento “${filename}” para assinatura. Acesse o link seguro: ${(zap as any).signature_url}`,
-      });
-      signatureWhatsappStatus = 'enviado_pela_api';
-    } catch (e) {
-      signatureWhatsappStatus = 'erro_no_envio_api';
-    }
+  // Cria a solicitação de assinatura nativa do AdvOS e envia o link diretamente pela API oficial do WhatsApp.
+  // O fluxo externo da ZapSign permanece disponível apenas como integração opcional, mas não é usado para o envio do link ao cliente.
+  const clientToken = crypto.randomBytes(28).toString('base64url');
+  const danielToken = crypto.randomBytes(28).toString('base64url');
+  const signatureExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  const signatureRequireSelfie = true;
+  const signatureRequireOtp = true;
+  const signatureRequireDocumentPhoto = false;
+  const { data: signatureRequest, error: signatureRequestError } = await admin.from('signature_requests').insert({
+    law_firm_id: profile.law_firm_id,
+    document_id: doc?.id || null,
+    public_token: clientToken,
+    status: 'pendente',
+    require_selfie: signatureRequireSelfie,
+    require_document_photo: signatureRequireDocumentPhoto,
+    require_otp: signatureRequireOtp,
+    consent_text: 'Autorizo a coleta e o tratamento das informações e imagens estritamente necessários para comprovar minha identidade e minha assinatura neste documento.',
+    expires_at: signatureExpiresAt,
+    created_by: session.user.id,
+  }).select('id,public_token').single();
+  if (signatureRequestError || !signatureRequest) {
+    throw new Error(signatureRequestError?.message || 'Não foi possível criar o link de assinatura.');
   }
-  await admin.from('document_signatures').insert({
-    ...zap.payload,
-    status: zap.status,
-    external_id: (zap as any).external_id || null,
-    signature_url: (zap as any).signature_url || null,
-    signed_document_url: (zap as any).signed_document_url || null,
-    raw_payload: (zap as any).raw || { error: (zap as any).error || null },
-  });
+
+  const { data: clientSigner, error: clientSignerError } = await admin.from('signature_signers').insert({
+    law_firm_id: profile.law_firm_id,
+    request_id: signatureRequest.id,
+    signer_token: clientToken,
+    signer_order: 1,
+    name: data.client_name,
+    email: data.email || null,
+    phone: cleanPhone(data.phone || ''),
+    cpf: onlyNumbers(data.cpf || '') || null,
+    role: 'cliente',
+    status: 'pendente',
+  }).select('id').single();
+  if (clientSignerError || !clientSigner) throw new Error(clientSignerError?.message || 'Não foi possível criar o signatário cliente.');
+
+  const { data: danielSigner, error: danielSignerError } = await admin.from('signature_signers').insert({
+    law_firm_id: profile.law_firm_id,
+    request_id: signatureRequest.id,
+    signer_token: danielToken,
+    signer_order: 2,
+    name: 'DANIEL COSTA LADEIRA',
+    email: 'dladadeiradv@gmail.com',
+    phone: '5527997940089',
+    role: 'advogado',
+    status: 'pendente',
+  }).select('id').single();
+  if (danielSignerError || !danielSigner) throw new Error(danielSignerError?.message || 'Não foi possível criar Daniel Costa Ladeira como signatário.');
 
   if (doc?.id) {
     await admin.from('documents').update({
-      zapsign_doc_token: (zap as any).external_id || null,
-      signature_status: zap.status,
+      signature_request_id: signatureRequest.id,
+      signature_status: 'pendente',
     }).eq('id', doc.id).eq('law_firm_id', profile.law_firm_id);
   }
+
+  const signatureUrl = `${new URL(req.url).origin}/assinar/${clientToken}`;
+  let signatureWhatsappStatus = 'nao_enviado';
+  try {
+    const { sendWhatsAppText } = await import('@/lib/whatsappApi');
+    if (!data.phone) throw new Error('WhatsApp do cliente não informado.');
+    await sendWhatsAppText({
+      lawFirmId: profile.law_firm_id,
+      to: cleanPhone(data.phone),
+      clientId: data.client_id || null,
+      sentBy: session.user.id,
+      message: `Olá, ${data.client_name}! O Ladeira Advogados enviou o documento “${filename}” para assinatura.\n\nAcesse o link seguro para visualizar e assinar:\n${signatureUrl}\n\nO link é válido por 7 dias.`,
+    });
+    signatureWhatsappStatus = 'enviado_pela_api';
+    await admin.from('signature_events').insert({
+      law_firm_id: profile.law_firm_id,
+      request_id: signatureRequest.id,
+      signer_id: clientSigner.id,
+      event_type: 'link_enviado_whatsapp_api',
+      metadata: { to: cleanPhone(data.phone), signature_url: signatureUrl },
+    });
+  } catch (e: any) {
+    signatureWhatsappStatus = 'erro_no_envio_api';
+    await admin.from('signature_events').insert({
+      law_firm_id: profile.law_firm_id,
+      request_id: signatureRequest.id,
+      signer_id: clientSigner.id,
+      event_type: 'erro_envio_whatsapp_api',
+      metadata: { error: String(e?.message || e || 'Erro desconhecido') },
+    });
+  }
+
+  const signaturePayload = {
+    law_firm_id: profile.law_firm_id,
+    document_id: doc?.id || null,
+    provider: 'advos',
+    signer_name: data.client_name,
+    signer_email: data.email || null,
+    signer_phone: data.phone || null,
+    sent_at: new Date().toISOString(),
+    status: 'pendente',
+    external_id: signatureRequest.id,
+    signature_url: signatureUrl,
+    signed_document_url: null,
+    raw_payload: { request_id: signatureRequest.id, client_signer_id: clientSigner.id, daniel_signer_id: danielSigner.id },
+  };
+  await admin.from('document_signatures').insert(signaturePayload);
+
 
   if (generated?.id) {
     await admin.from('generated_contracts').update({
       financial_contract_id: financialContract?.id || null,
       asaas_status: asaasIds.length ? 'cobrancas_criadas' : 'sem_cobrancas_ou_configuracao_pendente',
-      zapsign_status: zap.status,
-      zapsign_token: (zap as any).external_id || null,
-      zapsign_url: (zap as any).signature_url || null,
-      raw_zapsign_payload: (zap as any).raw || { error: (zap as any).error || null },
+      zapsign_status: 'desativado_para_envio_nativo',
+      zapsign_token: null,
+      zapsign_url: signatureUrl,
+      raw_zapsign_payload: { provider: 'advos', signature_request_id: signatureRequest.id },
     }).eq('id', generated.id).eq('law_firm_id', profile.law_firm_id);
   }
 
