@@ -33,5 +33,5 @@ export async function POST(req:Request){
   await admin.from('documents').update({signature_status:newStatus==='assinado'?'assinado':'aguardando_assinatura'}).eq('id',doc.id).eq('law_firm_id',r.law_firm_id);
   await admin.from('document_signatures').insert({law_firm_id:r.law_firm_id,document_id:doc.id,provider:'advos',status:'assinado',external_id:s.signer_token,signature_url:null,signed_document_url:finalPath,signer_name:s.name,signer_email:s.email,signer_phone:s.phone,signed_at:new Date().toISOString(),selfie_path:s.selfie_path,document_photo_path:s.document_photo_path,audit_metadata:{hash,signer_order:s.signer_order,require_selfie:r.require_selfie,require_document_photo:r.require_document_photo}});
   await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'documento_assinado',metadata:{hash,signer_order:s.signer_order,next_signer_id:next?.id||null}});
-  return NextResponse.json({ok:true,hash,nextSignerToken:next?.signer_token||null,nextSignerName:next?.name||null,status:newStatus});
+  return NextResponse.json({ok:true,hash,status:newStatus});
 }
