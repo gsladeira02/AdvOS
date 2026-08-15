@@ -56,7 +56,6 @@ const mobileItems = [
   ['/app/prazos', 'Prazos', CalendarDays],
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
-  ['/app/assinaturas', 'Assinaturas', ShieldCheck],
 ] as const;
 
 function isActive(pathname: string, href: string) {
