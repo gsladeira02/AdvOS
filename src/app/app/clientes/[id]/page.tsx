@@ -399,7 +399,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         {generated.map((g:any)=>{
           const charges = installmentsByContract.get(g.financial_contract_id) || [];
           const asaasLinks = charges.map((i:any, idx:number)=>({label:`Cobrança ${idx+1}`,amount:i.amount,dueDate:i.due_date,url:linkFromInstallment(i)})).filter((x:any)=>x.url);
-          const signatureUrl = signatureUrlByDocumentId.get(String(g.document_id || '')).trim();
+          const signatureUrl = (signatureUrlByDocumentId.get(String(g.document_id || '')) || '').trim();
           const message = buildContractLinksMessage({clientName:client.name,signatureUrl,asaasLinks});
           const targetPhone = client.whatsapp || client.phone || g.phone || '';
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
