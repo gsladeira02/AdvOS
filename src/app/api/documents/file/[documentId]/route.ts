@@ -97,8 +97,6 @@ export async function GET(req: Request, context: { params: Promise<{ documentId:
         'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
         'Pragma': 'no-cache',
         'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'SAMEORIGIN',
-        'Content-Security-Policy': "frame-ancestors 'self'",
       },
     });
   } catch (error) {

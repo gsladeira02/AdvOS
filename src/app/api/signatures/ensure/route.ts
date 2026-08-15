@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
   if (!validExisting) {
     const clientToken = crypto.randomBytes(28).toString('base64url');
-    const danielToken = '';
+    const danielToken = crypto.randomBytes(28).toString('base64url');
     const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
     const { data: created, error } = await db.from('signature_requests').insert({
       law_firm_id: profile.law_firm_id,
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     const clientPhone = cleanPhone(generated.phone || '');
     const { error: cErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: clientToken, signer_order: 1, name: generated.client_name, email: generated.email || null, phone: clientPhone || null, role: 'cliente', status: 'pendente' });
     if (cErr) return NextResponse.json({ ok: false, error: cErr.message }, { status: 400 });
-    const { error: dErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: null, signer_order: 2, name: DANIEL.name, email: DANIEL.email, phone: DANIEL.phone, role: DANIEL.role, status: 'pendente' });
+    const { error: dErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: danielToken, signer_order: 2, name: DANIEL.name, email: DANIEL.email, phone: DANIEL.phone, role: DANIEL.role, status: 'pendente' });
     if (dErr) return NextResponse.json({ ok: false, error: dErr.message }, { status: 400 });
     await db.from('documents').update({ signature_request_id: requestRow.id, signature_status: 'pendente' }).eq('id', doc.id).eq('law_firm_id', profile.law_firm_id);
     const signatureUrl = `${new URL(req.url).origin}/assinar/${clientToken}`;

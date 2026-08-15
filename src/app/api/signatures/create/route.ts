@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   if (!doc.storage_path) return NextResponse.json({ ok:false, error:'O documento precisa estar armazenado no AdvOS.' }, { status:400 });
 
   const clientToken = crypto.randomBytes(28).toString('base64url');
-  const danielToken = '';
+  const danielToken = crypto.randomBytes(28).toString('base64url');
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
   const { data: requestRow, error } = await admin.from('signature_requests').insert({
     law_firm_id: profile.law_firm_id,
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   if (clientError || !clientSigner) return NextResponse.json({ ok:false, error:clientError?.message || 'Não foi possível cadastrar o cliente como signatário.' }, { status:400 });
 
   const { data: danielSigner, error: danielError } = await admin.from('signature_signers').insert({
-    law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: null, signer_order: 2,
+    law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: danielToken, signer_order: 2,
     name: DANIEL.name, email: DANIEL.email, phone: DANIEL.phone, cpf: null, role: DANIEL.role,
   }).select('id').single();
   if (danielError || !danielSigner) return NextResponse.json({ ok:false, error:danielError?.message || 'Não foi possível cadastrar Daniel Costa Ladeira como signatário.' }, { status:400 });
@@ -90,5 +90,6 @@ export async function POST(req: Request) {
   redirect.searchParams.set('token', requestRow.public_token);
   redirect.searchParams.set('whatsapp', whatsappSent ? 'enviado' : 'erro');
   if (whatsappError) redirect.searchParams.set('erro', whatsappError.slice(0, 180));
+  redirect.searchParams.set('daniel', danielToken);
   return NextResponse.redirect(redirect,303);
 }
