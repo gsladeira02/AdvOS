@@ -4,20 +4,101 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Assinaturas({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+type Query = Record<string, string | string[] | undefined>;
+
+type Signer = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  signer_order: number | null;
+  signer_token: string | null;
+  status: string | null;
+  role: string | null;
+  signed_at: string | null;
+  request_id: string;
+};
+
+type RequestRow = {
+  id: string;
+  status: string | null;
+  created_at: string | null;
+  expires_at: string | null;
+  final_document_path: string | null;
+  document_title: string;
+  signers: Signer[];
+};
+
+function normalizeStatus(value: unknown) {
+  return String(value || '').trim().toLowerCase();
+}
+
+export default async function Assinaturas({ searchParams }: { searchParams?: Promise<Query> }) {
   const { profile } = await getCurrentProfile();
-  const query = await searchParams;
-  const tab = String(query?.tab || 'pendentes') === 'assinadas' ? 'assinadas' : 'pendentes';
+  const query = (await searchParams) || {};
+  const tab = String(query.tab || 'pendentes') === 'assinadas' ? 'assinadas' : 'pendentes';
   const db = createAdminSupabase();
-  const { data: reqs = [] } = await db
+
+  // A página não depende de joins relacionais do PostgREST. Isso evita erro
+  // 500 caso alguma foreign key/relationship ainda não esteja registrada.
+  const reqResult = await db
     .from('signature_requests')
-    .select('id,status,created_at,expires_at,final_document_path,documents(id,title),signature_signers(id,name,phone,signer_order,signer_token,status,role,signed_at)')
+    .select('id,status,created_at,expires_at,final_document_path,document_id')
     .eq('law_firm_id', profile.law_firm_id)
     .order('created_at', { ascending: false })
     .limit(100);
 
-  const pending = (reqs as any[]).filter((r) => !['assinado', 'cancelada', 'cancelado', 'expirada', 'expired'].includes(String(r.status || '').toLowerCase()));
-  const signed = (reqs as any[]).filter((r) => String(r.status || '').toLowerCase() === 'assinado');
+  if (reqResult.error) {
+    console.error('[AdvOS] Falha ao carregar signature_requests:', reqResult.error);
+  }
+
+  const rawRequests = (reqResult.data || []) as Array<{
+    id: string;
+    status: string | null;
+    created_at: string | null;
+    expires_at: string | null;
+    final_document_path: string | null;
+    document_id: string | null;
+  }>;
+
+  const documentIds = rawRequests.map((r) => r.document_id).filter(Boolean) as string[];
+  const requestIds = rawRequests.map((r) => r.id);
+
+  const [documentsResult, signersResult] = await Promise.all([
+    documentIds.length
+      ? db.from('documents').select('id,title').in('id', documentIds).eq('law_firm_id', profile.law_firm_id)
+      : Promise.resolve({ data: [], error: null } as any),
+    requestIds.length
+      ? db.from('signature_signers').select('id,request_id,name,phone,signer_order,signer_token,status,role,signed_at').in('request_id', requestIds).eq('law_firm_id', profile.law_firm_id).order('signer_order', { ascending: true })
+      : Promise.resolve({ data: [], error: null } as any),
+  ]);
+
+  if (documentsResult.error) console.error('[AdvOS] Falha ao carregar documentos de assinatura:', documentsResult.error);
+  if (signersResult.error) console.error('[AdvOS] Falha ao carregar signatários:', signersResult.error);
+
+  const documentMap = new Map<string, string>();
+  for (const doc of (documentsResult.data || []) as Array<{ id: string; title: string | null }>) {
+    documentMap.set(doc.id, doc.title || 'Documento');
+  }
+
+  const signersByRequest = new Map<string, Signer[]>();
+  for (const signer of (signersResult.data || []) as Signer[]) {
+    const list = signersByRequest.get(signer.request_id) || [];
+    list.push(signer);
+    signersByRequest.set(signer.request_id, list);
+  }
+
+  const requests: RequestRow[] = rawRequests.map((r) => ({
+    id: r.id,
+    status: r.status,
+    created_at: r.created_at,
+    expires_at: r.expires_at,
+    final_document_path: r.final_document_path,
+    document_title: r.document_id ? (documentMap.get(r.document_id) || 'Documento') : 'Documento',
+    signers: signersByRequest.get(r.id) || [],
+  }));
+
+  const pending = requests.filter((r) => !['assinado', 'cancelada', 'cancelado', 'expirada', 'expired'].includes(normalizeStatus(r.status)));
+  const signed = requests.filter((r) => normalizeStatus(r.status) === 'assinado');
   const rows = tab === 'assinadas' ? signed : pending;
 
   return (
@@ -48,32 +129,32 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
       <section className="space-y-3">
         {rows.length === 0 ? (
           <div className="card p-8 text-center text-sm font-semibold text-slate-500">Nenhuma assinatura nesta categoria.</div>
-        ) : rows.map((r: any) => {
-          const client = (r.signature_signers || []).find((s: any) => Number(s.signer_order) === 1) || r.signature_signers?.[0];
-          const daniel = (r.signature_signers || []).find((s: any) => Number(s.signer_order) === 2 || s.role === 'advogado');
-          const nextPending = (r.signature_signers || []).find((s: any) => String(s.status || '').toLowerCase() === 'pendente');
+        ) : rows.map((r) => {
+          const client = r.signers.find((s) => Number(s.signer_order) === 1) || r.signers[0];
+          const daniel = r.signers.find((s) => Number(s.signer_order) === 2 || s.role === 'advogado');
+          const nextPending = r.signers.find((s) => normalizeStatus(s.status) === 'pendente');
           return (
             <div key={r.id} className="card p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0">
-                  <h2 className="truncate text-base font-black text-slate-950">{r.documents?.title || 'Documento'}</h2>
+                  <h2 className="truncate text-base font-black text-slate-950">{r.document_title}</h2>
                   <p className="mt-1 text-xs font-semibold text-slate-500">Cliente: {client?.name || '—'} · Criada em {r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—'}</p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${String(r.status).toLowerCase() === 'assinado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{String(r.status || 'pendente').replaceAll('_',' ')}</span>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${normalizeStatus(r.status) === 'assinado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{String(r.status || 'pendente').replaceAll('_',' ')}</span>
               </div>
 
               <div className="mt-4 grid gap-2 md:grid-cols-2">
-                <div className={`rounded-2xl border p-3 ${client?.status === 'assinado' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                <div className={`rounded-2xl border p-3 ${normalizeStatus(client?.status) === 'assinado' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
                   <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Cliente</p>
                   <p className="mt-1 text-sm font-black">{client?.name || '—'}</p>
-                  <p className="text-xs font-semibold text-slate-600">{client?.status === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura'}</p>
+                  <p className="text-xs font-semibold text-slate-600">{normalizeStatus(client?.status) === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura'}</p>
                 </div>
-                <div className={`rounded-2xl border p-3 ${daniel?.status === 'assinado' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                <div className={`rounded-2xl border p-3 ${normalizeStatus(daniel?.status) === 'assinado' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
                   <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Daniel Costa Ladeira</p>
                   <p className="mt-1 text-sm font-black">Daniel Costa Ladeira</p>
-                  <p className="text-xs font-semibold text-slate-600">{daniel?.status === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura do escritório'}</p>
-                  {tab === 'pendentes' && nextPending?.signer_token && daniel?.status !== 'assinado' && (
-                    <Link href={`/assinar/${daniel.signer_token}`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
+                  <p className="text-xs font-semibold text-slate-600">{normalizeStatus(daniel?.status) === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura do escritório'}</p>
+                  {tab === 'pendentes' && nextPending?.signer_token && normalizeStatus(daniel?.status) !== 'assinado' && (
+                    <Link href={`/assinar/${nextPending.signer_token}`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
                   )}
                 </div>
               </div>
