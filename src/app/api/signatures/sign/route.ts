@@ -6,6 +6,21 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 
+async function resolveSignerWithPublicToken(db:any, signerId:string, token:string){
+  const {data:signer}=await db.from('signature_signers').select('id,request_id,law_firm_id,name,phone,email,status,role,signer_token,signer_order').eq('id',signerId).maybeSingle();
+  if(!signer) return null;
+  const {data:req}=await db.from('signature_requests').select('id,law_firm_id,public_token,status,expires_at,require_selfie,require_document_photo,require_otp').eq('id',signer.request_id).maybeSingle();
+  if(!req) return null;
+  const t=String(token||'').trim();
+  const publicOk=String(req.public_token||'').trim()===t;
+  const legacyOk=String(signer.signer_token||'').trim()===t;
+  if(!publicOk && !legacyOk) return null;
+  if(String(signer.role||'').toLowerCase()==='advogado') return null;
+  if(Number(signer.signer_order)!==1) return null;
+  return {signer,request:req};
+}
+
+
 const sha256=(b:Buffer)=>crypto.createHash('sha256').update(b).digest('hex');
 const safe=(v:unknown)=>String(v??'').trim();
 const esc=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -125,7 +140,7 @@ export async function POST(req:Request){
     if(!s || s.role!=='advogado') return NextResponse.json({ok:false,error:'Assinatura do escritório não autorizada.'},{status:403});
     const {data:rr}=await admin.from('signature_requests').select('*').eq('id',requestId).eq('law_firm_id',profile.law_firm_id).maybeSingle(); r=rr;
   }else{
-    const {data:sr}=await admin.from('signature_signers').select('*').eq('id',signerId).eq('signer_token',token).maybeSingle(); s=sr; if(!s)return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
+    const resolved=await resolveSignerWithPublicToken(admin, signerId, token); s=resolved?.signer||null; if(!s)return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
     const {data:rr}=await admin.from('signature_requests').select('*').eq('id',s.request_id).maybeSingle(); r=rr;
   }
   if(!r)return NextResponse.json({ok:false,error:'Solicitação inválida.'},{status:404});

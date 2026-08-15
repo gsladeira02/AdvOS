@@ -3,12 +3,27 @@ import crypto from 'crypto';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { sendWhatsAppTemplate, sendWhatsAppText, getWhatsAppConfig } from '@/lib/whatsappApi';
 const sha256=(v:string)=>crypto.createHash('sha256').update(v).digest('hex');
+async function resolveSignerWithPublicToken(db:any, signerId:string, token:string){
+  const {data:signer}=await db.from('signature_signers').select('id,request_id,law_firm_id,name,phone,email,status,role,signer_token,signer_order').eq('id',signerId).maybeSingle();
+  if(!signer) return null;
+  const {data:req}=await db.from('signature_requests').select('id,law_firm_id,public_token,status,expires_at,require_selfie,require_document_photo,require_otp').eq('id',signer.request_id).maybeSingle();
+  if(!req) return null;
+  const t=String(token||'').trim();
+  const publicOk=String(req.public_token||'').trim()===t;
+  const legacyOk=String(signer.signer_token||'').trim()===t;
+  if(!publicOk && !legacyOk) return null;
+  if(String(signer.role||'').toLowerCase()==='advogado') return null;
+  if(Number(signer.signer_order)!==1) return null;
+  return {signer,request:req};
+}
+
 export async function POST(req:Request){
   const body=await req.json(); const token=String(body.token||'').trim(); const signerId=String(body.signerId||'').trim();
   const admin=createAdminSupabase();
-  const {data:signer}=await admin.from('signature_signers').select('id,request_id,law_firm_id,name,phone').eq('id',signerId).eq('signer_token',token).maybeSingle();
-  if(!signer) return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
-  const {data:r}=await admin.from('signature_requests').select('id,status,expires_at,require_otp').eq('id',signer.request_id).maybeSingle();
+  const resolved=await resolveSignerWithPublicToken(admin, signerId, token);
+  if(!resolved) return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
+  const signer=resolved.signer;
+  const r=resolved.request;
   if(!r) return NextResponse.json({ok:false,error:'Solicitação inválida.'},{status:404});
   if(r.expires_at && new Date(r.expires_at).getTime()<Date.now()) return NextResponse.json({ok:false,error:'Link expirado.'},{status:410});
   if(!signer.phone) return NextResponse.json({ok:false,error:'O signatário não possui telefone para receber o código.'},{status:400});

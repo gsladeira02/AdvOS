@@ -1,12 +1,28 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createAdminSupabase } from '@/lib/supabase/admin';
+
+async function resolveSignerWithPublicToken(db:any, signerId:string, token:string){
+  const {data:signer}=await db.from('signature_signers').select('id,request_id,law_firm_id,name,phone,email,status,role,signer_token,signer_order').eq('id',signerId).maybeSingle();
+  if(!signer) return null;
+  const {data:req}=await db.from('signature_requests').select('id,law_firm_id,public_token,status,expires_at,require_selfie,require_document_photo,require_otp').eq('id',signer.request_id).maybeSingle();
+  if(!req) return null;
+  const t=String(token||'').trim();
+  const publicOk=String(req.public_token||'').trim()===t;
+  const legacyOk=String(signer.signer_token||'').trim()===t;
+  if(!publicOk && !legacyOk) return null;
+  if(String(signer.role||'').toLowerCase()==='advogado') return null;
+  if(Number(signer.signer_order)!==1) return null;
+  return {signer,request:req};
+}
+
 export async function POST(req:Request){
   const f=await req.formData(); const token=String(f.get('token')||'').trim(); const signerId=String(f.get('signerId')||'').trim(); const selfie=f.get('selfie'); const docPhoto=f.get('document_photo');
   if(!(selfie instanceof File)) return NextResponse.json({ok:false,error:'Selfie não enviada.'},{status:400});
   const admin=createAdminSupabase();
-  const {data:s}=await admin.from('signature_signers').select('id,request_id,law_firm_id').eq('id',signerId).eq('signer_token',token).maybeSingle();
-  if(!s) return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
+  const resolved=await resolveSignerWithPublicToken(admin, signerId, token);
+  if(!resolved) return NextResponse.json({ok:false,error:'Signatário inválido.'},{status:404});
+  const s=resolved.signer;
   const {data:r}=await admin.from('signature_requests').select('id,law_firm_id,require_selfie,require_document_photo,expires_at').eq('id',s.request_id).eq('law_firm_id',s.law_firm_id).maybeSingle();
   if(!r) return NextResponse.json({ok:false,error:'Solicitação inválida.'},{status:404});
   if(r.expires_at && new Date(r.expires_at).getTime()<Date.now()) return NextResponse.json({ok:false,error:'Link expirado.'},{status:410});
