@@ -31,18 +31,25 @@ export async function POST(req: Request) {
     let conversationQuery = admin.from('whatsapp_conversations').select('id,law_firm_id,client_id,phone,lead_name,department,status,closed_at,created_at,updated_at,assigned_to,tags').eq('law_firm_id', profile.law_firm_id);
     if (conversationIds) conversationQuery = conversationQuery.in('id', conversationIds);
     const { data: conversations, error: conversationError } = await conversationQuery.order('updated_at', { ascending: true });
-    if (conversationError) throw new Error(conversationError.message);
+    if (conversationError) throw new Error(`Falha ao carregar conversas para exportação: ${conversationError.message}`);
     if (!conversations?.length) throw new SecurityError('Nenhuma conversa encontrada para exportação.', 404);
 
     const ids = conversations.map((item: any) => item.id);
-    const { data: messages, error: messagesError } = await admin.from('whatsapp_messages').select('id,conversation_id,direction,message_type,body,external_id,status,created_at,updated_at,file_name,file_size,mime_type,media_url,sent_by,sent_by_name,deleted_at,deleted_for_all,remote_deleted_at,remote_deleted_by,remote_delete_source,transcription_text,client_reaction_emoji').eq('law_firm_id', profile.law_firm_id).in('conversation_id', ids).order('created_at', { ascending: true });
-    if (messagesError) throw new Error(messagesError.message);
+    const { data: messages, error: messagesError } = await admin.from('whatsapp_messages').select('id,conversation_id,direction,message_type,body,external_id,status,created_at,updated_at,file_name,file_size,mime_type,media_url,sent_by,deleted_at,deleted_for_all,remote_deleted_at,remote_deleted_by,remote_delete_source,transcription_text,client_reaction_emoji').eq('law_firm_id', profile.law_firm_id).in('conversation_id', ids).order('created_at', { ascending: true });
+    if (messagesError) throw new Error(`Falha ao carregar mensagens para exportação: ${messagesError.message}`);
 
     const hiddenIds = new Set<string>();
     const messageIds = (messages || []).map((item: any) => item.id).filter(Boolean);
     if (messageIds.length) {
       const { data: hiddenRows } = await admin.from('whatsapp_message_user_hides').select('message_id').eq('law_firm_id', profile.law_firm_id).eq('auth_user_id', session.user.id).in('message_id', messageIds.slice(0, 50000));
       (hiddenRows || []).forEach((row: any) => hiddenIds.add(String(row.message_id)));
+    }
+
+    const sentByIds = Array.from(new Set((messages || []).map((message: any) => String(message.sent_by || '')).filter(Boolean)));
+    const senderNames = new Map<string, string>();
+    if (sentByIds.length) {
+      const { data: profiles } = await admin.from('profiles').select('auth_user_id,full_name').eq('law_firm_id', profile.law_firm_id).in('auth_user_id', sentByIds.slice(0, 500));
+      (profiles || []).forEach((row: any) => senderNames.set(String(row.auth_user_id), String(row.full_name || '')));
     }
 
     const messageRows = (messages || []).filter((message: any) => !hiddenIds.has(String(message.id)));
@@ -52,7 +59,7 @@ export async function POST(req: Request) {
         id: message.id,
         external_id: message.external_id,
         direction: message.direction,
-        sender: message.direction === 'outbound' ? (message.sent_by_name || message.sent_by || 'Escritório') : (conversation.lead_name || conversation.phone),
+        sender: message.direction === 'outbound' ? (senderNames.get(String(message.sent_by || '')) || message.sent_by || 'Escritório') : (conversation.lead_name || conversation.phone),
         type: messageTypeLabel(message),
         body: message.body,
         status: message.status,
