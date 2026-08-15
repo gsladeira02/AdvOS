@@ -511,8 +511,10 @@ export function WhatsappThread({
   const [callMode, setCallMode] = useState<'voice' | 'video' | null>(null);
   const [reactionOpenId, setReactionOpenId] = useState<string | null>(null);
   const [deleteOpenId, setDeleteOpenId] = useState<string | null>(null);
-  const [forwardMessage, setForwardMessage] = useState<any | null>(null);
+  const [forwardSelectionMode, setForwardSelectionMode] = useState(false);
+  const [selectedForwardIds, setSelectedForwardIds] = useState<Set<string>>(() => new Set());
   const [forwardTargetId, setForwardTargetId] = useState('');
+  const [forwardPickerOpen, setForwardPickerOpen] = useState(false);
   const [forwardSending, setForwardSending] = useState(false);
   const [transcribingIds, setTranscribingIds] = useState<Set<string>>(() => new Set());
   const [transcriptionProgressById, setTranscriptionProgressById] = useState<Record<string, string>>({});
@@ -689,6 +691,7 @@ export function WhatsappThread({
     setFeedback(null);
     setReactionOpenId(null);
     setDeleteOpenId(null);
+    cancelForwardSelection();
     setTranscriptionProgressById({});
     if (conversationId && !conversation?.virtual) {
       window.setTimeout(() => refreshThreadMessages(true), 80);
@@ -907,32 +910,70 @@ export function WhatsappThread({
     }
   }
 
-  async function forwardSelectedMessage() {
-    const message = forwardMessage;
-    if (!message || !forwardTargetId) return;
+  function startForwardSelection(message: any) {
+    if (message?.direction !== 'inbound') return;
+    const id = String(message?.id || '');
+    if (!id || id.startsWith('local-')) {
+      setFeedback('Esta mensagem ainda não está sincronizada. Aguarde um instante e tente novamente.');
+      return;
+    }
+    setForwardSelectionMode(true);
+    setSelectedForwardIds(new Set([id]));
+    setForwardTargetId('');
+    setDeleteOpenId(null);
+    setReactionOpenId(null);
+  }
+
+  function toggleForwardSelection(message: any) {
+    if (!forwardSelectionMode || message?.direction !== 'inbound') return;
+    const id = String(message?.id || '');
+    if (!id || id.startsWith('local-')) return;
+    setSelectedForwardIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function cancelForwardSelection() {
+    setForwardSelectionMode(false);
+    setSelectedForwardIds(new Set());
+    setForwardTargetId('');
+    setForwardPickerOpen(false);
+    setForwardSending(false);
+  }
+
+  async function forwardSelectedMessages() {
+    if (!forwardTargetId || selectedForwardIds.size === 0) return;
     const target = (forwardTargets || []).find((item: any) => String(item?.id || item?.conversation_id || '') === String(forwardTargetId));
     const phone = String(target?.phone || target?.clients?.whatsapp || target?.clients?.phone || '').trim();
-    if (!phone) { setFeedback('O contato escolhido não possui WhatsApp válido.'); return; }
+    if (!phone) { setFeedback('A conversa escolhida não possui WhatsApp válido.'); return; }
+
+    const selectedMessages = visibleItems
+      .filter((item: any) => selectedForwardIds.has(String(item?.id || '')) && item?.direction === 'inbound')
+      .sort((a: any, b: any) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime());
+    if (!selectedMessages.length) return;
+
     setForwardSending(true);
     try {
       const response = await fetch('/api/whatsapp/messages/forward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messageId: message.id,
+          messageIds: selectedMessages.map((message: any) => message.id),
           targetPhone: phone,
           targetClientId: target?.client_id || target?.clients?.id || null,
-          caption: String(message?.body || '').trim(),
         }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível encaminhar a mensagem.');
-      setFeedback('Mensagem encaminhada com sucesso.');
-      setForwardMessage(null);
-      setForwardTargetId('');
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Não foi possível encaminhar as mensagens.');
+      const sent = Number(result?.sentCount || selectedMessages.length);
+      setFeedback(`${sent} ${sent === 1 ? 'mensagem encaminhada' : 'mensagens encaminhadas'} com sucesso.`);
+      cancelForwardSelection();
       onSent?.(result.conversationId);
     } catch (error: any) {
-      setFeedback(error?.message || 'Não foi possível encaminhar a mensagem.');
+      setFeedback(error?.message || 'Não foi possível encaminhar as mensagens.');
     } finally {
       setForwardSending(false);
     }
@@ -1448,6 +1489,19 @@ export function WhatsappThread({
         onChanged={onConversationChanged}
       />
 
+      {forwardSelectionMode && (
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-white px-3 py-2.5 shadow-sm">
+          <div className="min-w-0">
+            <div className="text-xs font-black text-slate-900">Selecionar mensagens</div>
+            <div className="text-[10px] font-semibold text-slate-500">{selectedForwardIds.size} {selectedForwardIds.size === 1 ? 'mensagem selecionada' : 'mensagens selecionadas'}</div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={cancelForwardSelection} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-black text-slate-600 hover:bg-slate-50">Cancelar</button>
+            <button type="button" disabled={selectedForwardIds.size === 0 || forwardSending} onClick={() => { setForwardPickerOpen(true); }} className="rounded-lg bg-[#075e54] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-50">Continuar</button>
+          </div>
+        </div>
+      )}
+
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleMessageScroll} className="whatsapp-message-scroll h-full overflow-y-scroll overscroll-contain bg-[radial-gradient(circle_at_top_left,rgba(7,94,84,.08),transparent_30%),#e5ddd5] px-3 py-3 pr-2">
           {!visibleItems.length && <p className="mx-auto mt-5 max-w-md rounded-xl bg-white/80 px-3 py-2 text-center text-xs font-bold text-slate-600 shadow-sm">Nenhuma mensagem nessa conversa ainda. Você já pode iniciar por aqui.</p>}
@@ -1456,10 +1510,17 @@ export function WhatsappThread({
               const outbound = message.direction === 'outbound';
               const bubbleReaction = outbound ? message.client_reaction_emoji || message.reaction_emoji : message.reaction_emoji || message.client_reaction_emoji;
               return (
-                <div key={message.id || stableMessageKey(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'}`}>
-                    <div className={`absolute top-1 flex items-center gap-1 md:hidden md:group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
-                      {!outbound && <><button type="button" onClick={() => { setForwardMessage(message); setForwardTargetId(''); setDeleteOpenId(null); setReactionOpenId(null); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Encaminhar mensagem"><Forward size={12} /></button><button type="button" onClick={() => void shareMessage(message)} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Compartilhar mensagem"><Share2 size={12} /></button></>}
+                <div key={message.id || stableMessageKey(message)} onClick={() => forwardSelectionMode && !outbound && toggleForwardSelection(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'} ${forwardSelectionMode && !outbound ? 'cursor-pointer' : ''}`}>
+                  <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'} ${selectedForwardIds.has(String(message.id)) ? 'ring-2 ring-[#075e54] ring-offset-1' : ''}`}>
+                    {forwardSelectionMode && !outbound && (
+                      <div className="absolute -left-7 top-2 z-30 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-white shadow">
+                        <div className={`grid h-4 w-4 place-items-center rounded-full ${selectedForwardIds.has(String(message.id)) ? 'bg-[#075e54] text-white' : 'bg-slate-100 text-transparent'}`}>
+                          <Check size={11} strokeWidth={3} />
+                        </div>
+                      </div>
+                    )}
+                    {!forwardSelectionMode && <div className={`absolute top-1 flex items-center gap-1 md:hidden md:group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
+                      {!outbound && <><button type="button" onClick={(event) => { event.stopPropagation(); startForwardSelection(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Selecionar mensagens para encaminhar"><Forward size={12} /></button><button type="button" onClick={(event) => { event.stopPropagation(); void shareMessage(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Compartilhar mensagem"><Share2 size={12} /></button></>}
                       <button type="button" onClick={() => setReactionOpenId(reactionOpenId === message.id ? null : String(message.id))} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Reagir">
                         <Smile size={12} />
                       </button>
@@ -1475,8 +1536,8 @@ export function WhatsappThread({
                           </div>
                         )}
                       </div>
-                    </div>
-                    {reactionOpenId === message.id && (
+                    </div>}
+                    {!forwardSelectionMode && reactionOpenId === message.id && (
                       <div className={`absolute top-[-36px] z-20 flex gap-1 rounded-full border border-[#e6dccb] bg-white px-2 py-1 shadow-lg ${outbound ? 'right-0' : 'left-0'}`}>
                         {reactionOptions.map((emoji) => (
                           <button key={emoji} type="button" className="grid h-7 w-7 place-items-center rounded-full text-base hover:bg-[#f0f2f5]" onClick={() => reactToMessage(message, emoji)}>{emoji}</button>
@@ -1515,11 +1576,11 @@ export function WhatsappThread({
         )}
       </div>
 
-      {forwardMessage && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Encaminhar mensagem">
+      {forwardSelectionMode && selectedForwardIds.size > 0 && forwardPickerOpen && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Encaminhar mensagens">
           <div className="w-full max-w-md rounded-2xl border border-[#e6dccb] bg-white p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-900">Encaminhar mensagem</h3><p className="text-[10px] text-slate-500">Escolha qualquer conversa do WhatsApp que receberá uma cópia.</p></div><button type="button" onClick={() => setForwardMessage(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={15}/></button></div>
-            <select value={forwardTargetId} onChange={(e) => setForwardTargetId(e.target.value)} className="input w-full">
+            <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-900">Encaminhar mensagens</h3><p className="text-[10px] text-slate-500">{selectedForwardIds.size} {selectedForwardIds.size === 1 ? 'mensagem selecionada' : 'mensagens selecionadas'}.</p></div><button type="button" onClick={() => setForwardPickerOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={15}/></button></div>
+            <select value={forwardTargetId === '__picker__' ? '' : forwardTargetId} onChange={(e) => setForwardTargetId(e.target.value)} className="input w-full">
               <option value="">Selecione uma conversa</option>
               {(forwardTargets || []).filter((item: any) => {
                 const id = String(item?.id || item?.conversation_id || '');
@@ -1534,7 +1595,7 @@ export function WhatsappThread({
                 return <option key={id} value={id}>{titleForForward(item)} · {phone} · {state}{lead}</option>;
               })}
             </select>
-            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setForwardMessage(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" disabled={!forwardTargetId || forwardSending} onClick={() => void forwardSelectedMessage()} className="rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50">{forwardSending ? 'Encaminhando...' : 'Encaminhar'}</button></div>
+            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setForwardPickerOpen(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" disabled={!forwardTargetId || forwardSending} onClick={() => void forwardSelectedMessages()} className="rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50">{forwardSending ? 'Encaminhando...' : 'Encaminhar'}</button></div>
           </div>
         </div>
       )}
