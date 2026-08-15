@@ -225,7 +225,7 @@ export async function POST(req: Request) {
       if (!firmIntegration?.law_firm_id) continue;
 
       const lawFirmId = firmIntegration.law_firm_id;
-      const eventId = value?.calls?.[0]?.id || value?.messages?.[0]?.id || value?.statuses?.[0]?.id || entry?.id || null;
+      const eventId = value?.calls?.[0]?.id || value?.messages?.[0]?.id || value?.message_echoes?.[0]?.id || value?.statuses?.[0]?.id || entry?.id || null;
 
       await admin.from('webhook_events').insert({
         law_firm_id: lawFirmId,
@@ -235,6 +235,20 @@ export async function POST(req: Request) {
         payload,
         processed_at: new Date().toISOString(),
       });
+
+      // Mensagens revogadas enviadas pelo WhatsApp Business App/linked device
+      // chegam como message_echoes com type=revoke e apontam para o WAMID original.
+      for (const echo of value?.message_echoes || []) {
+        if (String(echo?.type || '').toLowerCase() !== 'revoke') continue;
+        const originalMessageId = String(echo?.revoke?.original_message_id || echo?.revoke?.message_id || '').trim();
+        if (!originalMessageId) continue;
+        await admin.from('whatsapp_messages').update({
+          remote_deleted_at: new Date().toISOString(),
+          remote_deleted_by: 'contact',
+          remote_delete_source: change?.field || 'smb_message_echoes',
+          updated_at: new Date().toISOString(),
+        }).eq('law_firm_id', lawFirmId).eq('external_id', originalMessageId);
+      }
 
       for (const message of value?.messages || []) {
         const phone = normalizeBrazilPhone(message.from);
@@ -246,6 +260,29 @@ export async function POST(req: Request) {
           phone,
           leadName: client?.name || contact?.profile?.name || null,
         });
+
+        const messageType = String(message?.type || '').toLowerCase();
+        const revokeNode = message?.revoked || message?.revoke || message?.deleted || message?.message_revoke || null;
+        const revokedOriginalId = String(
+          message?.revoke?.original_message_id || message?.revoked?.original_message_id ||
+          revokeNode?.wamid || revokeNode?.message_id || revokeNode?.id ||
+          message?.wamid || message?.message_id || message?.revoke_message_id || message?.revoked_message_id || ''
+        ).trim();
+        if (['revoked', 'revoke', 'deleted'].includes(messageType) || revokeNode) {
+          if (revokedOriginalId) {
+            await admin
+              .from('whatsapp_messages')
+              .update({
+                remote_deleted_at: new Date().toISOString(),
+                remote_deleted_by: 'contact',
+                remote_delete_source: 'whatsapp_webhook',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('law_firm_id', lawFirmId)
+              .eq('external_id', revokedOriginalId);
+          }
+          continue;
+        }
 
         if (message.type === 'reaction') {
           const targetId = message?.reaction?.message_id;

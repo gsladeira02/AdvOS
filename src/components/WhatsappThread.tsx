@@ -925,7 +925,7 @@ export function WhatsappThread({
   }
 
   function toggleForwardSelection(message: any) {
-    if (!forwardSelectionMode || message?.direction !== 'inbound') return;
+    if (!forwardSelectionMode) return;
     const id = String(message?.id || '');
     if (!id || id.startsWith('local-')) return;
     setSelectedForwardIds((current) => {
@@ -951,7 +951,7 @@ export function WhatsappThread({
     if (!phone) { setFeedback('A conversa escolhida não possui WhatsApp válido.'); return; }
 
     const selectedMessages = visibleItems
-      .filter((item: any) => selectedForwardIds.has(String(item?.id || '')) && item?.direction === 'inbound')
+      .filter((item: any) => selectedForwardIds.has(String(item?.id || '')))
       .sort((a: any, b: any) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime());
     if (!selectedMessages.length) return;
 
@@ -1510,9 +1510,9 @@ export function WhatsappThread({
               const outbound = message.direction === 'outbound';
               const bubbleReaction = outbound ? message.client_reaction_emoji || message.reaction_emoji : message.reaction_emoji || message.client_reaction_emoji;
               return (
-                <div key={message.id || stableMessageKey(message)} onClick={() => forwardSelectionMode && !outbound && toggleForwardSelection(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'} ${forwardSelectionMode && !outbound ? 'cursor-pointer' : ''}`}>
+                <div key={message.id || stableMessageKey(message)} onClick={() => forwardSelectionMode && toggleForwardSelection(message)} className={`group flex ${outbound ? 'justify-end' : 'justify-start'} ${forwardSelectionMode ? 'cursor-pointer' : ''}`}>
                   <div className={`relative max-w-[78%] rounded-2xl px-3 py-2 text-[12px] shadow-sm ${outbound ? 'rounded-tr-sm bg-[#dcf8c6] text-slate-900' : 'rounded-tl-sm border border-black/5 bg-white text-slate-900'} ${selectedForwardIds.has(String(message.id)) ? 'ring-2 ring-[#075e54] ring-offset-1' : ''}`}>
-                    {forwardSelectionMode && !outbound && (
+                    {forwardSelectionMode && (
                       <div className="absolute -left-7 top-2 z-30 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-white shadow">
                         <div className={`grid h-4 w-4 place-items-center rounded-full ${selectedForwardIds.has(String(message.id)) ? 'bg-[#075e54] text-white' : 'bg-slate-100 text-transparent'}`}>
                           <Check size={11} strokeWidth={3} />
@@ -1520,7 +1520,7 @@ export function WhatsappThread({
                       </div>
                     )}
                     {!forwardSelectionMode && <div className={`absolute top-1 flex items-center gap-1 md:hidden md:group-hover:flex ${outbound ? '-left-[72px]' : '-right-[72px]'}`}>
-                      {!outbound && <><button type="button" onClick={(event) => { event.stopPropagation(); startForwardSelection(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Selecionar mensagens para encaminhar"><Forward size={12} /></button><button type="button" onClick={(event) => { event.stopPropagation(); void shareMessage(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Compartilhar mensagem"><Share2 size={12} /></button></>}
+                      <button type="button" onClick={(event) => { event.stopPropagation(); startForwardSelection(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Selecionar mensagens para encaminhar"><Forward size={12} /></button><button type="button" onClick={(event) => { event.stopPropagation(); void shareMessage(message); }} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Compartilhar mensagem"><Share2 size={12} /></button>
                       <button type="button" onClick={() => setReactionOpenId(reactionOpenId === message.id ? null : String(message.id))} className="grid h-6 w-6 place-items-center rounded-full bg-white text-slate-700 shadow hover:bg-slate-50" title="Reagir">
                         <Smile size={12} />
                       </button>
@@ -1545,6 +1545,7 @@ export function WhatsappThread({
                       </div>
                     )}
                     {outbound && <div className="mb-1 max-w-full truncate text-[9px] font-black text-[#075e54]" title={senderNameForMessage(message)}>{senderNameForMessage(message)}</div>}
+                    {message?.remote_deleted_at && <div className="mb-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800">Mensagem apagada pelo contato no WhatsApp · cópia preservada no AdvOS</div>}
                     {renderMessageBody(message)}
                     <div className="mt-1 flex items-center justify-end gap-1 text-[9px] font-bold text-slate-500">
                       {message.optimistic && <span>sincronizando</span>}

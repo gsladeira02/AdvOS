@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Bell, BellOff, Check, CheckCheck, Filter, MessageCircle, RefreshCw, Search, Settings2, UserCheck, Users, X } from 'lucide-react';
+import { Archive, Bell, BellOff, Check, CheckCheck, Download, Filter, MessageCircle, RefreshCw, Search, Settings2, UserCheck, Users, X } from 'lucide-react';
 import { WhatsappThread, type WhatsappTemplateOption } from '@/components/WhatsappThread';
 import { createBrowserSupabase } from '@/lib/supabase/browser';
 import { WhatsappSettingsCenter } from '@/components/WhatsappSettingsCenter';
@@ -197,6 +197,12 @@ export function WhatsappCentralClient({
   const refreshQueuedRef = useRef(false);
   const unreadSnapshotRef = useRef<Map<string, number>>(new Map());
   const unreadSnapshotReadyRef = useRef(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<'one' | 'selected' | 'all'>('one');
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
+  const [selectedExportIds, setSelectedExportIds] = useState<Set<string>>(() => new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<'default' | 'granted' | 'denied'>(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
     return Notification.permission;
@@ -311,6 +317,62 @@ export function WhatsappCentralClient({
     setSourceFilter('');
     setContactTypeFilter('all');
     setReadStatusFilter('all');
+  }
+
+  function toggleExportConversation(id: string) {
+    setSelectedExportIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllExportable() {
+    setSelectedExportIds(new Set(filteredConversations.map((item: any) => String(item?.id || '')).filter(Boolean)));
+  }
+
+  async function runConversationExport() {
+    if (exportScope === 'one' && !selectedId) {
+      setExportError('Abra uma conversa para exportá-la individualmente.');
+      return;
+    }
+    if (exportScope === 'selected' && selectedExportIds.size === 0) {
+      setExportError('Selecione ao menos uma conversa.');
+      return;
+    }
+    setExporting(true);
+    setExportError(null);
+    try {
+      const response = await fetch('/api/whatsapp/conversations/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: exportScope,
+          format: exportFormat,
+          conversationId: selectedId,
+          conversationIds: Array.from(selectedExportIds),
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result?.error || 'Não foi possível exportar as conversas.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `advos-whatsapp-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.${exportFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportOpen(false);
+      setSelectedExportIds(new Set());
+    } catch (error: any) {
+      setExportError(error?.message || 'Não foi possível exportar as conversas.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function enableBrowserNotifications() {
@@ -732,6 +794,34 @@ export function WhatsappCentralClient({
         {canConfigure && <button type="button" onClick={() => switchWorkspace('configuracoes')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'configuracoes' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Settings2 size={14}/>Configurações</button>}
       </nav>
 
+      {exportOpen && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Exportar conversas">
+          <div className="w-full max-w-lg rounded-2xl border border-[#e6dccb] bg-white p-4 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div><h3 className="text-sm font-black text-slate-950">Exportar conversas</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Escolha uma conversa, várias selecionadas ou todo o histórico.</p></div>
+              <button type="button" onClick={() => setExportOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={14}/></button>
+            </div>
+            <div className="mt-4 grid gap-2">
+              {([['one','Uma conversa'],['selected','Conversas selecionadas'],['all','Todas as conversas']] as const).map(([value,label]) => (
+                <button key={value} type="button" onClick={() => { setExportScope(value); setExportError(null); }} className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left ${exportScope === value ? 'border-[#075e54] bg-[#e8f4f0]' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                  <span className="text-xs font-black text-slate-800">{label}</span><span className={`grid h-4 w-4 place-items-center rounded-full border ${exportScope === value ? 'border-[#075e54] bg-[#075e54]' : 'border-slate-300'}`}>{exportScope === value && <span className="h-1.5 w-1.5 rounded-full bg-white"/>}</span>
+                </button>
+              ))}
+            </div>
+            {exportScope === 'one' && <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-600">{selected ? `Atual: ${titleFor(selected)}` : 'Abra uma conversa para usar esta opção.'}</div>}
+            {exportScope === 'selected' && (
+              <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-slate-200">
+                <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2"><span className="text-[10px] font-black text-slate-600">{selectedExportIds.size} selecionada(s)</span><button type="button" onClick={selectAllExportable} className="text-[10px] font-black text-[#075e54]">Selecionar todas</button></div>
+                {(departmentConversations || []).map((item: any) => { const id = String(item?.id || ''); const checked = selectedExportIds.has(id); return <label key={id} className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 hover:bg-slate-50"><input type="checkbox" checked={checked} onChange={() => toggleExportConversation(id)} className="h-4 w-4 rounded"/><span className="min-w-0 flex-1"><b className="block truncate text-[11px] text-slate-800">{titleFor(item)}</b><span className="block truncate text-[9px] text-slate-500">{item?.phone || ''} · {item?.department === 'financeiro_juridico' ? 'Financeiro/Jurídico' : item?.closed_at ? 'Encerrada' : 'Atendimento'}</span></span></label>; })}
+              </div>
+            )}
+            <div className="mt-3"><label className="text-[9px] font-black uppercase tracking-wide text-slate-500">Formato</label><select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')} className="input mt-1 w-full"><option value="json">JSON completo</option><option value="csv">CSV para Excel</option></select></div>
+            {exportError && <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[10px] font-bold text-red-700">{exportError}</div>}
+            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setExportOpen(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" onClick={() => void runConversationExport()} disabled={exporting || (exportScope === 'one' && !selectedId) || (exportScope === 'selected' && selectedExportIds.size === 0)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50"><Download size={13}/>{exporting ? 'Exportando...' : 'Exportar'}</button></div>
+          </div>
+        </div>
+      )}
+
       {workspaceView === 'configuracoes' && canConfigure ? (
         <WhatsappSettingsCenter
           tags={tagCatalog}
@@ -753,7 +843,11 @@ export function WhatsappCentralClient({
               <h2 className="truncate text-sm font-black text-slate-950">WhatsApp</h2>
               <p className="truncate text-[10px] text-slate-500">Atendimento, funil e relacionamento jurídico.</p>
             </div>
-            <button
+            <div className="flex shrink-0 items-center gap-1">
+              <button type="button" title="Exportar conversas" aria-label="Exportar conversas" onClick={() => { setExportOpen(true); setExportScope(selectedId ? 'one' : 'all'); setExportError(null); }} className="grid h-8 w-8 place-items-center rounded-lg border border-[#d6ddd6] bg-white text-slate-600 hover:bg-[#fbf7ef]">
+                <Download size={13} />
+              </button>
+              <button
               type="button"
               title="Atualizar agora"
               aria-label="Atualizar agora"
@@ -762,6 +856,7 @@ export function WhatsappCentralClient({
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
+            </div>
           </div>
 
 

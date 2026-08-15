@@ -34,7 +34,6 @@ export async function POST(req: Request) {
       .is('deleted_at', null);
     if (messageError) throw new Error(messageError.message);
     if (!messages?.length || messages.length !== ids.length) throw new Error('Uma ou mais mensagens não foram encontradas.');
-    if (messages.some((message: any) => String(message.direction || '') !== 'inbound')) throw new Error('Somente mensagens recebidas podem ser encaminhadas.');
 
     const targetConversation = await getOrCreateConversation({ lawFirmId: profile.law_firm_id, clientId: targetClientId, phone: targetPhone });
     const orderedMessages = [...messages].sort((a: any, b: any) => new Date(a?.created_at || 0).getTime() - new Date(b?.created_at || 0).getTime());
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
           mimeType: String(message.mime_type || 'application/octet-stream'),
           fileName: String(message.file_name || 'arquivo'),
           fileSize: Number(message.file_size || buffer.length),
-          caption: type === 'text' ? str(message.body) : null,
+          caption: str(message.body) || null,
           clientId: targetClientId || targetConversation.client_id || null,
           sentBy: session.user.id,
           storagePath,
