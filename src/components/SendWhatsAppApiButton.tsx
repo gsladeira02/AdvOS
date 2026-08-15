@@ -7,10 +7,12 @@ export default function SendWhatsAppApiButton({
   phone,
   message,
   clientId,
+  requiredLink,
 }: {
   phone: string;
   message: string;
   clientId?: string | null;
+  requiredLink?: string | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -20,6 +22,11 @@ export default function SendWhatsAppApiButton({
     setBusy(true);
     setSent(false);
     setError('');
+    if (requiredLink !== undefined && !String(requiredLink || '').trim()) {
+      setError('O link de assinatura não foi encontrado. Crie uma nova solicitação de assinatura antes de enviar pelo WhatsApp.');
+      setBusy(false);
+      return;
+    }
     try {
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',

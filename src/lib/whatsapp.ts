@@ -22,7 +22,7 @@ export function buildContractLinksMessage(input: {
   const lines: string[] = [];
   lines.push(`Olá${input.clientName ? `, ${input.clientName}` : ''}!`);
   lines.push('Segue(m) o(s) link(s) referente(s) ao atendimento do escritório:');
-  if (input.zapsignUrl) lines.push(`\nAssinatura digital ZapSign:\n${input.zapsignUrl}`);
+  if (input.zapsignUrl) lines.push(`\nAssinatura digital:\n${input.zapsignUrl}`);
   const charges = (input.asaasLinks || []).filter((l) => l.url);
   if (charges.length) {
     lines.push('\nCobrança(s) Asaas:');

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
@@ -101,6 +102,24 @@ export default async function PastaCliente({ params, searchParams }: { params: P
   }));
 
   const generated = generatedRes.data || [];
+
+  // Resolve the native AdvOS signature link from the document signature record.
+  // This is the source of truth for the link sent to the client.
+  const generatedDocumentIds = generated.map((row:any) => row.document_id).filter(Boolean);
+  const signatureUrlByDocumentId = new Map<string, string>();
+  if (generatedDocumentIds.length) {
+    const { data: signatureDocs } = await admin
+      .from('documents')
+      .select('id,document_signatures(signature_url,status)')
+      .eq('law_firm_id', profile.law_firm_id)
+      .in('id', generatedDocumentIds);
+
+    for (const row of (signatureDocs || []) as any[]) {
+      const persisted = (row.document_signatures || []).find((item:any) => item?.signature_url)?.signature_url;
+      if (persisted) signatureUrlByDocumentId.set(String(row.id), String(persisted));
+    }
+  }
+
   const financialIds = generated.map((g: any) => g.financial_contract_id).filter(Boolean);
   const installmentsRes = financialIds.length
     ? await admin.from('financial_installments').select('*').eq('law_firm_id', profile.law_firm_id).in('contract_id', financialIds).order('due_date')
@@ -380,7 +399,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         {generated.map((g:any)=>{
           const charges = installmentsByContract.get(g.financial_contract_id) || [];
           const asaasLinks = charges.map((i:any, idx:number)=>({label:`Cobrança ${idx+1}`,amount:i.amount,dueDate:i.due_date,url:linkFromInstallment(i)})).filter((x:any)=>x.url);
-          const message = buildContractLinksMessage({clientName:client.name,zapsignUrl:g.zapsign_url,asaasLinks});
+          const signatureUrl = signatureUrlByDocumentId.get(String(g.document_id || '')) || String(g.zapsign_url || '').trim();
+          const message = buildContractLinksMessage({clientName:client.name,zapsignUrl:signatureUrl,asaasLinks});
           const targetPhone = client.whatsapp || client.phone || g.phone || '';
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -388,7 +408,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
                 <b className="break-safe">{docLabel(g.document_type)}</b>
                 <p className="break-safe text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
-              {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
+              {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} requiredLink={signatureUrl} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
               <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
