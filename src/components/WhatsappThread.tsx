@@ -911,7 +911,6 @@ export function WhatsappThread({
   }
 
   function startForwardSelection(message: any) {
-    if (message?.direction !== 'inbound') return;
     const id = String(message?.id || '');
     if (!id || id.startsWith('local-')) {
       setFeedback('Esta mensagem ainda não está sincronizada. Aguarde um instante e tente novamente.');

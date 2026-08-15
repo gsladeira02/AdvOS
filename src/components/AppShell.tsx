@@ -23,12 +23,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <SessionSecurityGuard />
       <div className="desktop-grid grid min-h-[100dvh] md:grid-cols-[204px_minmax(0,1fr)]">
         <aside className="sidebar sticky top-0 hidden h-screen min-w-0 flex-col border-r border-[#e8e2d8] bg-white/95 px-3 py-3.5 shadow-[10px_0_30px_rgba(15,23,42,.025)] backdrop-blur md:flex">
-          <Link href="/app/dashboard" title={`AdvOS — ${firmName}`} className="brand-block mb-3 flex h-11 items-center gap-2.5 rounded-[14px] bg-ink px-2.5 text-white shadow-sm">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px] bg-white/14 text-[13px] font-black">A</span>
-            <div className="min-w-0">
-              <p className="truncate text-[12px] font-black leading-tight">AdvOS</p>
-              <p className="truncate text-[9px] font-semibold leading-tight text-white/55">Gestão jurídica</p>
-            </div>
+          <Link href="/app/dashboard" title={`AdvOS — ${firmName}`} className="brand-block mb-3 flex h-11 items-center overflow-hidden rounded-[14px] bg-white shadow-sm">
+            <img src="/brand/ladeira-advogados.png" alt="Ladeira Advogados" className="h-full w-full object-contain object-left px-1" />
           </Link>
 
           <DesktopNavigation admin={isAdmin} />
@@ -41,12 +37,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <header className="mobile-pwa-top md:hidden">
-          <Link href="/app/dashboard" className="flex min-w-0 items-center gap-2.5 font-black text-white">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-white/14">A</span>
-            <div className="min-w-0">
-              <p className="truncate text-[13px] leading-tight">AdvOS</p>
-              <p className="truncate text-[9px] font-semibold leading-tight text-white/55">{firmName}</p>
-            </div>
+          <Link href="/app/dashboard" className="flex min-w-0 items-center">
+            <span className="flex h-9 w-[132px] items-center overflow-hidden rounded-[10px] bg-white">
+              <img src="/brand/ladeira-advogados.png" alt="Ladeira Advogados" className="h-full w-full object-contain" />
+            </span>
           </Link>
           <div className="flex items-center gap-1.5"><MobileMoreMenu admin={isAdmin} /><LogoutButton mobile /></div>
         </header>

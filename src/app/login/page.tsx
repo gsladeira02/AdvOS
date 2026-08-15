@@ -37,13 +37,10 @@ export default async function Login({ searchParams }: LoginPageProps) {
     <main className="grid min-h-[100dvh] place-items-center px-4 py-6 sm:px-6">
       <div className="card w-full max-w-md p-6 sm:p-8">
         <Link href="/" className="mb-8 flex items-center gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-ink text-xl font-black text-white">
-            A
-          </div>
-          <div className="min-w-0">
-            <b className="block text-xl leading-relaxed">AdvOS</b>
-            <p className="text-xs font-bold leading-relaxed text-slate-500">Acesso interno</p>
-          </div>
+          <span className="flex h-14 w-[220px] items-center overflow-hidden rounded-xl bg-white">
+            <img src="/brand/ladeira-advogados.png" alt="Ladeira Advogados" className="h-full w-full object-contain" />
+          </span>
+          <p className="text-xs font-bold leading-relaxed text-slate-500">Acesso interno</p>
         </Link>
 
         <h1 className="text-3xl font-black leading-relaxed">Entrar</h1>

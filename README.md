@@ -1,3 +1,8 @@
+
+## v9.71
+- Logo oficial Ladeira Advogados aplicada ao app, login, PWA, favicon e navegação pública.
+- Encaminhamento permite selecionar mensagens recebidas e enviadas.
+- Exportação: uma ou várias conversas em Conversas selecionadas, ou todas.
 # AdvOS v9.66
 
 Versão atual do AdvOS, mantendo o hardening de segurança da v9.39 e incorporando todas as evoluções até a v9.66.

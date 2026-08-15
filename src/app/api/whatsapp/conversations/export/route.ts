@@ -17,15 +17,11 @@ export async function POST(req: Request) {
     const admin = createAdminSupabase();
     await enforceRateLimit(admin, `user:${session.user.id}:whatsapp-export`, 20, 60);
     const body = await readJsonBody(req, 262144);
-    const scope = str(body.scope || 'one');
+    const scope = str(body.scope || 'selected');
     const format = str(body.format || 'json') === 'csv' ? 'csv' : 'json';
-    const currentConversationId = str(body.conversationId);
     const requestedIds: string[] = Array.isArray(body.conversationIds) ? Array.from(new Set<string>(body.conversationIds.map(str).filter(Boolean))) : [];
     let conversationIds: string[] | null = null;
-    if (scope === 'one') {
-      if (!currentConversationId) throw new SecurityError('Conversa não informada.', 400);
-      conversationIds = [currentConversationId];
-    } else if (scope === 'selected') {
+    if (scope === 'selected') {
       if (!requestedIds.length) throw new SecurityError('Selecione ao menos uma conversa.', 400);
       conversationIds = requestedIds.slice(0, 500);
     } else if (scope !== 'all') {

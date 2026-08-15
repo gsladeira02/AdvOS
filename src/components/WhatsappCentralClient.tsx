@@ -198,7 +198,7 @@ export function WhatsappCentralClient({
   const unreadSnapshotRef = useRef<Map<string, number>>(new Map());
   const unreadSnapshotReadyRef = useRef(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportScope, setExportScope] = useState<'one' | 'selected' | 'all'>('one');
+  const [exportScope, setExportScope] = useState<'selected' | 'all'>('selected');
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
   const [selectedExportIds, setSelectedExportIds] = useState<Set<string>>(() => new Set());
   const [exporting, setExporting] = useState(false);
@@ -332,10 +332,6 @@ export function WhatsappCentralClient({
   }
 
   async function runConversationExport() {
-    if (exportScope === 'one' && !selectedId) {
-      setExportError('Abra uma conversa para exportá-la individualmente.');
-      return;
-    }
     if (exportScope === 'selected' && selectedExportIds.size === 0) {
       setExportError('Selecione ao menos uma conversa.');
       return;
@@ -791,6 +787,7 @@ export function WhatsappCentralClient({
         <button type="button" onClick={() => switchWorkspace('financeiro_juridico')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'financeiro_juridico' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Users size={14}/>Financeiro/Jurídico{financeiroUnread > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black ${workspaceView === 'financeiro_juridico' ? 'bg-white text-[#075e54]' : 'bg-[#25d366] text-white'}`}>{financeiroUnread > 99 ? '99+' : financeiroUnread}</span>}</button>
         <button type="button" onClick={() => switchWorkspace('encerrados')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'encerrados' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Archive size={14}/>Encerrados{closedCount > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${workspaceView === 'encerrados' ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>{closedCount}</span>}</button>
         {typeof window !== 'undefined' && 'Notification' in window && <button type="button" onClick={() => notificationPermission === 'granted' ? setNotificationPermission('granted') : void enableBrowserNotifications()} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${notificationPermission === 'granted' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-[#fbf7ef]'}`} title={notificationPermission === 'granted' ? 'Notificações ativadas' : 'Ativar notificações do WhatsApp'}>{notificationPermission === 'granted' ? <Bell size={14}/> : <BellOff size={14}/>}<span className="hidden sm:inline">{notificationPermission === 'granted' ? 'Notificações' : 'Ativar notificações'}</span></button>}
+        <button type="button" title="Exportar conversas" aria-label="Exportar conversas" onClick={() => { setExportOpen(true); setExportScope('selected'); setExportError(null); if (selectedId) setSelectedExportIds(new Set([String(selectedId)])); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-[#fbf7ef]"><Download size={14}/><span className="hidden sm:inline">Exportar</span></button>
         {canConfigure && <button type="button" onClick={() => switchWorkspace('configuracoes')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black transition ${workspaceView === 'configuracoes' ? 'bg-[#075e54] text-white' : 'text-slate-600 hover:bg-[#fbf7ef]'}`}><Settings2 size={14}/>Configurações</button>}
       </nav>
 
@@ -798,157 +795,13 @@ export function WhatsappCentralClient({
         <div className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Exportar conversas">
           <div className="w-full max-w-lg rounded-2xl border border-[#e6dccb] bg-white p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
-              <div><h3 className="text-sm font-black text-slate-950">Exportar conversas</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Escolha uma conversa, várias selecionadas ou todo o histórico.</p></div>
+              <div><h3 className="text-sm font-black text-slate-950">Exportar conversas</h3><p className="mt-0.5 text-[10px] font-semibold text-slate-500">Exporte uma ou várias conversas selecionadas, ou todo o histórico.</p></div>
               <button type="button" onClick={() => setExportOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={14}/></button>
             </div>
             <div className="mt-4 grid gap-2">
-              {([['one','Uma conversa'],['selected','Conversas selecionadas'],['all','Todas as conversas']] as const).map(([value,label]) => (
+              {([['selected','Conversas selecionadas'],['all','Todas as conversas']] as const).map(([value,label]) => (
                 <button key={value} type="button" onClick={() => { setExportScope(value); setExportError(null); }} className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left ${exportScope === value ? 'border-[#075e54] bg-[#e8f4f0]' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
                   <span className="text-xs font-black text-slate-800">{label}</span><span className={`grid h-4 w-4 place-items-center rounded-full border ${exportScope === value ? 'border-[#075e54] bg-[#075e54]' : 'border-slate-300'}`}>{exportScope === value && <span className="h-1.5 w-1.5 rounded-full bg-white"/>}</span>
                 </button>
               ))}
             </div>
-            {exportScope === 'one' && <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-bold text-slate-600">{selected ? `Atual: ${titleFor(selected)}` : 'Abra uma conversa para usar esta opção.'}</div>}
-            {exportScope === 'selected' && (
-              <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-slate-200">
-                <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2"><span className="text-[10px] font-black text-slate-600">{selectedExportIds.size} selecionada(s)</span><button type="button" onClick={selectAllExportable} className="text-[10px] font-black text-[#075e54]">Selecionar todas</button></div>
-                {(departmentConversations || []).map((item: any) => { const id = String(item?.id || ''); const checked = selectedExportIds.has(id); return <label key={id} className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0 hover:bg-slate-50"><input type="checkbox" checked={checked} onChange={() => toggleExportConversation(id)} className="h-4 w-4 rounded"/><span className="min-w-0 flex-1"><b className="block truncate text-[11px] text-slate-800">{titleFor(item)}</b><span className="block truncate text-[9px] text-slate-500">{item?.phone || ''} · {item?.department === 'financeiro_juridico' ? 'Financeiro/Jurídico' : item?.closed_at ? 'Encerrada' : 'Atendimento'}</span></span></label>; })}
-              </div>
-            )}
-            <div className="mt-3"><label className="text-[9px] font-black uppercase tracking-wide text-slate-500">Formato</label><select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')} className="input mt-1 w-full"><option value="json">JSON completo</option><option value="csv">CSV para Excel</option></select></div>
-            {exportError && <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[10px] font-bold text-red-700">{exportError}</div>}
-            <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setExportOpen(false)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" onClick={() => void runConversationExport()} disabled={exporting || (exportScope === 'one' && !selectedId) || (exportScope === 'selected' && selectedExportIds.size === 0)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50"><Download size={13}/>{exporting ? 'Exportando...' : 'Exportar'}</button></div>
-          </div>
-        </div>
-      )}
-
-      {workspaceView === 'configuracoes' && canConfigure ? (
-        <WhatsappSettingsCenter
-          tags={tagCatalog}
-          stages={leadStages}
-          preferences={preferences}
-          autoReplies={autoReplies}
-          leadTracking={leadTracking}
-          templates={templateOptions as any}
-          initialSection={initialSettingsSection}
-          onSettingsChanged={(next) => { setTagCatalog(next.tags || []); setLeadStages(next.stages || []); setPreferences(next.preferences || {}); setAutoReplies(next.autoReplies || []); setLeadTracking(next.leadTracking || null); }}
-          onTemplatesChanged={(next) => setTemplateOptions(next as WhatsappTemplateOption[])}
-        />
-      ) : (
-    <div className="whatsapp-central grid h-[calc(100dvh-168px)] min-h-[540px] min-w-0 gap-3 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-      <section className={`whatsapp-panel flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm ${mobileListOpen ? 'flex' : 'hidden xl:flex'}`}>
-        <div className="shrink-0 border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-black text-slate-950">WhatsApp</h2>
-              <p className="truncate text-[10px] text-slate-500">Atendimento, funil e relacionamento jurídico.</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button type="button" title="Exportar conversas" aria-label="Exportar conversas" onClick={() => { setExportOpen(true); setExportScope(selectedId ? 'one' : 'all'); setExportError(null); }} className="grid h-8 w-8 place-items-center rounded-lg border border-[#d6ddd6] bg-white text-slate-600 hover:bg-[#fbf7ef]">
-                <Download size={13} />
-              </button>
-              <button
-              type="button"
-              title="Atualizar agora"
-              aria-label="Atualizar agora"
-              onClick={() => load(selectedId, false)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#d6ddd6] bg-white text-slate-600 hover:bg-[#fbf7ef]"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            </button>
-            </div>
-          </div>
-
-
-          {workspaceView === 'encerrados' ? (
-            <div className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[9px] font-bold text-slate-600">Atendimentos concluídos. Uma nova mensagem do cliente reabre a conversa automaticamente.</div>
-          ) : activeDepartment === 'atendimento' ? (
-            <div className="mt-2 grid grid-cols-3 rounded-full bg-[#e2e8e5] p-1 text-[9px] font-black text-slate-600">
-              <button type="button" onClick={() => setActiveTab('conversas')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'conversas' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}>
-                <MessageCircle size={11} /> Conversas <span className="text-[8px] opacity-70">{conversationCount}</span>
-              </button>
-              <button type="button" onClick={() => setActiveTab('leads')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'leads' ? 'bg-white text-amber-700 shadow-sm' : 'hover:bg-white/50'}`}>
-                {leadPlural} <span className="text-[8px] opacity-70">{leadCount}</span>
-              </button>
-              <button type="button" onClick={() => setActiveTab('contatos')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'contatos' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}>
-                <Users size={11} /> Contatos <span className="text-[8px] opacity-70">{contactCount}</span>
-              </button>
-            </div>
-          ) : (
-            <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Conversas transferidas para acompanhamento jurídico ou financeiro.</div>
-          )}
-
-          <div className="relative mt-2">
-            <div className="flex items-center gap-1.5">
-              <div className="field-with-icon min-w-0 flex-1">
-                <Search size={13} className="field-with-icon__icon text-slate-400" aria-hidden="true" />
-                <input
-                  className="input field-with-icon__input rounded-[20px] border-transparent bg-white text-[11px] shadow-sm"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={workspaceView === 'encerrados' ? 'Pesquisar conversa encerrada ou tag' : activeTab === 'leads' ? `Pesquisar ${leadSingular.toLowerCase()} ou tag` : 'Pesquisar conversa, contato ou tag'}
-                  aria-label="Pesquisar no WhatsApp"
-                />
-              </div>
-              {activeTab !== 'contatos' && (
-                <button type="button" onClick={() => setFilterOpen((value) => !value)} className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-sm ${filterOpen || activeFilterCount ? 'border-[#075e54] bg-[#e7f3ef] text-[#075e54]' : 'border-transparent bg-white text-slate-500'}`} title="Filtrar conversas" aria-label="Filtrar conversas">
-                  <Filter size={13} />
-                  {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#075e54] px-1 text-[8px] font-black text-white">{activeFilterCount}</span>}
-                </button>
-              )}
-            </div>
-
-            {filterOpen && activeTab !== 'contatos' && (
-              <div className="whatsapp-filter-panel absolute right-0 top-[calc(100%+6px)] z-50 w-full rounded-xl border border-[#d6ddd6] bg-white p-2 shadow-xl">
-                <div className="mb-2 flex items-center justify-between gap-2"><b className="text-[9px] uppercase tracking-wide text-slate-500">Filtros</b><div className="flex items-center gap-2">{activeFilterCount > 0 && <button type="button" onClick={clearOperationalFilters} className="inline-flex items-center gap-1 text-[9px] font-black text-red-600 hover:text-red-700"><X size={9}/>Limpar</button>}<button type="button" onClick={() => setFilterOpen(false)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Fechar filtros"><X size={12}/></button></div></div>
-                <div className="grid gap-1.5">
-                  {activeTab === 'conversas' && <select value={contactTypeFilter} onChange={(event) => setContactTypeFilter(event.target.value as 'all' | 'leads' | 'clients' | 'unregistered')} className="input whatsapp-filter-control" aria-label="Filtrar por tipo de contato"><option value="all">Todos os contatos</option><option value="leads">Somente leads</option><option value="clients">Somente clientes</option><option value="unregistered">Sem cadastro</option></select>}
-                  <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por responsável">
-                    <option value="all">Todos os responsáveis</option>
-                    <option value="mine">Minhas conversas</option>
-                    <option value="unassigned">Sem responsável</option>
-                    {activeTeamUsers.map((user: any) => <option key={user.auth_user_id} value={user.auth_user_id}>{user.full_name || user.email}</option>)}
-                  </select>
-                  <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por tag">
-                    <option value="">Todas as tags</option>
-                    {(tagCatalog || []).filter((tag: any) => tag.active !== false).map((tag: any) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-                  </select>
-                  {leadFiltersVisible && <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por etapa do lead"><option value="">Todas as etapas</option>{(leadStages || []).filter((stage: any) => stage.active !== false).map((stage: any) => <option key={stage.stage_key} value={stage.stage_key}>{stage.name}</option>)}</select>}
-                  {leadFiltersVisible && <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="input whatsapp-filter-control" aria-label="Filtrar por origem do lead"><option value="">Todas as origens</option><option value="meta">Meta Ads</option><option value="google">Google Ads</option></select>}
-                  <select value={readStatusFilter} onChange={(event) => setReadStatusFilter(event.target.value as 'all' | 'read' | 'unread')} className="input whatsapp-filter-control" aria-label="Filtrar por status de leitura">
-                    <option value="all">Todas as mensagens</option>
-                    <option value="read">Lidas</option>
-                    <option value="unread">Não lidas</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="whatsapp-list-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-          {renderList()}
-        </div>
-
-        <div className="shrink-0 border-t border-[#d6ddd6] bg-[#f0f2f5] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
-          {error ? error : lastUpdate ? `${realtimeStatus === 'live' ? 'Ao vivo' : 'Atualização automática'} · ${shortTime(lastUpdate)}` : 'Conectando atualização automática...' }
-        </div>
-      </section>
-
-      {selected ? (
-        <div key={String(selected?.id || selectedId)} className={`${mobileListOpen ? 'hidden xl:block' : 'block'} h-full min-w-0`}>
-          <WhatsappThread conversation={selected} messages={messages || []} templates={templateOptions.filter((template: any) => template.active !== false)} availableTags={tagCatalog} leadStages={leadStages} leadLabel={leadSingular} teamUsers={teamUsers} forwardTargets={allTargets} currentUserId={currentUserId} currentUserName={currentUserName} canConfigure={canConfigure} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={handleConversationChanged} />
-        </div>
-      ) : (
-        <section className="whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">
-          <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
-            <MessageCircle size={34} className="text-[#075e54]" />
-            <p>Selecione uma conversa, lead ou contato. Nenhuma conversa é aberta automaticamente.</p>
-          </div>
-        </section>
-      )}
-    </div>
-      )}
-    </div>
-  );
-}

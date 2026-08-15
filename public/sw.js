@@ -1,10 +1,11 @@
-const CACHE_NAME = 'advos-pwa-v9-66-static-only';
+const CACHE_NAME = 'advos-pwa-v9-71-brand-static';
 const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/brand/icon-192.png',
+  '/brand/icon-512.png',
+  '/brand/apple-touch-icon.png',
+  '/brand/ladeira-advogados.png'
 ];
 
 self.addEventListener('install', (event) => {
