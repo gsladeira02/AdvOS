@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const body = await readJsonBody(req, 65536);
     const messageIds = Array.isArray(body.messageIds) ? body.messageIds.map(str).filter(Boolean) : [];
     const messageId = str(body.messageId);
-    const ids = messageIds.length ? [...new Set(messageIds)] : (messageId ? [messageId] : []);
+    const ids = messageIds.length ? Array.from(new Set(messageIds)) : (messageId ? [messageId] : []);
     const targetPhone = normalizeBrazilPhone(str(body.targetPhone || body.phone));
     const targetClientId = str(body.targetClientId || body.clientId) || null;
     if (!ids.length) throw new Error('Nenhuma mensagem informada.');
