@@ -1518,10 +1518,21 @@ export function WhatsappThread({
       {forwardMessage && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label="Encaminhar mensagem">
           <div className="w-full max-w-md rounded-2xl border border-[#e6dccb] bg-white p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-900">Encaminhar mensagem</h3><p className="text-[10px] text-slate-500">Escolha o contato que receberá uma cópia.</p></div><button type="button" onClick={() => setForwardMessage(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={15}/></button></div>
+            <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-900">Encaminhar mensagem</h3><p className="text-[10px] text-slate-500">Escolha qualquer conversa do WhatsApp que receberá uma cópia.</p></div><button type="button" onClick={() => setForwardMessage(null)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-slate-100" aria-label="Fechar"><X size={15}/></button></div>
             <select value={forwardTargetId} onChange={(e) => setForwardTargetId(e.target.value)} className="input w-full">
-              <option value="">Selecione um contato</option>
-              {(forwardTargets || []).filter((item: any) => String(item?.id || '') !== String(conversation?.id) && String(item?.phone || item?.clients?.whatsapp || item?.clients?.phone || '')).map((item: any) => { const id=String(item?.id || item?.conversation_id || ''); const name=titleForForward(item); return <option key={id} value={id}>{name} · {item?.phone || item?.clients?.whatsapp || item?.clients?.phone}</option>; })}
+              <option value="">Selecione uma conversa</option>
+              {(forwardTargets || []).filter((item: any) => {
+                const id = String(item?.id || item?.conversation_id || '');
+                const phone = String(item?.phone || item?.clients?.whatsapp || item?.clients?.phone || '').trim();
+                return id && id !== String(conversation?.id) && phone;
+              }).map((item: any) => {
+                const id = String(item?.id || item?.conversation_id || '');
+                const phone = item?.phone || item?.clients?.whatsapp || item?.clients?.phone;
+                const department = item?.department === 'financeiro_juridico' ? 'Financeiro/Jurídico' : 'Atendimento';
+                const state = item?.closed_at ? 'Encerrada' : department;
+                const lead = item?.lead ? ' · Lead' : '';
+                return <option key={id} value={id}>{titleForForward(item)} · {phone} · {state}{lead}</option>;
+              })}
             </select>
             <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setForwardMessage(null)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600">Cancelar</button><button type="button" disabled={!forwardTargetId || forwardSending} onClick={() => void forwardSelectedMessage()} className="rounded-xl bg-[#075e54] px-3 py-2 text-xs font-black text-white disabled:opacity-50">{forwardSending ? 'Encaminhando...' : 'Encaminhar'}</button></div>
           </div>

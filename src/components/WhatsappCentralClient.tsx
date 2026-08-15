@@ -205,7 +205,7 @@ export function WhatsappCentralClient({
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { queryRef.current = query; }, [query]);
 
-  const allTargets = useMemo(() => dedupeById([...(conversations || []), ...(contacts || [])]), [conversations, contacts]);
+  const allTargets = useMemo(() => dedupeById([...(conversations || [])]), [conversations]);
 
   const selected = useMemo(() => {
     if (!selectedId) return null;
