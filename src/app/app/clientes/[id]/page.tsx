@@ -5,7 +5,8 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
-import { buildContractLinksMessage, whatsappUrl } from '@/lib/whatsapp';
+import { buildContractLinksMessage } from '@/lib/whatsapp';
+import SendWhatsAppApiButton from '@/components/SendWhatsAppApiButton';
 import { dateBR, money } from '@/lib/utils';
 import { ClientFileUploader } from '@/components/ClientFileUploader';
 import { FinanceInstallmentActions } from '@/components/FinanceInstallmentActions';
@@ -380,14 +381,14 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           const charges = installmentsByContract.get(g.financial_contract_id) || [];
           const asaasLinks = charges.map((i:any, idx:number)=>({label:`Cobrança ${idx+1}`,amount:i.amount,dueDate:i.due_date,url:linkFromInstallment(i)})).filter((x:any)=>x.url);
           const message = buildContractLinksMessage({clientName:client.name,zapsignUrl:g.zapsign_url,asaasLinks});
-          const wa = whatsappUrl(client.whatsapp || client.phone || g.phone, message);
+          const targetPhone = client.whatsapp || client.phone || g.phone || '';
           return <div className="rounded-2xl border border-[#eee4d4] p-4" key={g.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <b className="break-safe">{docLabel(g.document_type)}</b>
                 <p className="break-safe text-sm text-slate-500">{g.pdf_filename || 'PDF'} · {dateBR(g.created_at)} · {money(g.total_amount || 0)}</p>
               </div>
-              {wa ? <Link className="btn btn-primary" href={wa} target="_blank" rel="noreferrer">Enviar links no WhatsApp</Link> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
+              {targetPhone ? <SendWhatsAppApiButton phone={targetPhone} message={message} clientId={client.id} /> : <span className="badge badge-warn">sem WhatsApp cadastrado</span>}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
               <p><b>ZapSign:</b> {g.zapsign_url ? <Link href={g.zapsign_url} target="_blank" rel="noreferrer" className="font-bold text-blue-700">abrir assinatura</Link> : <span className={`badge ${statusClass(g.zapsign_status)}`}>{g.zapsign_status || 'pendente'}</span>}</p>
