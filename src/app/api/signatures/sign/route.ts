@@ -53,7 +53,7 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
   for(const s of sorted){
     const signed=String(s.status||'')==='assinado';
     const boxH=172;
-    p.drawRoundedRectangle({x:45,y:y-boxH,width:505,height:154,corner:10,borderWidth:1,borderColor:line,color:pale});
+    p.drawRectangle({x:45,y:y-boxH,width:505,height:154,borderWidth:1,borderColor:line,color:pale});
     const image=s.signer_order===1?clientSelfie:danielPhoto;
     if(image){
       try{
