@@ -238,7 +238,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       <div className="mb-5">
         <h2 className="text-2xl font-black">Gerar documentos e cobrança</h2>
         <p className="mt-2 max-w-4xl text-sm text-slate-600">
-          Use esta área dentro da pasta do cliente para gerar contrato, procuração, enviar o PDF para a ZapSign, criar entrada/parcelas no Asaas e depois mandar os links pelo WhatsApp cadastrado.
+          Use esta área dentro da pasta do cliente para gerar contrato, procuração, enviar o PDF para assinatura, criar entrada/parcelas no Asaas e enviar o link de assinatura ao cliente pela API oficial do WhatsApp.
         </p>
       </div>
 
@@ -304,12 +304,12 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           </div>
         </div>
 
-        <div>
-          <h3 className="mb-3 text-lg font-black">Assinantes ZapSign</h3>
-          <div className="grid gap-4 md:grid-cols-3">
-            <input className="input" name="responsible_signer_name" defaultValue={responsible?.full_name || ''} placeholder="Nome do responsável do escritório" />
-            <input className="input" name="responsible_signer_email" defaultValue={responsible?.email || ''} placeholder="E-mail do responsável" />
-            <input className="input" name="responsible_signer_phone" defaultValue={responsible?.phone || ''} placeholder="WhatsApp do responsável" />
+        <div className="card border-emerald-200 bg-emerald-50 p-4">
+          <h3 className="text-lg font-black text-emerald-950">Signatários fixos</h3>
+          <p className="mt-1 text-xs font-semibold text-emerald-800">A assinatura do documento ficará restrita ao cliente e ao advogado Daniel Costa Ladeira.</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl bg-white p-3"><b>1. Cliente</b><p className="mt-1 text-xs text-slate-600">{client.name || 'Cliente'} · {clientPhone || 'WhatsApp não cadastrado'}</p></div>
+            <div className="rounded-xl bg-white p-3"><b>2. Daniel Costa Ladeira</b><p className="mt-1 text-xs text-slate-600">OAB/ES 23.416 · dladadeiradv@gmail.com · (27) 99794-0089</p></div>
           </div>
         </div>
 

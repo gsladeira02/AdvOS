@@ -265,71 +265,19 @@ async function generatePdfBuffer(data: Record<string, string>) {
 
 async function zapsignSend(lawFirmId: string, documentTitle: string, pdfBuffer: Buffer, data: Record<string, string>, documentId: string | null) {
   const config = await getIntegrationConfig(lawFirmId, 'zapsign');
-  const basePayload = {
-    law_firm_id: lawFirmId,
-    document_id: documentId,
-    provider: 'zapsign',
-    signer_name: data.client_name,
-    signer_email: data.email || null,
-    signer_phone: data.phone || null,
-    sent_at: new Date().toISOString(),
-  };
-
-  if (!config.configured) {
-    return { status: 'configuracao_pendente', payload: basePayload };
-  }
-
-  const phoneNumber = cleanPhone(data.phone || '');
-  const responsiblePhone = cleanPhone(data.responsible_signer_phone || '');
+  const basePayload = { law_firm_id: lawFirmId, document_id: documentId, provider: 'zapsign', signer_name: data.client_name, signer_email: data.email || null, signer_phone: data.phone || null, sent_at: new Date().toISOString() };
+  if (!config.configured) return { status: 'configuracao_pendente', payload: basePayload };
+  const clientPhone = cleanPhone(data.phone || '');
+  const danielPhone = cleanPhone('27997940089');
   const signers: any[] = [
-    {
-      name: data.client_name,
-      email: data.email || undefined,
-      phone_country: phoneNumber ? '55' : undefined,
-      phone_number: phoneNumber || undefined,
-      send_automatic_email: Boolean(data.email),
-      send_automatic_whatsapp: Boolean(phoneNumber),
-    },
+    { name: data.client_name, email: data.email || undefined, phone_country: clientPhone ? '55' : undefined, phone_number: clientPhone || undefined, send_automatic_email: false, send_automatic_whatsapp: false },
+    { name: 'DANIEL COSTA LADEIRA', email: 'dladadeiradv@gmail.com', phone_country: danielPhone ? '55' : undefined, phone_number: danielPhone || undefined, send_automatic_email: false, send_automatic_whatsapp: false },
   ];
-  if (data.responsible_signer_name || data.responsible_signer_email || responsiblePhone) {
-    signers.push({
-      name: data.responsible_signer_name || 'Representante do escritório',
-      email: data.responsible_signer_email || undefined,
-      phone_country: responsiblePhone ? '55' : undefined,
-      phone_number: responsiblePhone || undefined,
-      send_automatic_email: Boolean(data.responsible_signer_email),
-      send_automatic_whatsapp: Boolean(responsiblePhone),
-    });
-  }
-
-  const response = await fetch(`${config.baseUrl}/docs/`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name: documentTitle,
-      base64_pdf: pdfBuffer.toString('base64'),
-      signers,
-    }),
-  });
-
+  const response = await fetch(`${config.baseUrl}/docs/`, { method:'POST', headers:{Authorization:`Bearer ${config.token}`,'Content-Type':'application/json'}, body:JSON.stringify({name:documentTitle,base64_pdf:pdfBuffer.toString('base64'),signers}) });
   const json = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = json?.detail || json?.message || 'Erro ao criar documento na ZapSign.';
-    return { status: 'erro', error: message, raw: json, payload: basePayload };
-  }
-
+  if (!response.ok) return { status:'erro', error:json?.detail||json?.message||'Erro ao criar documento na ZapSign.', raw:json, payload:basePayload };
   const signer = Array.isArray(json?.signers) ? json.signers[0] : null;
-  return {
-    status: json?.status || 'enviado',
-    external_id: json?.token || json?.open_id || json?.id || null,
-    signature_url: signer?.sign_url || json?.sign_url || null,
-    signed_document_url: json?.signed_file || null,
-    raw: json,
-    payload: basePayload,
-  };
+  return { status:json?.status||'enviado', external_id:json?.token||json?.open_id||json?.id||null, signature_url:signer?.sign_url||json?.sign_url||null, signed_document_url:json?.signed_file||null, raw:json, payload:basePayload };
 }
 
 function mapAsaasStatus(status?: string) {
@@ -581,6 +529,22 @@ export async function POST(req: Request) {
     : [];
 
   const zap = await zapsignSend(profile.law_firm_id, filename, pdfBuffer, data, doc?.id || null);
+  let signatureWhatsappStatus = 'nao_enviado';
+  if ((zap as any).signature_url && data.phone) {
+    try {
+      const { sendWhatsAppText } = await import('@/lib/whatsappApi');
+      await sendWhatsAppText({
+        lawFirmId: profile.law_firm_id,
+        to: cleanPhone(data.phone),
+        clientId: data.client_id || null,
+        sentBy: session.user.id,
+        message: `Olá, ${data.client_name}! O Ladeira Advogados enviou o documento “${filename}” para assinatura. Acesse o link seguro: ${(zap as any).signature_url}`,
+      });
+      signatureWhatsappStatus = 'enviado_pela_api';
+    } catch (e) {
+      signatureWhatsappStatus = 'erro_no_envio_api';
+    }
+  }
   await admin.from('document_signatures').insert({
     ...zap.payload,
     status: zap.status,
@@ -614,6 +578,7 @@ export async function POST(req: Request) {
     action: 'gerou_pdf_zapsign_asaas',
     entity: 'generated_contracts',
     entity_id: generated?.id || null,
+    metadata: { signature_whatsapp_status: signatureWhatsappStatus },
   });
 
   const redirectTo = safeInternalPath(data.redirect_to, data.client_id ? `/app/clientes/${data.client_id}?gerado=1` : '/app/clientes?gerado=1');
