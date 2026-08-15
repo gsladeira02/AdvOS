@@ -532,7 +532,7 @@ export async function POST(req: Request) {
   // Cria a solicitação de assinatura nativa do AdvOS e envia o link diretamente pela API oficial do WhatsApp.
   // O fluxo externo da ZapSign permanece disponível apenas como integração opcional, mas não é usado para o envio do link ao cliente.
   const clientToken = crypto.randomBytes(28).toString('base64url');
-  const danielToken = crypto.randomBytes(28).toString('base64url');
+  const danielToken = '';
   const signatureExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
   const signatureRequireSelfie = true;
   const signatureRequireOtp = true;
@@ -570,7 +570,7 @@ export async function POST(req: Request) {
   const { data: danielSigner, error: danielSignerError } = await admin.from('signature_signers').insert({
     law_firm_id: profile.law_firm_id,
     request_id: signatureRequest.id,
-    signer_token: danielToken,
+    signer_token: null,
     signer_order: 2,
     name: 'DANIEL COSTA LADEIRA',
     email: 'dladadeiradv@gmail.com',

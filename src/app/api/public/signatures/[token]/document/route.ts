@@ -4,7 +4,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token:s
   const { token } = await params; const admin=createAdminSupabase();
   const {data:byReq}=await admin.from('signature_requests').select('id,law_firm_id,document_id,status,expires_at,final_document_path').eq('public_token',token).maybeSingle();
   let r:any=byReq;
-  if(!r){ const {data:s}=await admin.from('signature_signers').select('request_id').eq('signer_token',token).maybeSingle(); if(!s) return new NextResponse('Solicitação não encontrada.',{status:404}); const {data:req}=await admin.from('signature_requests').select('id,law_firm_id,document_id,status,expires_at,final_document_path').eq('id',s.request_id).maybeSingle(); r=req; }
+  if(!r){ const {data:s}=await admin.from('signature_signers').select('request_id,signer_order').eq('signer_token',token).maybeSingle(); if(!s || Number(s.signer_order)!==1) return new NextResponse('Solicitação não encontrada.',{status:404}); const {data:req}=await admin.from('signature_requests').select('id,law_firm_id,document_id,status,expires_at,final_document_path').eq('id',s.request_id).maybeSingle(); r=req; }
   if(!r) return new NextResponse('Solicitação não encontrada.',{status:404});
   if(r.expires_at && new Date(r.expires_at).getTime()<Date.now() && r.status!=='assinado') return new NextResponse('Link expirado.',{status:410});
   const path=r.final_document_path || (await admin.from('documents').select('storage_path').eq('id',r.document_id).eq('law_firm_id',r.law_firm_id).maybeSingle()).data?.storage_path;

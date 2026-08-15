@@ -11,7 +11,6 @@ type Signer = {
   name: string | null;
   phone: string | null;
   signer_order: number | null;
-  signer_token: string | null;
   status: string | null;
   role: string | null;
   signed_at: string | null;
@@ -68,7 +67,7 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
       ? db.from('documents').select('id,title').in('id', documentIds).eq('law_firm_id', profile.law_firm_id)
       : Promise.resolve({ data: [], error: null } as any),
     requestIds.length
-      ? db.from('signature_signers').select('id,request_id,name,phone,signer_order,signer_token,status,role,signed_at').in('request_id', requestIds).eq('law_firm_id', profile.law_firm_id).order('signer_order', { ascending: true })
+      ? db.from('signature_signers').select('id,request_id,name,phone,signer_order,status,role,signed_at').in('request_id', requestIds).eq('law_firm_id', profile.law_firm_id).order('signer_order', { ascending: true })
       : Promise.resolve({ data: [], error: null } as any),
   ]);
 
@@ -153,8 +152,8 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
                   <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Daniel Costa Ladeira</p>
                   <p className="mt-1 text-sm font-black">Daniel Costa Ladeira</p>
                   <p className="text-xs font-semibold text-slate-600">{normalizeStatus(daniel?.status) === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura do escritório'}</p>
-                  {tab === 'pendentes' && nextPending?.signer_token && normalizeStatus(daniel?.status) !== 'assinado' && (
-                    <Link href={`/assinar/${nextPending.signer_token}`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
+                  {tab === 'pendentes' && normalizeStatus(daniel?.status) !== 'assinado' && Number(daniel?.signer_order) === 2 && (
+                    <Link href={`/app/assinaturas/assinar?requestId=${r.id}`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
                   )}
                 </div>
               </div>
