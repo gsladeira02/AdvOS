@@ -1,0 +1,3 @@
+-- AdvOS V7
+-- Não há alteração obrigatória no banco de dados.
+-- Esta versão move o gerador de contratos/procurações/cobranças para dentro da pasta do cliente.

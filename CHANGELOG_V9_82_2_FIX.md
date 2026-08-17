@@ -1,0 +1,1 @@
+v9.82.2 fix: replaced unsupported pdf-lib drawRoundedRectangle with drawRectangle in signature evidence PDF generation to pass Vercel TypeScript build. No functional signature-flow changes.

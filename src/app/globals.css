@@ -1,0 +1,375 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{--ink:#0f172a;--paper:#f6f2ea;--line:#e6dccb;--soft:#fbf7ef;--muted:#64748b;--whatsapp:#25D366;--whatsapp-dark:#075e54}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
+body{margin:0;max-width:100%;overflow-x:hidden;background:linear-gradient(180deg,#f8f5ef 0%,#f3eee4 100%);color:#0f172a;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.45;text-rendering:optimizeLegibility}
+a{text-decoration:none;color:inherit}
+input,select,textarea,button{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed}
+.page-shell{min-height:100vh}
+.app-main{max-width:100%;overflow-x:hidden}
+.card,.panel{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 28px rgba(15,23,42,.045)}
+.panel{box-shadow:0 8px 22px rgba(15,23,42,.035)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border-radius:11px;padding:.62rem .72rem .66rem;font-weight:900;transition:.18s;font-size:.78rem;line-height:1.35;white-space:nowrap}
+.btn-primary{background:#0f172a;color:white}.btn-primary:hover{background:#1e293b}
+.btn-secondary,.btn-ghost{background:#fff;border:1px solid var(--line);color:#0f172a}.btn-secondary:hover,.btn-ghost:hover{background:var(--soft)}
+.input{width:100%;border:1px solid #ded4c2;background:#fff;border-radius:12px;padding:.6rem .7rem .64rem;outline:none;font-size:.79rem;line-height:1.4;transition:.15s}
+.input:focus{border-color:#c7a252;box-shadow:0 0 0 3px rgba(199,162,82,.13)}
+.compact-input{border-radius:10px!important;padding:.48rem .62rem!important;font-size:.74rem!important}
+.label{display:block;font-size:.64rem;font-weight:950;color:#475569;text-transform:uppercase;letter-spacing:.06em;line-height:1.35;padding-bottom:.04rem}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.04);font-size:.75rem}
+.table th{background:var(--soft);text-align:left;color:#64748b;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;padding:8px 9px;border-bottom:1px solid #eee4d4;white-space:nowrap}
+.table td{background:#fff;border-bottom:1px solid #f0e7d8;padding:8px 9px;vertical-align:top}
+.table tr:hover td{background:#fffaf2}
+.table p{margin:.12rem 0 0}
+.spreadsheet{width:100%;border-collapse:collapse;background:#fff;font-size:.74rem}
+.spreadsheet th{background:#fbf7ef;color:#64748b;font-size:.62rem;font-weight:950;text-align:left;text-transform:uppercase;letter-spacing:.06em;padding:8px 9px;border-bottom:1px solid #eee4d4;white-space:nowrap}
+.spreadsheet td{border-bottom:1px solid #f0e7d8;padding:6px 8px;vertical-align:top}
+.spreadsheet tr:hover td{background:#fffaf2}
+.sheet-input{width:100%;min-width:0;border:1px solid transparent;background:transparent;border-radius:8px;padding:.42rem .46rem;outline:none;font-size:.72rem;color:#0f172a}
+.sheet-input:focus{border-color:#c7a252;background:#fff;box-shadow:0 0 0 2px rgba(199,162,82,.12)}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:.24rem .46rem .27rem;font-size:.62rem;font-weight:950;line-height:1.3;white-space:nowrap}.badge-ok{background:#dcfce7;color:#166534}.badge-warn{background:#fef3c7;color:#92400e}.badge-danger{background:#fee2e2;color:#991b1b}.badge-info{background:#dbeafe;color:#1e40af}
+.mobile-readonly{display:none}
+.sidebar nav{scrollbar-width:thin;scrollbar-color:#d8cfbe transparent}
+.sidebar nav::-webkit-scrollbar{width:6px}.sidebar nav::-webkit-scrollbar-thumb{background:#d8cfbe;border-radius:999px}
+@media(max-width:760px){.desktop-grid{display:block}.sidebar{display:none}.app-main{padding:12px!important}.hide-mobile{display:none!important}.mobile-readonly{display:block;background:#0f172a;color:white;padding:10px 14px;text-align:center;font-weight:800;font-size:.76rem}.table{font-size:.74rem;display:block;overflow-x:auto;white-space:nowrap}.table th,.table td{padding:7px 8px}.spreadsheet{font-size:.72rem}}
+
+.whatsapp-message-scroll{scrollbar-width:thin;scrollbar-color:rgba(7,94,84,.48) rgba(229,221,213,.8)}
+.whatsapp-message-scroll::-webkit-scrollbar{width:10px}
+.whatsapp-message-scroll::-webkit-scrollbar-track{background:rgba(229,221,213,.8);border-radius:999px}
+.whatsapp-message-scroll::-webkit-scrollbar-thumb{background:rgba(7,94,84,.42);border:2px solid rgba(229,221,213,.8);border-radius:999px}
+.whatsapp-message-scroll::-webkit-scrollbar-thumb:hover{background:rgba(7,94,84,.62)}
+
+/* PWA / mobile app experience */
+.mobile-pwa-top{position:sticky;top:0;z-index:45;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#075e54;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;box-shadow:0 8px 24px rgba(15,23,42,.16)}
+.mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:50;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;border-top:1px solid rgba(15,23,42,.08);background:rgba(255,255,255,.96);padding:7px 7px calc(env(safe-area-inset-bottom,0px) + 7px);box-shadow:0 -12px 30px rgba(15,23,42,.12);backdrop-filter:blur(14px)}
+.mobile-bottom-nav-item{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:14px;padding:6px 3px;color:#475569;font-size:9px;font-weight:950;line-height:1.25;transition:.15s}
+.mobile-bottom-nav-item:hover{background:#f0f2f5;color:#075e54}.mobile-bottom-nav-item svg{color:#075e54}.pwa-only{display:none}
+@media(display-mode:standalone){.pwa-only{display:initial}.browser-only{display:none!important}body{overscroll-behavior-y:none}}
+@media(max-width:760px){
+  body{background:#f0f2f5;font-size:12px;-webkit-tap-highlight-color:transparent}
+  .desktop-grid{display:block;min-height:100dvh}
+  .app-main{padding:10px 10px calc(env(safe-area-inset-bottom,0px) + 76px)!important;overflow-x:hidden}
+  .mobile-readonly{display:none!important}
+  .card,.panel{border-radius:15px;box-shadow:0 8px 20px rgba(15,23,42,.04)}
+  .btn{min-height:38px;padding:.54rem .64rem;font-size:.73rem}
+  .input{min-height:38px;font-size:16px}
+  .compact-input{font-size:16px!important}
+  .spreadsheet th,.spreadsheet td{padding:6px 7px}
+  .whatsapp-central{height:calc(100dvh - 128px)!important;min-height:0!important;gap:0!important}
+  .whatsapp-panel{height:100%;min-height:0;border-radius:0!important;border-left:0!important;border-right:0!important}
+  .whatsapp-list-scroll{max-height:calc(100dvh - 262px)!important}
+  .whatsapp-thread{height:100%!important;min-height:0!important;border-radius:0!important;border-left:0!important;border-right:0!important}
+  .whatsapp-message-scroll{padding-left:8px!important;padding-right:8px!important}
+  .whatsapp-thread textarea{font-size:16px!important;max-height:110px}
+}
+@media(max-width:760px){.page-header{margin-bottom:8px!important;border-radius:14px!important;padding:9px 11px!important}.page-header h1{font-size:1rem!important}.page-header-subtitle{display:none!important}.page-header .btn{min-height:32px;padding:.42rem .55rem;font-size:.68rem}}
+
+
+/* V9.21: PWA sem zoom lateral, conversas/contatos encaixados na tela */
+#__next, .page-shell, .desktop-grid, .app-main{min-width:0;max-width:100vw}
+@media(max-width:760px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:auto}
+  input,select,textarea{font-size:16px!important}
+  .app-main{width:100%;max-width:100vw;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 70px)!important}
+  .mobile-pwa-top{padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px}
+  .mobile-bottom-nav{padding:5px 5px calc(env(safe-area-inset-bottom,0px) + 5px)}
+  .mobile-bottom-nav-item{border-radius:11px;padding:5px 2px;font-size:8px}
+  .whatsapp-central{display:block!important;width:100%!important;max-width:100%!important;height:calc(100dvh - 116px)!important;min-height:0!important;overflow:hidden!important}
+  .whatsapp-panel,.whatsapp-thread{width:100%!important;max-width:100%!important;min-width:0!important}
+  .whatsapp-list-scroll{max-height:calc(100dvh - 224px)!important;overflow-x:hidden!important}
+  .whatsapp-thread{height:calc(100dvh - 116px)!important}
+  .whatsapp-thread textarea{min-width:0!important;max-height:92px!important;resize:none!important}
+  .whatsapp-message-scroll{overflow-x:hidden!important}
+  .whatsapp-message-scroll img,.whatsapp-message-scroll video{max-width:100%!important;height:auto!important}
+  .whatsapp-thread .group > div{max-width:86%!important;word-break:break-word;overflow-wrap:anywhere}
+  .whatsapp-thread .relative.flex.items-end{gap:5px!important}
+  .whatsapp-thread .relative.flex.items-end > button{height:34px!important;width:34px!important;min-width:34px!important;margin-bottom:3px!important}
+  .whatsapp-thread .relative.flex.items-end svg{width:16px!important;height:16px!important}
+  .whatsapp-thread .relative.flex.items-end .relative.flex-1{min-width:0!important}
+  .whatsapp-thread .absolute.bottom-\[calc\(100\%\+8px\)\]{max-width:calc(100vw - 80px)!important}
+  .page-header{max-width:100%;overflow:hidden}
+  .table,.spreadsheet{max-width:100%;min-width:0;white-space:normal!important}
+  .table-wrapper,.spreadsheet-wrapper{max-width:100%;overflow-x:auto}
+}
+
+/* V9.24 — consistência visual, responsividade e prevenção de sobreposição */
+.card,.panel,.page-header{min-width:0}
+.input,.sheet-input,select,textarea{min-width:0;max-width:100%}
+img,video{max-width:100%;height:auto}
+.break-safe{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.table-responsive{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px}
+.table-responsive .table{margin:0;min-width:680px}
+.table td,.spreadsheet td{overflow-wrap:anywhere}
+.page-header-action>.btn{max-width:100%}
+
+@media(max-width:760px){
+  .btn{max-width:100%;white-space:normal;text-align:center}
+  .page-header{padding:9px 11px!important;overflow:visible!important}
+  .page-header>div{flex-direction:row;align-items:center;gap:8px}
+  .page-header h1{min-width:0;flex:1;font-size:1rem!important;line-height:1.2!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+  .page-header-action{margin-left:auto;max-width:48%;flex-shrink:1}
+  .page-header-action .btn{min-height:32px;padding:.42rem .55rem;font-size:.68rem;line-height:1.15}
+  .table-responsive{border-radius:14px}
+  .table-responsive .table{display:table;min-width:660px;white-space:normal!important}
+  .whatsapp-central{height:calc(100dvh - 176px)!important;min-height:360px!important}
+  .whatsapp-panel,.whatsapp-thread{height:100%!important;min-height:0!important}
+  .whatsapp-list-scroll{max-height:none!important;min-height:0!important;flex:1 1 0%!important}
+  .whatsapp-emoji-picker{width:min(310px,calc(100vw - 72px))!important;grid-template-columns:repeat(8,minmax(0,1fr))!important}
+  .whatsapp-emoji-picker button{width:100%!important;min-width:0!important}
+  .whatsapp-sticker-picker{width:min(310px,calc(100vw - 72px))!important}
+  .whatsapp-message-body{overflow-wrap:anywhere;word-break:break-word}
+}
+
+@media(max-width:380px){
+  .mobile-bottom-nav-item{font-size:7px}
+  .whatsapp-central{height:calc(100dvh - 170px)!important}
+  .whatsapp-emoji-picker{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+}
+
+
+/* V9.25 — pente-fino final de layout e campos com ícones */
+.field-with-icon{position:relative;min-width:0;width:100%}
+.field-with-icon__icon{pointer-events:none;position:absolute;left:.75rem;top:50%;z-index:2;transform:translateY(-50%);flex:none}
+.field-with-icon .field-with-icon__input{padding-left:2.25rem!important;padding-right:.75rem!important}
+.btn svg{flex:0 0 auto}
+.card,.panel{overflow-wrap:anywhere}
+.mobile-bottom-nav-item span{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input[type="file"]{max-width:100%}
+
+@media(max-width:639px){
+  .page-header>div{flex-direction:column!important;align-items:stretch!important;gap:7px!important}
+  .page-header-action{margin-left:0!important;width:100%!important;max-width:100%!important;justify-content:flex-start!important}
+  .page-header-action>.btn{width:100%!important}
+}
+
+@media(min-width:640px) and (max-width:760px){
+  .page-header>div{align-items:center!important}
+  .page-header-action{max-width:44%!important}
+}
+
+@media(max-width:760px){
+  .field-with-icon .field-with-icon__input{padding-left:2.35rem!important;padding-right:.8rem!important}
+  .whatsapp-emoji-picker,.whatsapp-sticker-picker{left:auto!important;right:0!important;width:min(300px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px)!important}
+  .whatsapp-thread .relative.flex.items-end .relative.flex-1{min-width:0!important}
+  .whatsapp-thread .relative.flex.items-end textarea{width:100%!important}
+  .whatsapp-thread .absolute.bottom-4.right-5{right:10px!important;max-width:calc(100% - 20px)!important;white-space:normal!important}
+}
+
+@media(max-width:380px){
+  .whatsapp-thread .relative.flex.items-end{gap:3px!important}
+  .whatsapp-thread .relative.flex.items-end>button{height:31px!important;width:31px!important;min-width:31px!important}
+  .whatsapp-thread .relative.flex.items-end svg{width:15px!important;height:15px!important}
+  .whatsapp-emoji-picker{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+}
+
+
+/* V9.42 — tipografia: preserva descendentes (g, j, ç, y etc.) em textos compactos */
+p,span,label,a,button,input,select,textarea{font-clip-margin:.12em}
+.btn,.label,.badge,.mobile-bottom-nav-item{overflow:visible}
+
+/* V9.51 — revisão visual profissional e PWA enxuto */
+:root{--surface:#ffffff;--canvas:#f5f3ef;--line-soft:#ece7de;--ink-soft:#334155}
+body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
+.app-main{padding:18px 20px 26px}
+.app-content{width:100%;max-width:1640px;margin:0 auto}
+.card,.panel{border-color:#e9e3da;border-radius:14px;box-shadow:0 6px 18px rgba(15,23,42,.035)}
+.card:hover,.panel:hover{border-color:#e3dcd1}
+
+/* Sidebar compacta, previsível e com estado ativo */
+.desktop-nav{display:flex;min-height:0;flex:1;flex-direction:column;gap:2px;overflow-y:auto;padding:0 1px 4px}
+.desktop-nav-label{margin:4px 8px 3px;color:#94a3b8;font-size:8px;font-weight:950;letter-spacing:.11em;text-transform:uppercase}
+.desktop-nav-link{display:flex;height:33px;min-width:0;align-items:center;gap:9px;border:1px solid transparent;border-radius:10px;padding:0 9px;color:#64748b;font-size:10.5px;font-weight:850;line-height:1;transition:.14s}
+.desktop-nav-link svg{flex:none;color:#94a3b8;transition:.14s}
+.desktop-nav-link span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desktop-nav-link:hover{background:#f7f5f1;color:#0f172a}.desktop-nav-link:hover svg{color:#334155}
+.desktop-nav-link.is-active{border-color:#e9e3da;background:#f5f2ec;color:#0f172a;box-shadow:inset 3px 0 0 #0f172a}
+.desktop-nav-link.is-active svg{color:#0f172a}
+
+/* Cabeçalhos e formulários mais densos */
+.page-header{min-height:56px}
+.compact-form-grid .input{min-height:36px}
+.compact-form-grid .btn{min-height:36px}
+.compact-alert{border-width:1px;border-style:solid;border-radius:12px;padding:9px 12px;font-size:11px;font-weight:750}
+.empty-state{margin-top:10px;border:1px dashed #ded8ce;border-radius:12px;background:#fff;padding:14px;color:#64748b;font-size:11px;font-weight:700}
+
+/* Tabelas: uma linha por registro sempre que possível */
+.professional-table,.table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;font-size:11px}
+.professional-table thead th,.table th{height:34px;background:#faf8f4;border-bottom:1px solid #ebe5dc;padding:0 10px;color:#718096;font-size:9px;font-weight:950;letter-spacing:.055em;text-align:left;text-transform:uppercase;white-space:nowrap}
+.professional-table tbody td,.table td{height:42px;border-bottom:1px solid #f0ece5;padding:6px 10px;vertical-align:middle;white-space:nowrap;color:#334155;line-height:1.2}
+.professional-table tbody tr:last-child td,.table tbody tr:last-child td{border-bottom:0}
+.professional-table tbody tr:hover td,.table tbody tr:hover td{background:#fcfbf9}
+.professional-table td p,.table td p{display:inline;margin:0 0 0 6px;font-size:10px}
+.professional-table b,.table b{color:#0f172a;font-weight:850}
+.table-ellipsis{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-primary-link{display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0f172a;font-weight:900}
+.table-primary-link:hover{color:#075e54;text-decoration:underline}
+.table-sort{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:3px 4px;color:#718096;font-size:9px;font-weight:950;letter-spacing:.055em;text-transform:uppercase;transition:.12s}
+.table-sort:hover{background:#f0ece5;color:#0f172a}
+.table-actions{display:flex;align-items:center;justify-content:center;gap:5px}
+.icon-action{display:inline-grid;height:28px;width:28px;place-items:center;border:1px solid #e7e1d8;border-radius:8px;background:#fff;color:#475569;transition:.12s}
+.icon-action:hover{border-color:#cfc7bc;background:#f8f6f2;color:#0f172a}.icon-action.is-whatsapp{border-color:#c8efd8;background:#effbf4;color:#128c4e}
+.compact-action-button{border:1px solid #ddd6cc;border-radius:8px;background:#fff;padding:5px 8px;color:#475569;font-size:9px;font-weight:900}
+
+/* Filtros */
+.status-filter-row{display:flex;min-height:34px;flex-wrap:wrap;align-items:center;gap:5px}
+.status-filter-chip{border:1px solid #e4ded5;border-radius:8px;background:#faf8f4;padding:5px 8px;color:#64748b;font-size:9px;font-weight:900;line-height:1.2;transition:.12s}
+.status-filter-chip:hover{border-color:#cfc8be;color:#0f172a}.status-filter-chip.is-active{border-color:#0f172a;background:#0f172a;color:#fff}
+.finance-status-select{width:100%;min-height:29px;border-radius:8px;border:1px solid;padding:4px 7px;font-size:9px;font-weight:900;outline:none}
+.finance-status-select.is-paid{border-color:#b7e4ca;background:#effaf4;color:#166534}.finance-status-select.is-overdue{border-color:#fecaca;background:#fff4f4;color:#b91c1c}.finance-status-select.is-waiting{border-color:#fde1a7;background:#fff9eb;color:#a16207}
+
+/* Details reutilizados no mobile */
+.mobile-disclosure summary,.mobile-record summary,.mobile-filter-disclosure summary{list-style:none}.mobile-disclosure summary::-webkit-details-marker,.mobile-record summary::-webkit-details-marker,.mobile-filter-disclosure summary::-webkit-details-marker{display:none}
+.disclosure-chevron{transition:transform .16s}.mobile-disclosure[open] .disclosure-chevron,.mobile-record[open] .disclosure-chevron,.mobile-filter-disclosure[open] .disclosure-chevron{transform:rotate(180deg)}
+.mobile-disclosure-summary{display:flex;min-height:48px;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;cursor:pointer}
+.mobile-record-list{overflow:hidden;border:1px solid #e9e3da;border-radius:13px;background:#fff}
+.mobile-record{border-bottom:1px solid #eee9e2;background:#fff}.mobile-record:last-child{border-bottom:0}
+.mobile-record>summary{display:flex;min-height:56px;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;cursor:pointer}
+.mobile-record[open]>summary{background:#faf9f6}
+.mobile-record-main{min-width:0;flex:1}.mobile-record-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0f172a;font-size:11.5px;font-weight:900;line-height:1.25}.mobile-record-main span{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:9px;font-weight:650;line-height:1.25}
+.mobile-record-side{display:flex;max-width:42%;flex:none;align-items:center;gap:5px;text-align:right}.mobile-record-side>strong{color:#0f172a;font-size:10px;font-weight:900;white-space:nowrap}.mobile-record-meta{border-radius:999px;background:#f1f5f9;padding:3px 6px;color:#475569;font-size:8px;font-weight:900;white-space:nowrap}
+.mobile-status-dot{display:inline-flex;max-width:90px;align-items:center;border-radius:999px;background:#f1f5f9;padding:3px 6px;color:#475569;font-size:7.5px;font-weight:900;line-height:1.2;white-space:nowrap}.mobile-status-dot.is-paid{background:#eaf8f0;color:#15803d}.mobile-status-dot.is-overdue{background:#fff0f0;color:#b91c1c}.mobile-status-dot.is-waiting{background:#fff7e6;color:#a16207}
+.mobile-record-details{border-top:1px solid #eee9e2;background:#fcfbf9;padding:10px}
+.mobile-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mobile-detail-grid>div{min-width:0;border-radius:9px;background:#fff;padding:7px 8px;border:1px solid #eee9e2}.mobile-detail-grid span{display:block;color:#94a3b8;font-size:7.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}.mobile-detail-grid b{display:block;margin-top:2px;overflow-wrap:anywhere;color:#334155;font-size:9.5px;font-weight:850;line-height:1.35}.mobile-record-actions{display:flex;align-items:center;gap:7px;margin-top:9px}.mobile-record-actions>.btn{flex:1;min-width:0}
+.mobile-filter-disclosure{position:relative;flex:none}.mobile-filter-disclosure>summary{display:flex;height:38px;align-items:center;gap:4px;border:1px solid #ded8cf;border-radius:10px;background:#fff;padding:0 9px;color:#475569;font-size:9px;font-weight:900;cursor:pointer}.mobile-filter-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:40;display:grid;width:min(300px,calc(100vw - 24px));gap:7px;border:1px solid #e6dfd5;border-radius:12px;background:#fff;padding:9px;box-shadow:0 16px 40px rgba(15,23,42,.14)}
+
+/* Paginação mais discreta */
+.card+div>.table-pagination{border-radius:0}
+
+/* PWA */
+.mobile-pwa-top{background:#0f172a;padding:calc(env(safe-area-inset-top,0px) + 7px) 10px 7px;box-shadow:0 5px 16px rgba(15,23,42,.16)}
+.mobile-bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;border-top:1px solid #e9e3da;background:rgba(255,255,255,.975);padding:5px 5px calc(env(safe-area-inset-bottom,0px) + 5px);box-shadow:0 -8px 22px rgba(15,23,42,.08)}
+.mobile-bottom-nav-item{position:relative;min-height:47px;gap:2px;border-radius:10px;padding:5px 2px;color:#94a3b8;font-size:7.5px;font-weight:900}
+.mobile-bottom-nav-item svg{color:#94a3b8}.mobile-bottom-nav-item.is-active{background:#f2f0eb;color:#0f172a}.mobile-bottom-nav-item.is-active svg{color:#0f172a}.mobile-bottom-nav-item.is-active:after{content:"";position:absolute;bottom:3px;width:16px;height:2px;border-radius:999px;background:#0f172a}
+
+@media(max-width:760px){
+  body{background:#f5f3ef;font-size:12px}
+  .app-main{padding:7px 7px calc(env(safe-area-inset-bottom,0px) + 64px)!important}
+  .app-content{max-width:none}
+  .page-header{min-height:44px;margin-bottom:7px!important;border-radius:12px!important;padding:7px 9px!important;box-shadow:none}
+  .page-header h1{font-size:15px!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  .page-header-subtitle{display:none!important}.page-header-action{display:none!important}
+  .card,.panel{border-radius:12px;box-shadow:0 3px 12px rgba(15,23,42,.025)}
+  .stat-card{padding:10px!important}.stat-card .label{font-size:7.5px}.stat-card h2{margin-top:3px;font-size:15px!important}.stat-card-detail{display:none}
+  .compact-form-grid{grid-template-columns:1fr!important;gap:7px!important}.compact-form-grid .input,.compact-form-grid .btn{width:100%;min-height:40px}
+  .input,.compact-input{font-size:16px!important}
+  .status-filter-row{flex-wrap:nowrap;overflow-x:auto;padding-bottom:1px;scrollbar-width:none}.status-filter-row::-webkit-scrollbar{display:none}.status-filter-chip{flex:none;padding:6px 8px;font-size:8px}
+  .mobile-record-actions{align-items:stretch}.mobile-record-actions .btn{min-height:36px!important;padding:7px!important;font-size:9px!important;white-space:nowrap}
+  .mobile-record-actions form,.mobile-record-actions>div{min-width:0;flex:1}
+  .table-responsive{border-radius:12px}
+  .table-responsive .table{display:table}
+  .whatsapp-central{height:calc(100dvh - 105px)!important;min-height:0!important}
+  .whatsapp-thread{height:calc(100dvh - 105px)!important}
+}
+
+@media(min-width:761px){
+  .table-responsive{border:1px solid #e9e3da;border-radius:13px;background:#fff;box-shadow:0 5px 16px rgba(15,23,42,.025)}
+}
+.table-pagination{font-size:10px}.table-pagination .btn{min-height:28px}.table-pagination select{min-height:28px}
+@media(max-width:760px){.table-pagination{gap:6px!important;padding:7px 8px!important}.table-pagination>div{justify-content:space-between;width:100%}.table-pagination label span{display:none}.table-pagination .btn{height:29px!important;width:29px!important}.table-pagination select{height:29px;font-size:12px!important}.table-pagination span{font-size:9px!important}}
+@media(max-width:760px){.mobile-disclosure .panel{box-shadow:none}.mobile-disclosure [class*="grid h-[210px]"]{height:170px!important}.mobile-disclosure [class*="h-[150px]"]{height:112px!important}.mobile-disclosure section.panel>div{padding:10px!important}.mobile-disclosure section.panel h2{font-size:11px!important}.mobile-disclosure section.panel p{font-size:8px!important}.mobile-disclosure .grid.gap-5{gap:8px!important}.mobile-disclosure .space-y-3{gap:6px!important}}
+.mobile-more-menu{position:relative}.mobile-more-menu>summary{display:grid;height:32px;width:32px;place-items:center;border-radius:9px;background:rgba(255,255,255,.1);color:#fff;list-style:none;cursor:pointer}.mobile-more-menu>summary::-webkit-details-marker{display:none}.mobile-more-panel{position:absolute;right:0;top:calc(100% + 7px);z-index:70;width:210px;overflow:hidden;border:1px solid #e4ded4;border-radius:13px;background:#fff;padding:6px;box-shadow:0 18px 42px rgba(15,23,42,.2)}.mobile-more-panel>p{padding:5px 7px 6px;color:#94a3b8;font-size:8px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}.mobile-more-panel>a{display:flex;height:36px;align-items:center;gap:8px;border-radius:9px;padding:0 8px;color:#475569;font-size:10px;font-weight:850}.mobile-more-panel>a:hover{background:#f5f3ef;color:#0f172a}.mobile-more-panel>a svg{color:#64748b}
+@media(max-width:760px){.page-header>div{flex-direction:row!important;align-items:center!important;gap:8px!important}}
+@media(min-width:761px){.app-content .card.p-6{padding:18px!important}.app-content .card.p-5{padding:16px!important}.app-content .gap-6{gap:16px!important}}
+@media(max-width:760px){.app-content .card.p-6,.app-content .card.p-5,.app-content .card.p-4{padding:10px!important}.app-content .gap-6,.app-content .gap-5,.app-content .gap-4{gap:9px!important}.app-content h2.text-xl,.app-content h2.text-lg{font-size:13px!important}.app-content h3.text-lg{font-size:12px!important}.app-content p.text-sm{font-size:10px!important;line-height:1.4}.app-content .badge{font-size:8px!important;padding:3px 6px!important}}
+
+/* V9.52 — PWA estável, WhatsApp sem sobreposição e controles compactos */
+.whatsapp-workspace{width:100%;min-width:0}
+.whatsapp-workspace-nav{flex:none}
+.whatsapp-conversation-controls{position:relative;z-index:20}
+.whatsapp-control-row,.whatsapp-tag-row,.whatsapp-operations-row{min-width:0}
+.whatsapp-tag-picker{isolation:isolate}
+
+@media(max-width:760px){
+  /* O cabeçalho global do PWA já identifica o app; no WhatsApp, o cabeçalho da
+     página era redundante e roubava altura da conversa. */
+  .whatsapp-page>.page-header{display:none!important}
+  .whatsapp-page{min-width:0}
+  .whatsapp-page>.compact-alert,.whatsapp-page>section{margin-bottom:7px!important}
+
+  /* Navegação interna em uma única faixa, sem quebrar e empurrar a conversa. */
+  .whatsapp-workspace{gap:7px!important}
+  .whatsapp-workspace-nav{flex-wrap:nowrap!important;gap:4px!important;overflow-x:auto!important;overflow-y:hidden!important;border-radius:12px!important;padding:5px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .whatsapp-workspace-nav::-webkit-scrollbar{display:none}
+  .whatsapp-workspace-nav>button{min-height:34px!important;flex:none!important;border-radius:9px!important;padding:7px 9px!important;font-size:9px!important;white-space:nowrap!important}
+
+  /* Altura única e autoritativa: cabeçalho do PWA + faixa interna + navegação
+     inferior ficam fora da área útil da central. Substitui os cálculos antigos. */
+  .whatsapp-central{display:block!important;width:100%!important;max-width:100%!important;height:calc(100dvh - 176px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important;min-height:0!important;overflow:hidden!important}
+  .whatsapp-panel,.whatsapp-thread{height:100%!important;min-height:0!important;width:100%!important;max-width:100%!important;border-radius:12px!important;border-left:1px solid #d6ddd6!important;border-right:1px solid #d6ddd6!important}
+  .whatsapp-list-scroll{min-height:0!important;max-height:none!important;flex:1 1 0%!important;overflow-y:auto!important;overflow-x:hidden!important}
+
+  /* Cabeçalho operacional compacto: as ações continuam disponíveis sem criar
+     quatro ou cinco linhas sobre as mensagens. */
+  .whatsapp-conversation-controls{padding:6px 7px!important}
+  .whatsapp-control-row,.whatsapp-operations-row{flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;padding-bottom:2px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .whatsapp-control-row::-webkit-scrollbar,.whatsapp-operations-row::-webkit-scrollbar{display:none}
+  .whatsapp-control-row>* ,.whatsapp-operations-row>*{flex:none!important}
+  .whatsapp-control-row button,.whatsapp-control-row select,.whatsapp-operations-row button,.whatsapp-operations-row select{min-height:28px!important;max-width:220px!important;font-size:9px!important;white-space:nowrap!important}
+  .whatsapp-tag-row{margin-top:4px!important;min-height:28px;flex-wrap:nowrap!important;overflow:visible!important}
+  .whatsapp-tag-row>span{flex:none!important;max-width:112px!important}
+  .whatsapp-tag-picker{left:0!important;right:auto!important;width:min(280px,calc(100vw - 30px))!important;max-width:calc(100vw - 30px)!important}
+
+  /* Mais área para mensagens e um compositor que nunca fica atrás da barra inferior. */
+  .whatsapp-message-scroll{padding:8px 7px!important}
+  .whatsapp-message-scroll .group>div{max-width:88%!important}
+  .whatsapp-thread>div:last-child{padding:7px!important}
+  .whatsapp-thread textarea{min-height:40px!important;max-height:88px!important;padding:9px 12px!important;line-height:1.35!important}
+  .whatsapp-thread .relative.flex.items-end{gap:4px!important}
+  .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:34px!important;width:34px!important;min-width:34px!important}
+
+  /* PWA geral: conteúdo não entra sob a barra inferior e mantém uma única largura. */
+  .app-main{min-width:0!important;width:100%!important;padding:7px 7px calc(env(safe-area-inset-bottom,0px) + 66px)!important}
+  .app-content{min-width:0!important;width:100%!important;max-width:100%!important}
+  .mobile-pwa-top{min-height:46px}
+  .mobile-bottom-nav{min-height:58px}
+  .mobile-bottom-nav-item{min-width:0!important}
+  .mobile-bottom-nav-item span{font-size:8px!important}
+}
+
+@media(max-width:390px){
+  .whatsapp-central{height:calc(100dvh - 170px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
+  .whatsapp-workspace-nav>button{padding-left:8px!important;padding-right:8px!important}
+  .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:32px!important;width:32px!important;min-width:32px!important}
+  .whatsapp-message-scroll .group>div{max-width:91%!important}
+}
+
+/* V9.53 — tipografia sem recorte e alvos móveis mais estáveis */
+.btn{line-height:1.45}
+.label{line-height:1.5}
+.badge{line-height:1.45}
+.desktop-nav-link{height:auto!important;min-height:36px;line-height:1.35!important;padding-top:7px;padding-bottom:7px}
+.desktop-nav-link span{display:block;min-width:0;padding-block:1px;line-height:1.35}
+.mobile-more-panel>a{height:auto!important;min-height:38px;line-height:1.4;padding-top:8px;padding-bottom:8px}
+.table th,.table td,.spreadsheet th,.spreadsheet td,.professional-table th,.professional-table td{line-height:1.4!important}
+
+@media(max-width:760px){
+  /* Descendentes (g, p, q, ç) não ficam presos em caixas de linha apertadas. */
+  .page-header h1{line-height:1.35!important;padding-top:1px;padding-bottom:2px!important}
+  .mobile-pwa-top p,.brand-block p{line-height:1.35!important;padding-block:1px}
+  .mobile-bottom-nav-item{line-height:1.4!important;padding-top:6px!important;padding-bottom:7px!important}
+  .mobile-bottom-nav-item span{display:block!important;line-height:1.4!important;padding-block:1px!important;overflow:visible!important}
+  .btn{line-height:1.45!important;padding-top:.58rem!important;padding-bottom:.62rem!important}
+  .badge{line-height:1.45!important;padding-top:4px!important;padding-bottom:4px!important}
+  .label{line-height:1.5!important;padding-bottom:2px!important}
+  .mobile-record-main strong,.mobile-record-main span,.mobile-detail-grid b,.mobile-detail-grid span{line-height:1.4!important}
+  .whatsapp-workspace-nav>button,.whatsapp-control-row button,.whatsapp-control-row select,.whatsapp-operations-row button,.whatsapp-operations-row select{line-height:1.4!important}
+}
+.page-header-action .btn,.status-filter-chip,.mobile-status-dot{line-height:1.4!important}
+@media(max-width:760px){
+  .app-content h1,.app-content h2,.app-content h3{line-height:1.35!important;padding-bottom:1px}
+  .mobile-record-main strong,.mobile-record-main span{padding-bottom:1px}
+}
+
+/* V9.60 — filtros do WhatsApp sem recorte + filtro por leads */
+.whatsapp-filter-panel{max-height:min(460px,calc(100dvh - 230px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.whatsapp-filter-control{height:auto!important;min-height:36px!important;padding-top:7px!important;padding-bottom:8px!important;line-height:1.4!important}
+@media(max-width:760px){
+  .whatsapp-filter-panel{left:0!important;right:0!important;width:100%!important;max-width:100%!important;max-height:min(420px,calc(100dvh - 210px))!important;padding:9px!important;border-radius:12px!important}
+  .whatsapp-filter-control{height:auto!important;min-height:42px!important;padding:8px 10px 9px!important;font-size:16px!important;line-height:1.35!important}
+  .whatsapp-filter-panel label{line-height:1.4!important}
+}
