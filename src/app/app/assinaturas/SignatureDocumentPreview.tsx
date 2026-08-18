@@ -179,11 +179,12 @@ export default function SignatureDocumentPreview({
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 bg-slate-100 p-2 sm:p-4">
-                  <object data={blobUrl} type="application/pdf" className="h-full w-full rounded-xl bg-white">
-                    <div className="grid h-full place-items-center p-8 text-center">
-                      <div><p className="text-sm font-black text-slate-900">O navegador não conseguiu exibir o PDF.</p><button type="button" onClick={openNewWindow} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#075e54] px-4 py-2 text-xs font-black text-white"><ExternalLink size={14}/> Abrir documento</button></div>
-                    </div>
-                  </object>
+                  <iframe
+                    src={blobUrl}
+                    title={`Documento PDF — ${title}`}
+                    className="h-full w-full rounded-xl bg-white"
+                    style={{ minHeight: '70vh', border: 0 }}
+                  />
                 </div>
               </div>
             </div>

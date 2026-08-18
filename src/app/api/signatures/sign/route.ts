@@ -55,50 +55,77 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
   const teal=rgb(0.05,0.36,0.31), ink=rgb(0.08,0.09,0.11), muted=rgb(0.38,0.42,0.47), line=rgb(0.87,0.88,0.9), pale=rgb(0.97,0.98,0.98), green=rgb(0.08,0.48,0.27);
   // A dedicated signature/evidence section is appended so the original contract layout remains intact.
   const p=pdf.addPage([595.28,841.89]);
+  // Página exclusiva para evidências: layout em cartões, sem sobreposição entre CPF,
+  // método, data/hora, IP e a representação visual da assinatura.
   p.drawLine({start:{x:45,y:760},end:{x:550,y:760},thickness:0.8,color:line});
   if(logo) p.drawImage(logo,{x:468,y:776,width:66,height:50});
   p.drawText('LADEIRA ADVOGADOS',{x:45,y:785,size:10,font:bold,color:ink});
-  p.drawText('REGISTRO DE ASSINATURAS ELETRÔNICAS',{x:45,y:720,size:16,font:bold,color:teal});
-  p.drawText(String(doc.title||'Documento'),{x:45,y:696,size:11,font:regular,color:ink});
-  p.drawText(`Status: ${finalizing?'Assinado':'Aguardando assinatura'}`,{x:45,y:678,size:10,font:bold,color:finalizing?green:muted});
-  p.drawText(`Hash do documento original (SHA-256): ${sha256(original)}`,{x:45,y:658,size:8,font:regular,color:muted});
+  p.drawText('REGISTRO DE ASSINATURAS ELETRÔNICAS',{x:45,y:720,size:15,font:bold,color:teal});
+  p.drawText(String(doc.title||'Documento').slice(0,85),{x:45,y:698,size:10.5,font:regular,color:ink});
+  p.drawText(`Status: ${finalizing?'Assinado':'Aguardando assinatura'}`,{x:45,y:680,size:9.5,font:bold,color:finalizing?green:muted});
+  p.drawText(`Hash SHA-256: ${sha256(original)}`,{x:45,y:661,size:7.2,font:regular,color:muted});
 
   const sorted=[...signers].sort((a,b)=>Number(a.signer_order)-Number(b.signer_order));
-  let y=620;
+  let y=630;
   for(const s of sorted){
-    const signed=String(s.status||'')==='assinado';
-    const boxH=190;
-    p.drawRectangle({x:45,y:y-boxH,width:505,height:174,borderWidth:1,borderColor:line,color:pale});
+    const signed=String(s.status||'').toLowerCase()==='assinado';
+    const boxH=205;
+    const boxY=y-boxH;
+    p.drawRectangle({x:45,y:boxY,width:505,height:185,borderWidth:1,borderColor:line,color:pale});
+
+    // Área reservada para a selfie/foto. Nunca invade os dados textuais.
     const image=s.signer_order===1?clientSelfie:danielPhoto;
     if(image){
       try{
         let img:any; try{img=await pdf.embedJpg(image)}catch{img=await pdf.embedPng(image)}
-        const size=88; p.drawImage(img,{x:60,y:y-118,width:size,height:size});
+        const size=82;
+        p.drawImage(img,{x:60,y:y-112,width:size,height:size});
       }catch{}
     }else{
-      p.drawCircle({x:104,y:y-74,size:44,borderWidth:1,borderColor:line,color:rgb(0.92,0.93,0.94)});
-      p.drawText(s.signer_order===1?'C':'DL',{x:85,y:y-80,size:11,font:bold,color:muted});
+      p.drawCircle({x:101,y:y-71,size:41,borderWidth:1,borderColor:line,color:rgb(0.92,0.93,0.94)});
+      p.drawText(s.signer_order===1?'C':'DL',{x:84,y:y-77,size:10,font:bold,color:muted});
     }
-    p.drawText(s.signer_order===1?'CLIENTE':'DANIEL COSTA LADEIRA',{x:165,y:y-24,size:9,font:bold,color:teal});
-    p.drawText(String(s.name||''),{x:165,y:y-44,size:13,font:bold,color:ink});
-    if(s.email) p.drawText(`E-mail: ${String(s.email)}`,{x:165,y:y-64,size:8.5,font:regular,color:muted});
-    if(s.phone) p.drawText(`Telefone: ${String(s.phone)}`,{x:165,y:y-80,size:8.5,font:regular,color:muted});
-    if(s.cpf) p.drawText(`CPF: ${String(s.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4')}`,{x:165,y:y-94,size:8.5,font:regular,color:muted});
-    p.drawText(`Método: ${s.signer_order===1?'OTP WhatsApp + selfie + confirmação de nome':'Conta autenticada do AdvOS'}`,{x:165,y:y-96,size:8.5,font:regular,color:muted});
-    p.drawText(`Status: ${signed?'Assinado':'Pendente'}`,{x:165,y:y-128,size:8.5,font:bold,color:signed?green:muted});
+
+    // Coluna de identificação.
+    const x=160;
+    p.drawText(s.signer_order===1?'CLIENTE':'DANIEL COSTA LADEIRA',{x,y:y-25,size:8.5,font:bold,color:teal});
+    p.drawText(String(s.name||'').slice(0,52),{x,y:y-45,size:11.5,font:bold,color:ink});
+    let infoY=y-63;
+    if(s.email){
+      p.drawText(`E-mail: ${String(s.email).slice(0,64)}`,{x,y:infoY,size:7.8,font:regular,color:muted});
+      infoY-=14;
+    }
+    if(s.phone){
+      p.drawText(`Telefone: ${String(s.phone).slice(0,42)}`,{x,y:infoY,size:7.8,font:regular,color:muted});
+      infoY-=14;
+    }
+    if(s.cpf){
+      p.drawText(`CPF: ${String(s.cpf).replace(/\D/g,'').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4')}`,{x,y:infoY,size:7.8,font:regular,color:muted});
+      infoY-=14;
+    }
+    const method=s.signer_order===1?'OTP WhatsApp + selfie + confirmação de nome':'Conta autenticada do AdvOS';
+    p.drawText(`Método: ${method}`,{x,y:infoY,size:7.3,font:regular,color:muted});
+    infoY-=18;
+    p.drawText(`Status: ${signed?'ASSINADO':'PENDENTE'}`,{x,y:infoY,size:8,font:bold,color:signed?green:muted});
+
     if(signed){
       const ev=events.find((e:any)=>e.signer_id===s.id && e.event_type==='documento_assinado');
       const when=s.signed_at?new Date(s.signed_at).toLocaleString('pt-BR'):'—';
-      p.drawText(`Data/hora: ${when}`,{x:165,y:y-144,size:8,font:regular,color:muted});
-      const ip=signed&&ev?.metadata?.ip?String(ev.metadata.ip):'';
-      if(ip)p.drawText(`IP: ${ip}`,{x:165,y:y-158,size:8,font:regular,color:muted});
-      const ua=signed&&ev?.metadata?.user_agent?String(ev.metadata.user_agent):'';
-      if(ua)p.drawText(`Dispositivo: ${ua.slice(0,72)}`,{x:165,y:y-172,size:7.2,font:regular,color:muted});
-      p.drawText(String(s.name||'').trim(),{x:165,y:y-116,size:15,font:italic,color:ink});
-      p.drawLine({start:{x:165,y:y-119},end:{x:420,y:y-119},thickness:0.8,color:rgb(0.65,0.68,0.72)});
-      p.drawText('Assinatura eletrônica registrada',{x:430,y:y-118,size:7.5,font:bold,color:teal});
+      const evidenceY=infoY-18;
+      p.drawLine({start:{x,y:evidenceY+8},end:{x:530,y:evidenceY+8},thickness:0.5,color:line});
+      p.drawText(`Assinado em: ${when}`,{x,y:evidenceY-6,size:7.4,font:regular,color:muted});
+      const ip=String(ev?.ip||ev?.metadata?.ip||'').trim();
+      if(ip) p.drawText(`IP: ${ip.slice(0,42)}`,{x,y:evidenceY-20,size:7.4,font:regular,color:muted});
+      const ua=String(ev?.user_agent||ev?.metadata?.user_agent||'').trim();
+      if(ua) p.drawText(`Dispositivo: ${ua.slice(0,64)}`,{x,y:evidenceY-34,size:6.8,font:regular,color:muted});
+
+      // Assinatura eletrônica visual fica em uma faixa própria na parte inferior.
+      const sigY=boxY+24;
+      p.drawLine({start:{x:60,y:sigY+20},end:{x:330,y:sigY+20},thickness:0.8,color:rgb(0.65,0.68,0.72)});
+      p.drawText(String(s.name||'').slice(0,42),{x:60,y:sigY+25,size:9,font:italic,color:ink});
+      p.drawText('Assinatura eletrônica registrada',{x:350,y:sigY+18,size:7.2,font:bold,color:teal});
     }
-    y-=202;
+    y-=218;
   }
   const cert=pdf.addPage([595.28,841.89]);
   if(logo) cert.drawImage(logo,{x:468,y:776,width:66,height:50});
