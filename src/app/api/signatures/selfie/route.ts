@@ -17,7 +17,7 @@ async function resolveSignerWithPublicToken(db:any, signerId:string, token:strin
 }
 
 export async function POST(req:Request){
-  const f=await req.formData(); const token=String(f.get('token')||'').trim(); const signerId=String(f.get('signerId')||'').trim(); const selfie=f.get('selfie'); const docPhoto=f.get('document_photo');
+  const f=await req.formData(); const token=String(f.get('token')||'').trim(); const signerId=String(f.get('signerId')||'').trim(); const cpf=String(f.get('cpf')||'').replace(/\D/g,''); const selfie=f.get('selfie'); const docPhoto=f.get('document_photo');
   if(!(selfie instanceof File)) return NextResponse.json({ok:false,error:'Selfie não enviada.'},{status:400});
   const admin=createAdminSupabase();
   const resolved=await resolveSignerWithPublicToken(admin, signerId, token);
@@ -32,7 +32,7 @@ export async function POST(req:Request){
   const up=await sb.upload(selfiePath,selfBuf,{contentType:selfie.type||'image/jpeg',upsert:false}); if(up.error) return NextResponse.json({ok:false,error:up.error.message},{status:400});
   let docPath:string|null=null;
   if(docPhoto instanceof File){const buf=Buffer.from(await docPhoto.arrayBuffer()); if(buf.length>10*1024*1024) return NextResponse.json({ok:false,error:'Documento muito grande.'},{status:400}); docPath=`${r.law_firm_id}/${r.id}/${signerId}-document-${crypto.randomUUID()}.${ext}`; const d=await sb.upload(docPath,buf,{contentType:docPhoto.type||'image/jpeg',upsert:false}); if(d.error) return NextResponse.json({ok:false,error:d.error.message},{status:400});}
-  await admin.from('signature_signers').update({selfie_path:selfiePath,document_photo_path:docPath}).eq('id',s.id);
-  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'evidencia_facial_recebida',metadata:{has_document:Boolean(docPath),mime:selfie.type}});
+  await admin.from('signature_signers').update({selfie_path:selfiePath,document_photo_path:docPath,cpf:cpf||s.cpf||null}).eq('id',s.id);
+  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'evidencia_facial_recebida',ip:String(req.headers.get('x-forwarded-for')||req.headers.get('x-real-ip')||'').split(',')[0].trim(), user_agent:String(req.headers.get('user-agent')||''), has_document:Boolean(docPath), mime:selfie.type, cpf:cpf||s.cpf||null});
   return NextResponse.json({ok:true});
 }

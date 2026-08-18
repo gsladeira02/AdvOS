@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const db = createAdminSupabase();
   const { data: generated, error: generatedError } = await db
     .from('generated_contracts')
-    .select('id,client_id,client_name,phone,email,document_id,pdf_filename')
+    .select('id,client_id,client_name,phone,email,cpf,document_id,pdf_filename')
     .eq('id', generatedContractId)
     .eq('law_firm_id', profile.law_firm_id)
     .maybeSingle();
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
     await db.from('signature_signers').delete().eq('request_id', requestRow.id).eq('law_firm_id', profile.law_firm_id);
     const clientPhone = cleanPhone(generated.phone || '');
-    const { error: cErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: clientToken, signer_order: 1, name: generated.client_name, email: generated.email || null, phone: clientPhone || null, role: 'cliente', status: 'pendente' });
+    const { error: cErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: clientToken, signer_order: 1, name: generated.client_name, email: generated.email || null, phone: clientPhone || null, cpf: generated.cpf || null, role: 'cliente', status: 'pendente' });
     if (cErr) return NextResponse.json({ ok: false, error: cErr.message }, { status: 400 });
     const { error: dErr } = await db.from('signature_signers').insert({ law_firm_id: profile.law_firm_id, request_id: requestRow.id, signer_token: danielToken, signer_order: 2, name: DANIEL.name, email: DANIEL.email, phone: DANIEL.phone, role: DANIEL.role, status: 'pendente' });
     if (dErr) return NextResponse.json({ ok: false, error: dErr.message }, { status: 400 });

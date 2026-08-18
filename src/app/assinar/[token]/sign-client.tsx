@@ -13,7 +13,7 @@ type Props = {
   status: string;
 };
 
-type Step = 'preview' | 'identity' | 'confirm' | 'done';
+type Step = 'preview' | 'camera' | 'identity' | 'confirm' | 'done';
 
 export default function SignClient({ token, requestId, signerId, title, signer, settings, status }: Props) {
   const [step, setStep] = useState<Step>(status === 'assinado' ? 'done' : 'preview');
@@ -23,6 +23,9 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [otp, setOtp] = useState('');
   const [nameConfirm, setNameConfirm] = useState('');
+  const [cpfConfirm, setCpfConfirm] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -35,7 +38,8 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     try {
       const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       setStream(media);
-      if (videoRef.current) videoRef.current.srcObject = media;
+      setCameraOpen(true);
+      requestAnimationFrame(() => { if (videoRef.current) videoRef.current.srcObject = media; });
     } catch {
       setMessage('Não foi possível acessar a câmera. Autorize a câmera para continuar.');
     }
@@ -43,6 +47,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
 
   const captureSelfie = () => {
     const video = videoRef.current;
+    if (!cameraOpen || !stream) { setMessage('Abra a câmera antes de capturar a selfie.'); return; }
     if (!video) return;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth || 640;
@@ -56,6 +61,10 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       setMessage('Confirme que visualizou o documento completo.');
       return;
     }
+    const cpfDigits = normalizeCpf(cpfConfirm);
+    if (cpfDigits.length !== 11) { setMessage('Informe um CPF válido com 11 dígitos.'); return; }
+    const storedCpf = normalizeCpf(String(signer?.cpf || ''));
+    if (storedCpf && storedCpf !== cpfDigits) { setMessage('O CPF informado não confere com o cadastro do cliente.'); return; }
     setBusy(true);
     setMessage('');
     try {
@@ -68,7 +77,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível registrar a visualização.');
       setViewConfirmed(true);
       setConsent(false);
-      setStep('identity');
+      setStep(settings.requireSelfie ? 'camera' : 'identity');
     } catch (error: any) {
       setMessage(error.message || 'Não foi possível registrar a visualização.');
     } finally {
@@ -87,7 +96,8 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       });
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível enviar o código.');
-      setMessage('Código de segurança enviado pelo WhatsApp.');
+      setOtpSent(true);
+      setMessage('Token enviado. Digite o código recebido e continue.');
     } catch (error: any) {
       setMessage(error.message || 'Não foi possível enviar o código.');
     } finally {
@@ -96,12 +106,13 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   };
 
   const continueIdentity = () => {
-    if (!settings.requireSelfie || selfie) {
-      setStep('confirm');
-      return;
-    }
-    setMessage('Capture a selfie para continuar.');
+    if (settings.requireSelfie && !selfie) { setMessage('Capture a selfie para continuar.'); return; }
+    setStep('confirm');
   };
+
+  const normalizeCpf = (v:string) => v.replace(/\D/g,'').slice(0,11);
+  const formatCpf = (v:string) => { const d=normalizeCpf(v); if(d.length<=3) return d; if(d.length<=6) return `${d.slice(0,3)}.${d.slice(3)}`; if(d.length<=9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`; return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`; };
+
 
   const sign = async () => {
     if (!viewConfirmed) {
@@ -116,10 +127,8 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       setMessage('Capture a selfie antes de assinar.');
       return;
     }
-    if (settings.requireOtp && !otp) {
-      setMessage('Informe o código de segurança enviado por WhatsApp.');
-      return;
-    }
+    if (settings.requireOtp && !otpSent) { setMessage('Clique em “Enviar token por WhatsApp” para receber o código.'); return; }
+    if (settings.requireOtp && !otp) { setMessage('Informe o código de segurança enviado por WhatsApp.'); return; }
     if (nameConfirm.trim().toLowerCase() !== String(signer?.name || '').trim().toLowerCase()) {
       setMessage('Confirme seu nome completo exatamente como aparece no documento.');
       return;
@@ -133,6 +142,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
         selfieForm.append('requestId', requestId);
         selfieForm.append('signerId', signerId);
         selfieForm.append('selfie', selfie, 'selfie.jpg');
+        selfieForm.append('cpf', cpfDigits);
         const selfieResponse = await fetch('/api/signatures/selfie', { method: 'POST', body: selfieForm });
         const selfieJson = await selfieResponse.json();
         if (!selfieResponse.ok || !selfieJson.ok) throw new Error(selfieJson.error || 'Não foi possível salvar a selfie.');
@@ -143,6 +153,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       form.append('signerId', signerId);
       form.append('otp', otp);
       form.append('confirmation_name', nameConfirm.trim());
+      form.append('cpf', cpfDigits);
       const response = await fetch('/api/signatures/sign', { method: 'POST', body: form });
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível concluir a assinatura.');
@@ -212,23 +223,34 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
               </div>
             )}
 
-            {step === 'identity' && (
+            {step === 'camera' && (
               <div className="space-y-4">
                 <div className="rounded-2xl border p-4">
-                  <div className="flex items-center gap-2 font-black"><Camera size={17} /> 2. Confirme sua identidade</div>
-                  <p className="mt-1 text-xs text-slate-500">A selfie é usada como evidência do processo de assinatura.</p>
-                  {settings.requireSelfie && (
+                  <div className="flex items-center gap-2 font-black"><Camera size={17} /> 2. Selfie de segurança</div>
+                  <p className="mt-1 text-xs text-slate-500">Abra a câmera primeiro. O botão para capturar a selfie aparece somente depois que a câmera estiver ativa.</p>
+                  {!cameraOpen && <button className="btn btn-primary mt-4 w-full" onClick={startCamera}><Camera size={16}/> Abrir câmera</button>}
+                  {cameraOpen && (
                     <>
                       <video ref={videoRef} id="advos-sign-camera" autoPlay playsInline className="mt-3 aspect-video w-full rounded-2xl bg-slate-900 object-cover" />
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <button className="btn btn-secondary" onClick={startCamera}>Abrir câmera</button>
-                        <button className="btn btn-primary" onClick={captureSelfie}>Capturar selfie</button>
-                      </div>
+                      <button className="btn btn-primary mt-3 w-full" onClick={captureSelfie}><Camera size={16}/> Capturar selfie</button>
                       {selfie && <p className="mt-2 text-xs font-black text-emerald-700">Selfie capturada ✓</p>}
                     </>
                   )}
                 </div>
                 <button onClick={continueIdentity} disabled={settings.requireSelfie && !selfie} className="btn btn-primary w-full">Continuar</button>
+              </div>
+            )}
+
+            {step === 'identity' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border p-4">
+                  <p className="text-sm font-black">3. Confirme seus dados</p>
+                  <label className="label mt-4">Nome completo</label>
+                  <input className="input mt-1" value={nameConfirm} onChange={(e)=>setNameConfirm(e.target.value)} placeholder="Digite seu nome completo" />
+                  <label className="label mt-4">CPF</label>
+                  <input inputMode="numeric" className="input mt-1" value={formatCpf(cpfConfirm)} onChange={(e)=>setCpfConfirm(normalizeCpf(e.target.value))} placeholder="Digite seu CPF" />
+                </div>
+                <button onClick={continueIdentity} disabled={!nameConfirm.trim() || normalizeCpf(cpfConfirm).length!==11} className="btn btn-primary w-full">Continuar</button>
               </div>
             )}
 
@@ -241,13 +263,14 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
                     <div className="mt-4">
                       <label className="label">Código de segurança</label>
                       <div className="mt-1 flex gap-2">
-                        <input className="input flex-1" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" />
-                        <button className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp ? 'Enviando…' : <Send size={15} />}</button>
+                        <input disabled={!otpSent} className="input flex-1" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" />
+                        <button className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp ? 'Enviando…' : 'Enviar token por WhatsApp'}</button>
                       </div>
                     </div>
                   )}
-                  <label className="label mt-4">Nome completo</label>
-                  <input className="input mt-1" value={nameConfirm} onChange={(e) => setNameConfirm(e.target.value)} placeholder={String(signer?.name || '')} />
+                  <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-xs font-semibold text-slate-700">
+                    Nome: {nameConfirm || '—'}<br/>CPF: {formatCpf(cpfConfirm) || '—'}
+                  </div>
                   <label className="mt-3 flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold">
                     <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
                     Li e concordo com o documento e com a assinatura eletrônica.

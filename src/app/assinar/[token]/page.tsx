@@ -45,7 +45,7 @@ export default async function PublicSignPage({ params }: { params: Promise<{ tok
     // cliente é o próprio public_token recebido na URL.
     const { data: signer, error: signerError } = await admin
       .from('signature_signers')
-      .select('id, request_id, name, phone, email, status, role, signer_order')
+      .select('id, request_id, name, phone, email, cpf, status, role, signer_order')
       .eq('request_id', requestRow.id)
       .eq('signer_order', 1)
       .maybeSingle();

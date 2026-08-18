@@ -83,14 +83,17 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
     p.drawText(String(s.name||''),{x:165,y:y-44,size:13,font:bold,color:ink});
     if(s.email) p.drawText(`E-mail: ${String(s.email)}`,{x:165,y:y-64,size:8.5,font:regular,color:muted});
     if(s.phone) p.drawText(`Telefone: ${String(s.phone)}`,{x:165,y:y-80,size:8.5,font:regular,color:muted});
+    if(s.cpf) p.drawText(`CPF: ${String(s.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4')}`,{x:165,y:y-94,size:8.5,font:regular,color:muted});
     p.drawText(`Método: ${s.signer_order===1?'OTP WhatsApp + selfie + confirmação de nome':'Conta autenticada do AdvOS'}`,{x:165,y:y-96,size:8.5,font:regular,color:muted});
-    p.drawText(`Status: ${signed?'Assinado':'Pendente'}`,{x:165,y:y-112,size:8.5,font:bold,color:signed?green:muted});
+    p.drawText(`Status: ${signed?'Assinado':'Pendente'}`,{x:165,y:y-128,size:8.5,font:bold,color:signed?green:muted});
     if(signed){
       const ev=events.find((e:any)=>e.signer_id===s.id && e.event_type==='documento_assinado');
       const when=s.signed_at?new Date(s.signed_at).toLocaleString('pt-BR'):'—';
-      p.drawText(`Data/hora: ${when}`,{x:165,y:y-128,size:8,font:regular,color:muted});
+      p.drawText(`Data/hora: ${when}`,{x:165,y:y-144,size:8,font:regular,color:muted});
       const ip=signed&&ev?.metadata?.ip?String(ev.metadata.ip):'';
-      if(ip)p.drawText(`IP: ${ip}`,{x:165,y:y-142,size:8,font:regular,color:muted});
+      if(ip)p.drawText(`IP: ${ip}`,{x:165,y:y-158,size:8,font:regular,color:muted});
+      const ua=signed&&ev?.metadata?.user_agent?String(ev.metadata.user_agent):'';
+      if(ua)p.drawText(`Dispositivo: ${ua.slice(0,72)}`,{x:165,y:y-172,size:7.2,font:regular,color:muted});
       p.drawText(String(s.name||'').trim(),{x:165,y:y-116,size:15,font:italic,color:ink});
       p.drawLine({start:{x:165,y:y-119},end:{x:420,y:y-119},thickness:0.8,color:rgb(0.65,0.68,0.72)});
       p.drawText('Assinatura eletrônica registrada',{x:430,y:y-118,size:7.5,font:bold,color:teal});
@@ -120,6 +123,7 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
     cert.drawText(`Método: ${s.signer_order===1?'OTP WhatsApp + selfie + confirmação de nome':'Conta autenticada do AdvOS + confirmação interna'}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;
     if(s.email) {cert.drawText(`E-mail: ${s.email}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;}
     if(s.phone) {cert.drawText(`Telefone: ${s.phone}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;}
+    if(s.cpf){cert.drawText(`CPF: ${String(s.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4')}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;}
     const ev=events.find((e:any)=>e.signer_id===s.id && e.event_type==='documento_assinado');
     if(ev?.metadata?.ip){cert.drawText(`IP: ${String(ev.metadata.ip)}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;}
     if(ev?.metadata?.user_agent){cert.drawText(`Dispositivo: ${String(ev.metadata.user_agent).slice(0,90)}`,{x:60,y:cy,size:8.5,font:regular,color:muted});cy-=14;}
@@ -132,7 +136,7 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
 }
 
 export async function POST(req:Request){
-  const f=await req.formData(); const token=safe(f.get('token')); const signerId=safe(f.get('signerId')); const requestId=safe(f.get('requestId')); const otp=safe(f.get('otp')); const confirmationName=safe(f.get('confirmation_name'));
+  const f=await req.formData(); const token=safe(f.get('token')); const signerId=safe(f.get('signerId')); const requestId=safe(f.get('requestId')); const otp=safe(f.get('otp')); const confirmationName=safe(f.get('confirmation_name')); const cpf=safe(f.get('cpf')).replace(/\D/g,'');
   const admin=createAdminSupabase(); let s:any=null; let r:any=null; let internal=false;
   if(!token){
     const {profile}=await getCurrentProfile(); internal=true;
@@ -152,6 +156,8 @@ export async function POST(req:Request){
   if(!internal){
     if(s.role==='cliente'&&r.require_selfie&&!s.selfie_path)return NextResponse.json({ok:false,error:'A selfie é obrigatória antes da assinatura.'},{status:400});
     if(s.role==='cliente'&&r.require_otp){if(!otp||!s.otp_hash||!s.otp_expires_at||new Date(s.otp_expires_at).getTime()<Date.now()||crypto.createHash('sha256').update(otp).digest('hex')!==s.otp_hash)return NextResponse.json({ok:false,error:'Código de autenticação inválido ou expirado.'},{status:400});}
+    if(s.role==='cliente'&&cpf.length!==11)return NextResponse.json({ok:false,error:'CPF inválido.'},{status:400});
+    if(s.role==='cliente'&&s.cpf&&String(s.cpf).replace(/\D/g,'')!==cpf)return NextResponse.json({ok:false,error:'CPF informado não confere com o cadastro.'},{status:400});
     if(s.role==='cliente'&&confirmationName.trim().toLowerCase()!==String(s.name||'').trim().toLowerCase())return NextResponse.json({ok:false,error:'Confirmação de nome inválida.'},{status:400});
   }else if(confirmationName.trim().toLowerCase()!==String(s.name||'DANIEL COSTA LADEIRA').trim().toLowerCase()){
     return NextResponse.json({ok:false,error:'Confirmação do nome do escritório inválida.'},{status:400});
@@ -161,8 +167,8 @@ export async function POST(req:Request){
   const original=Buffer.from(await originalFile.arrayBuffer());
   const signatureBuffer=await makeSignatureImage(internal?'Daniel Costa Ladeira':String(s.name||'Cliente')); const signaturePath=`${r.law_firm_id}/${r.id}/${s.id}-signature-${crypto.randomUUID()}.svg`; const sigUpload=await admin.storage.from('signature-evidence').upload(signaturePath,signatureBuffer,{contentType:'image/svg+xml',upsert:false}); if(sigUpload.error)return NextResponse.json({ok:false,error:'Não foi possível salvar a evidência da assinatura.'},{status:400});
   const now=new Date(); const headers=req.headers; const ip=safe(headers.get('x-forwarded-for')||headers.get('x-real-ip')||'').split(',')[0].trim(); const userAgent=safe(headers.get('user-agent')||'');
-  await admin.from('signature_signers').update({status:'assinado',signature_image_path:signaturePath,signed_at:now.toISOString()}).eq('id',s.id);
-  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'documento_assinado',metadata:{signer_order:s.signer_order,internal,ip,user_agent:userAgent}});
+  await admin.from('signature_signers').update({status:'assinado',signature_image_path:signaturePath,signed_at:now.toISOString(),cpf:(!internal&&cpf)?cpf:s.cpf||null}).eq('id',s.id);
+  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'documento_assinado',metadata:{signer_order:s.signer_order,internal,ip,user_agent:userAgent,cpf:(!internal&&cpf)?cpf:s.cpf||null}});
   const {data:signers}=await admin.from('signature_signers').select('*').eq('request_id',r.id).order('signer_order',{ascending:true});
   const {data:events}=await admin.from('signature_events').select('signer_id,event_type,metadata,created_at').eq('request_id',r.id).in('event_type',['documento_assinado']);
   const clientSelfie=s.selfie_path&&s.signer_order===1?await readImageFromStorage(admin,'signature-evidence',s.selfie_path):((signers||[]).find((x:any)=>x.signer_order===1)?.selfie_path?await readImageFromStorage(admin,'signature-evidence',(signers||[]).find((x:any)=>x.signer_order===1).selfie_path):null);
@@ -170,6 +176,15 @@ export async function POST(req:Request){
   const allSigned=(signers||[]).length===2&&(signers||[]).every((x:any)=>x.status==='assinado');
   const final=await buildSignedPdf({original,doc,request:r,signers:signers||[],events:events||[],clientSelfie,danielPhoto,finalizing:allSigned});
   const hash=sha256(final); const finalPath=`${r.law_firm_id}/${r.id}/documento-assinado-${crypto.randomUUID()}.pdf`; const up=await admin.storage.from('documents').upload(finalPath,final,{contentType:'application/pdf',upsert:false}); if(up.error)return NextResponse.json({ok:false,error:'Não foi possível salvar o documento assinado.'},{status:400});
+  if(allSigned){
+    const clientId=doc.client_id||null;
+    const signedTitle=`Contrato assinado - ${String(doc.title||'Documento').replace(/\.pdf$/i,'')}.pdf`;
+    let existingSigned:any=null;
+    let signedQuery=admin.from('documents').select('id').eq('law_firm_id',r.law_firm_id).eq('title',signedTitle).limit(1);
+    if(clientId) signedQuery=signedQuery.eq('client_id',clientId); else signedQuery=signedQuery.is('client_id',null);
+    const existing=await signedQuery.maybeSingle(); existingSigned=existing.data;
+    if(!existingSigned){ await admin.from('documents').insert({law_firm_id:r.law_firm_id,client_id:clientId,title:signedTitle,doc_type:'contrato_assinado',storage_path:finalPath,notes:'Documento final assinado eletronicamente no AdvOS.',signature_status:'assinado'}); }
+  }
   const next=(signers||[]).find((x:any)=>x.status==='pendente'); const newStatus=next?'aguardando_assinatura':'assinado';
   await admin.from('signature_requests').update({status:newStatus,signed_at:next?null:now.toISOString(),final_document_path:finalPath,final_document_hash:hash}).eq('id',r.id);
   await admin.from('documents').update({signature_status:newStatus==='assinado'?'assinado':'aguardando_assinatura'}).eq('id',doc.id).eq('law_firm_id',r.law_firm_id);
