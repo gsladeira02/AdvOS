@@ -14,6 +14,9 @@ function str(v: FormDataEntryValue | null) {
   return String(v || '').trim();
 }
 
+const CONTRACTED_NAME = 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA';
+const CONTRACTED_QUALIFICATION = 'pessoa jurídica de direito privado, inscrita no CNPJ 57.377.637/0001-19, com endereço profissional na Rodovia do Sol, Edifício Royal Blue Corporate, nº 2070, sala 1008, Praia de Itaparica, Vila Velha/ES, representada por Dr. DANIEL COSTA LADEIRA, OAB/ES nº 23.416, e-mail dladadeiradv@gmail.com.';
+
 function num(v: string) {
   const n = Number(String(v || '').replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
@@ -93,7 +96,7 @@ function contractSections(data: Record<string, string>) {
   const successText = data.success_fee ? `Caso haja eventual benefício econômico decorrente de danos morais, o CONTRATADO será remunerado com um percentual correspondente a ${data.success_fee}% do benefício econômico auferido.` : 'Caso haja eventual benefício econômico decorrente de danos morais, o CONTRATADO será remunerado com um percentual correspondente a 30% do benefício econômico auferido.';
   return [
     { text: `CONTRATANTE: ${qualification(data)}` },
-    { text: `CONTRATADO: ${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA, pessoa jurídica de direito privado, inscrita na OAB sob o CNPJ 57.377.637/0001-19, com endereço profissional na Rodovia do Sol, Edifício Royal Blue Corporate, nº 2070, sala 1008, Praia de Itaparica, Vila Velha/ES, representada por Dr. DANIEL COSTA LADEIRA, OAB/ES nº 23.416, e-mail dladadeiradv@gmail.com.'}` },
+    { text: `CONTRATADO: ${CONTRACTED_NAME}, ${CONTRACTED_QUALIFICATION}` },
     { text: 'As partes acima identificadas têm, entre si, justo e acertado o presente Contrato de Honorários Advocatícios, que se regerá pelas cláusulas e pelas condições a seguir descritas.' },
     { heading: 'DO OBJETO DO CONTRATO', text: `Cláusula 1ª. O presente contrato tem como objeto a prestação de serviços advocatícios visando ${data.object || 'a prestação de serviços jurídicos conforme a demanda informada pelo(a) CONTRATANTE'}.` },
     { heading: 'DAS ATIVIDADES', text: 'Cláusula 2ª. O CONTRATADO deverá praticar todos os atos relacionados ao exercício da advocacia, obrigações tipicamente de meio, particularmente aqueles constantes no Estatuto da Ordem dos Advogados do Brasil, assim como o que for especificado na outorga da procuração, com a diligência habitual que se presume da atuação profissional.' },
@@ -120,7 +123,8 @@ function contractSections(data: Record<string, string>) {
     { heading: 'DA SUSPENSÃO DOS SERVIÇOS', text: 'Cláusula 13ª. Em caso de não pagamento das parcelas dentro do prazo estipulado, fica ao contratado o direito de suspender, automaticamente, a prestação dos serviços em andamento, até que a situação seja regularizada, observadas as regras legais e éticas aplicáveis.' },
     { text: 'Parágrafo primeiro. Na hipótese de ocorrência do previsto na cláusula acima, o CONTRATANTE estará sujeito às consequências previstas neste contrato e na legislação aplicável.' },
     { heading: 'DO FORO', text: `Cláusula 14ª. Para dirimir quaisquer controvérsias oriundas deste contrato, as partes elegem o foro da comarca de ${data.forum || data.local || 'Vila Velha/ES'}.` },
-    { text: `Por estarem assim justos e contratados, firmam o presente instrumento, em duas vias de igual teor.\n\n${data.local || 'Vila Velha/ES'}, ${dateBR(data.contract_date)}.\n\n\n__________________________________________\n${data.client_name}\nCONTRATANTE\n\n\n__________________________________________\n${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA'}\nCONTRATADO` },
+    { heading: 'ASSINATURAS', text: `Por estarem assim justos e contratados, firmam o presente instrumento, em duas vias de igual teor.\n\n${data.local || 'Vila Velha/ES'}, ${dateBR(data.contract_date)}.` },
+    { text: `__________________________________________\n${data.client_name}\nCONTRATANTE\n\n__________________________________________\n${CONTRACTED_NAME}\nCONTRATADO` },
   ];
 }
 
@@ -132,7 +136,7 @@ function paymentMethodLabel(type?: string) {
 function powerSections(data: Record<string, string>, withHipossuficiencia: boolean) {
   const sections: { heading?: string; text: string }[] = [
     { text: `OUTORGANTE: ${qualification(data)}.` },
-    { text: `OUTORGADOS: ${data.attorneys || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA, pessoa jurídica de direito privado, inscrita na OAB sob o CNPJ 57.377.637/0001-19, representada por Dr. DANIEL COSTA LADEIRA, OAB/ES nº 23.416.'}` },
+    { text: `OUTORGADOS: ${CONTRACTED_NAME}, ${CONTRACTED_QUALIFICATION}` },
     { heading: 'PODERES', text: `O OUTORGANTE nomeia e constitui o OUTORGADO seu procurador; onde este se apresentar, outorgando-lhe os necessários poderes para representá-lo, em juízo ou fora dele, junto à ação em que é réu, podendo, nesta ação, e tudo praticar, requerer, assinar, com poderes para transigir, desistir, reconvir, discordar, ratificar, retificar, receber quantias e intimações, dar quitação, propor contraposição, acompanhar quaisquer recursos em todos os termos ou instâncias, responder perante qualquer repartição pública ou privada, autarquia ou órgão federal, estadual ou municipal no que se refere a esta ação em específico, e ainda praticar todos os demais atos que se fizerem necessários ao integral cumprimento do presente mandato, para o que confere os mais amplos poderes, bem como os contidos na cláusula “ad judicia”, podendo, ainda, substabelecer, no todo ou em parte, com ou sem reserva, os poderes ora conferidos, que se destinam especialmente para fim de representação do outorgante na ${data.object || 'ação judicial e/ou atuação administrativa relacionada ao caso do outorgante'}, bem como para interpor recursos administrativos contra DETRAN, DAER, DER, DNIT, PRF e Prefeituras Municipais, quando cabível.` },
   ];
   if (withHipossuficiencia) {
@@ -187,41 +191,91 @@ async function generatePdfBuffer(data: Record<string, string>) {
   const regular = await pdf.embedFont(StandardFonts.TimesRoman);
   const bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
   const W = 595.28, H = 841.89;
-  const marginX = 66, topY = 748, bottomY = 62, contentW = W - marginX * 2;
-  const fontSize = 10.5, lineH = 15.3;
+  const marginX = 62;
+  const headerBottom = H - 92;
+  const topY = H - 112;
+  const bottomY = 76;
+  const contentW = W - marginX * 2;
+  const fontSize = 10.4;
+  const lineH = 15.1;
   const logoPath = join(process.cwd(), 'public', 'brand', 'ladeira-advogados.png');
   let logo: any = null;
   try { logo = await pdf.embedPng(readFileSync(logoPath)); } catch {}
   const docs = docsForType(data);
   let page: any = null, y = topY, pageNo = 0;
-  const green = rgb(0.03, 0.37, 0.31), gray = rgb(0.32,0.32,0.32), black = rgb(0,0,0);
-  function newPage() {
-    page = pdf.addPage([W,H]); pageNo += 1; y = topY;
-    if (logo) { const s=logo.scaleToFit(96,52); page.drawImage(logo,{x:marginX,y:H-72,width:s.width,height:s.height}); }
-    page.drawText('LADEIRA ADVOGADOS',{x:W-marginX-150,y:H-58,size:9,font:bold,color:gray});
-    page.drawLine({start:{x:marginX,y:H-82},end:{x:W-marginX,y:H-82},thickness:0.8,color:rgb(.82,.82,.82)});
-    page.drawText(`Documento gerado pelo AdvOS · Página ${pageNo}`,{x:marginX,y:28,size:6.8,font:regular,color:gray});
-    page.drawText('Rod. do Sol, 2070 · Ed. Royal Blue Corporate · sala 1008 · Praia de Itaparica · Vila Velha/ES · (27) 99794-0089',{x:W-marginX-330,y:28,size:6.4,font:regular,color:gray});
+  const green = rgb(0.03, 0.37, 0.31), gray = rgb(0.32, 0.32, 0.32), black = rgb(0.05, 0.05, 0.05), light = rgb(0.86, 0.86, 0.86);
+
+  function wrap(text: string, font: any, size: number, max: number) {
+    const out: string[] = [];
+    let line = '';
+    for (const word of String(text || '').replace(/\s+/g, ' ').trim().split(' ')) {
+      if (!word) continue;
+      const next = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(next, size) <= max) line = next;
+      else { if (line) out.push(line); line = word; }
+    }
+    if (line) out.push(line);
+    return out;
   }
-  function ensure(h:number){ if(!page) newPage(); if(y-h<bottomY) newPage(); }
-  function wrap(text:string,font:any,size:number,max:number){ const out:string[]=[]; let line=''; for(const word of String(text||'').replace(/\s+/g,' ').trim().split(' ')){ const n=line?`${line} ${word}`:word; if(font.widthOfTextAtSize(n,size)<=max) line=n; else { if(line) out.push(line); line=word; } } if(line) out.push(line); return out; }
-  function para(text:string, opts:{heading?:boolean;center?:boolean}={}){
-    const f=opts.heading?bold:regular, sz=opts.heading?11.2:fontSize;
-    for(const chunk of String(text||'').split('\n')){
-      if(!chunk.trim()){ y-=lineH*.55; continue; }
-      const lines=wrap(chunk,f,sz,contentW);
-      for(const line of lines){ ensure(lineH); const x=opts.center?(W-f.widthOfTextAtSize(line,sz))/2:marginX; page.drawText(line,{x,y,size:sz,font:f,color:opts.heading?green:black}); y-=lineH; }
-      y-=opts.heading?4:2;
+
+  function drawFooter() {
+    page.drawLine({ start: { x: marginX, y: 54 }, end: { x: W - marginX, y: 54 }, thickness: 0.55, color: light });
+    page.drawText(`Documento gerado pelo AdvOS · Página ${pageNo}`, { x: marginX, y: 36, size: 6.8, font: regular, color: gray });
+    const address = 'Rod. do Sol, 2070 · Ed. Royal Blue Corporate · sala 1008 · Praia de Itaparica · Vila Velha/ES · (27) 99794-0089';
+    const lines = wrap(address, regular, 6.4, 320);
+    const startX = W - marginX - 320;
+    lines.slice(0, 2).forEach((line, i) => page.drawText(line, { x: startX, y: 39 - i * 8, size: 6.4, font: regular, color: gray }));
+  }
+
+  function newPage() {
+    page = pdf.addPage([W, H]);
+    pageNo += 1;
+    y = topY;
+    if (logo) {
+      const s = logo.scaleToFit(82, 58);
+      page.drawImage(logo, { x: marginX, y: H - 74, width: s.width, height: s.height });
+    }
+    page.drawText('DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA', { x: W - marginX - 245, y: H - 48, size: 7.2, font: bold, color: gray });
+    page.drawText('CNPJ 57.377.637/0001-19 · OAB/ES 23.416', { x: W - marginX - 245, y: H - 61, size: 6.8, font: regular, color: gray });
+    page.drawLine({ start: { x: marginX, y: headerBottom }, end: { x: W - marginX, y: headerBottom }, thickness: 0.8, color: light });
+    drawFooter();
+  }
+
+  function ensure(h: number) {
+    if (!page) newPage();
+    if (y - h < bottomY) newPage();
+  }
+
+  function para(text: string, opts: { heading?: boolean; center?: boolean } = {}) {
+    const f = opts.heading ? bold : regular;
+    const sz = opts.heading ? 11.3 : fontSize;
+    const lh = opts.heading ? 16 : lineH;
+    for (const chunk of String(text || '').split('\n')) {
+      if (!chunk.trim()) { y -= lh * 0.65; continue; }
+      const lines = wrap(chunk, f, sz, contentW);
+      for (const line of lines) {
+        ensure(lh);
+        const x = opts.center ? (W - f.widthOfTextAtSize(line, sz)) / 2 : marginX;
+        page.drawText(line, { x, y, size: sz, font: f, color: opts.heading ? green : black });
+        y -= lh;
+      }
+      y -= opts.heading ? 5 : 2.5;
     }
   }
-  for(let di=0;di<docs.length;di++){
+
+  for (let di = 0; di < docs.length; di++) {
     newPage();
-    para(docs[di].title,{heading:true,center:true}); y-=5;
-    for(const section of docs[di].sections){ if(section.heading) para(section.heading,{heading:true}); para(section.text); }
-    if(di<docs.length-1){ y=bottomY+1; }
+    para(docs[di].title, { heading: true, center: true });
+    y -= 4;
+    for (const section of docs[di].sections) {
+      if (section.heading) para(section.heading, { heading: true });
+      para(section.text);
+    }
   }
+
   return Buffer.from(await pdf.save());
 }
+
 function mapAsaasStatus(status?: string) {
   const s = String(status || '').toUpperCase();
   if (['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(s)) return 'pago';

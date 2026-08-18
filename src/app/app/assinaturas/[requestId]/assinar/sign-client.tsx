@@ -9,6 +9,7 @@ export default function InternalSignClient({requestId,signerId,title,status,sign
  const [consent,setConsent]=useState(false);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
+ const [previewBlobUrl,setPreviewBlobUrl]=useState('');
  const [done,setDone]=useState(status==='assinado');
 
  const checkPreview=async()=>{
@@ -18,6 +19,9 @@ export default function InternalSignClient({requestId,signerId,title,status,sign
      const response=await fetch(`${previewUrl}?check=${Date.now()}`,{method:'GET',cache:'no-store',credentials:'same-origin'});
      const contentType=String(response.headers.get('content-type')||'').toLowerCase();
      if(!response.ok||!contentType.includes('application/pdf')) throw new Error('O documento não pôde ser carregado.');
+     const blob=await response.blob();
+     const nextUrl=URL.createObjectURL(blob);
+     setPreviewBlobUrl(prev=>{ if(prev) URL.revokeObjectURL(prev); return nextUrl; });
      setPreviewState('ready');
    }catch(e:any){
      setPreviewState('error');
@@ -26,6 +30,7 @@ export default function InternalSignClient({requestId,signerId,title,status,sign
  };
 
  useEffect(()=>{checkPreview();},[requestId]);
+ useEffect(()=>()=>{ if(previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); },[previewBlobUrl]);
 
  const view=async()=>{
    if(previewState!=='ready'){setMessage('Aguarde o carregamento do documento antes de confirmar a visualização.');return}
@@ -63,7 +68,7 @@ export default function InternalSignClient({requestId,signerId,title,status,sign
      <div className="relative aspect-[1/1.3] bg-slate-100">
        {previewState==='loading'&&<div className="absolute inset-0 z-10 grid place-items-center bg-slate-100"><div className="text-center"><Loader2 className="mx-auto animate-spin text-[#075e54]" size={34}/><p className="mt-3 text-sm font-black text-slate-700">Carregando documento...</p></div></div>}
        {previewState==='error'&&<div className="absolute inset-0 z-10 grid place-items-center bg-slate-100 p-6"><div className="max-w-sm text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-700">!</div><h2 className="mt-3 text-base font-black text-slate-900">Documento indisponível</h2><p className="mt-1 text-sm text-slate-600">Não foi possível carregar o PDF para conferência.</p><button onClick={checkPreview} className="btn btn-secondary mt-4 inline-flex items-center gap-2"><RefreshCw size={15}/> Tentar novamente</button></div></div>}
-       <iframe title="Documento" src={previewUrl} onLoad={()=>previewState==='loading'&&setPreviewState('ready')} className={`h-full w-full border-0 ${previewState==='error'?'invisible':''}`}/>
+       <iframe title="Documento" src={previewBlobUrl || undefined} className={`h-full w-full border-0 ${previewState==='error'||!previewBlobUrl?'invisible':''}`}/>
      </div>
    </section>
    <aside className="card p-5"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Documento</p><h2 className="mt-1 text-lg font-black">{title}</h2><p className="mt-1 text-sm text-slate-500">Signatário: Daniel Costa Ladeira</p>
