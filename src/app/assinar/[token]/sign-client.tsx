@@ -83,6 +83,18 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     }
   };
 
+  const continueIdentity = async () => {
+    if (settings.requireSelfie && !selfie) {
+      setMessage('Capture a selfie antes de continuar.');
+      return;
+    }
+    stream?.getTracks().forEach((track) => track.stop());
+    setStream(null);
+    setCameraOpen(false);
+    setMessage('');
+    setStep('confirm');
+  };
+
   const sendOtp = async () => {
     setSendingOtp(true);
     setMessage('');
