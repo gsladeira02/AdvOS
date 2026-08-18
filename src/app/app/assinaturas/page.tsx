@@ -153,7 +153,40 @@ export default async function Assinaturas({ searchParams }: { searchParams?: Pro
                   <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Daniel Costa Ladeira</p>
                   <p className="mt-1 text-sm font-black">Daniel Costa Ladeira</p>
                   <p className="text-xs font-semibold text-slate-600">{normalizeStatus(daniel?.status) === 'assinado' ? 'Assinado ✓' : 'Aguardando assinatura do escritório'}</p>
-                  {tab === 'pendentes' && daniel?.id && normalizeStatus(daniel?.status) !== 'assinado' && (
+                  {tab === 'pendentes' && normalizeStatus(client?.status) === 'assinado' && (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Documento disponível para conferência</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-600">O cliente já assinou. Visualize o documento antes de realizar a assinatura do escritório.</p>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                        <iframe
+                          title={`Documento para assinatura - ${r.document_title}`}
+                          src={`/api/app/documents/${r.id}/preview`}
+                          className="h-[58vh] min-h-[430px] md:h-[620px] w-full border-0"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={`/api/app/documents/${r.id}/preview`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700"
+                        >
+                          Abrir documento em nova janela
+                        </a>
+                        {daniel?.id && normalizeStatus(daniel?.status) !== 'assinado' && (
+                          <Link
+                            href={`/app/assinaturas/${r.id}/assinar`}
+                            className="inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white"
+                          >
+                            Assinar como escritório
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {tab === 'pendentes' && normalizeStatus(client?.status) !== 'assinado' && daniel?.id && normalizeStatus(daniel?.status) !== 'assinado' && (
                     <Link href={`/app/assinaturas/${r.id}/assinar`} className="mt-2 inline-flex rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">Assinar como escritório</Link>
                   )}
                   {tab === 'assinadas' && r.final_document_path && (
