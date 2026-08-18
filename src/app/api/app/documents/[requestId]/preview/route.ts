@@ -26,7 +26,7 @@ function normalizeStoragePath(value: unknown) {
     const decoded = decodeURIComponent(p);
     if (decoded !== p) candidates.push(decoded);
   } catch {}
-  return [...new Set(candidates.filter(Boolean))];
+  return Array.from(new Set(candidates.filter(Boolean)));
 }
 
 async function downloadCandidate(db: any, value: unknown) {
