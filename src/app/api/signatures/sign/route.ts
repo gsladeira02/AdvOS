@@ -7,7 +7,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 
 async function resolveSignerWithPublicToken(db:any, signerId:string, token:string){
-  const {data:signer}=await db.from('signature_signers').select('id,request_id,law_firm_id,name,phone,email,status,role,signer_token,signer_order').eq('id',signerId).maybeSingle();
+  const {data:signer}=await db.from('signature_signers').select('*').eq('id',signerId).maybeSingle();
   if(!signer) return null;
   const {data:req}=await db.from('signature_requests').select('id,law_firm_id,public_token,status,expires_at,require_selfie,require_document_photo,require_otp').eq('id',signer.request_id).maybeSingle();
   if(!req) return null;
@@ -154,7 +154,17 @@ export async function POST(req:Request){
   if(!pending||pending.id!==s.id)return NextResponse.json({ok:false,error:`Aguardando a assinatura de ${pending?.name||'outro signatário'}.`},{status:409});
   const {data:viewEvent}=await admin.from('signature_events').select('id').eq('request_id',r.id).eq('signer_id',s.id).eq('event_type','documento_visualizado').limit(1).maybeSingle(); if(!viewEvent)return NextResponse.json({ok:false,error:'É necessário visualizar o documento antes de assinar.'},{status:400});
   if(!internal){
-    if(s.role==='cliente'&&r.require_selfie&&!s.selfie_path)return NextResponse.json({ok:false,error:'A selfie é obrigatória antes da assinatura.'},{status:400});
+    if(s.role==='cliente'&&r.require_selfie&&!s.selfie_path){
+      const {data:selfieEvent}=await admin.from('signature_events').select('metadata').eq('request_id',r.id).eq('signer_id',s.id).eq('event_type','evidencia_facial_recebida').order('created_at',{ascending:false}).limit(1).maybeSingle();
+      const recoveredPath=String((selfieEvent as any)?.metadata?.selfie_path||'').trim();
+      if(recoveredPath){
+        s.selfie_path=recoveredPath;
+        const rec=await admin.from('signature_signers').update({selfie_path:recoveredPath}).eq('id',s.id);
+        if(rec.error) return NextResponse.json({ok:false,error:'A selfie foi capturada, mas não foi possível vinculá-la à assinatura.'},{status:400});
+      } else {
+        return NextResponse.json({ok:false,error:'A selfie foi capturada, mas não foi registrada. Capture a selfie novamente.'},{status:400});
+      }
+    }
     if(s.role==='cliente'&&r.require_otp){if(!otp||!s.otp_hash||!s.otp_expires_at||new Date(s.otp_expires_at).getTime()<Date.now()||crypto.createHash('sha256').update(otp).digest('hex')!==s.otp_hash)return NextResponse.json({ok:false,error:'Código de autenticação inválido ou expirado.'},{status:400});}
     if(s.role==='cliente'&&cpf.length!==11)return NextResponse.json({ok:false,error:'CPF inválido.'},{status:400});
     if(s.role==='cliente'&&s.cpf&&String(s.cpf).replace(/\D/g,'')!==cpf)return NextResponse.json({ok:false,error:'CPF informado não confere com o cadastro.'},{status:400});
