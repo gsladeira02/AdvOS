@@ -115,6 +115,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
 
 
   const sign = async () => {
+    const cpfDigits = normalizeCpf(cpfConfirm);
     if (!viewConfirmed) {
       setMessage('Visualize o documento antes de assinar.');
       return;
