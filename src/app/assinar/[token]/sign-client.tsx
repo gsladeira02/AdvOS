@@ -26,16 +26,14 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   const [cpfConfirm, setCpfConfirm] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [selfiePreviewUrl, setSelfiePreviewUrl] = useState('');
+  const [selfiePreviewUrl, setSelfiePreviewUrl] = useState<string | null>(null);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => () => stream?.getTracks().forEach((track) => track.stop()), [stream]);
-
-  useEffect(() => () => { if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl); }, [selfiePreviewUrl]);
+  useEffect(() => () => { stream?.getTracks().forEach((track) => track.stop()); if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl); }, [stream, selfiePreviewUrl]);
 
   useEffect(() => {
     if (!cameraOpen || !stream || !videoRef.current) return;
@@ -86,10 +84,11 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
-      if (!blob) { setMessage('Não foi possível capturar a selfie.'); return; }
+      if (!blob) return;
       if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+      const nextUrl = URL.createObjectURL(blob);
       setSelfie(blob);
-      setSelfiePreviewUrl(URL.createObjectURL(blob));
+      setSelfiePreviewUrl(nextUrl);
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
       setCameraOpen(false);
@@ -284,19 +283,18 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
                   <div className="flex items-center gap-2 font-black"><Camera size={17} /> 2. Selfie de segurança</div>
                   <p className="mt-1 text-xs text-slate-500">Abra a câmera primeiro. O botão para capturar a selfie aparece somente depois que a câmera estiver ativa.</p>
                   <input ref={fileInputRef} type="file" accept="image/*" capture="user" onChange={handleCameraFile} className="hidden" aria-hidden="true" />
-                  {cameraOpen && (
+                  {!cameraOpen && <button type="button" className="btn btn-primary mt-4 w-full" onClick={startCamera}><Camera size={16}/> Abrir câmera</button>}
+                  {selfie && selfiePreviewUrl ? (
+                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                      <img src={selfiePreviewUrl} alt="Selfie capturada" className="mx-auto aspect-square w-full max-w-sm rounded-2xl object-cover" />
+                      <p className="mt-3 text-center text-xs font-black text-emerald-700">Selfie capturada ✓</p>
+                    </div>
+                  ) : cameraOpen ? (
                     <>
                       <video ref={videoRef} id="advos-sign-camera" autoPlay playsInline className="mt-3 aspect-video w-full rounded-2xl bg-slate-900 object-cover" />
                       <button type="button" className="btn btn-primary mt-3 w-full" onClick={captureSelfie}><Camera size={16}/> Capturar selfie</button>
                     </>
-                  )}
-                  {!cameraOpen && !selfie && <button type="button" className="btn btn-primary mt-4 w-full" onClick={startCamera}><Camera size={16}/> Abrir câmera</button>}
-                  {!cameraOpen && selfie && (
-                    <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
-                      {selfiePreviewUrl ? <img src={selfiePreviewUrl} alt="Selfie capturada" className="w-full rounded-2xl object-cover aspect-[4/3]" /> : null}
-                      <p className="mt-2 text-center text-xs font-black text-emerald-700">Selfie capturada ✓</p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
                 <button type="button" onClick={continueIdentity} disabled={settings.requireSelfie && !selfie} className="btn btn-primary w-full">Continuar</button>
               </div>
