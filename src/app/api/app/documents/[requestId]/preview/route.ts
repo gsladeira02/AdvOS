@@ -38,8 +38,16 @@ async function downloadCandidate(db: any, value: unknown) {
       } catch {}
       continue;
     }
-    const { data, error } = await db.storage.from('documents').download(candidate);
+      const { data, error } = await db.storage.from('documents').download(candidate);
     if (!error && data) return { file: await data.arrayBuffer(), path: candidate };
+    // Último recurso para paths válidos: gera uma URL assinada curta e baixa pelo servidor.
+    try {
+      const signed = await db.storage.from('documents').createSignedUrl(candidate, 120);
+      if (signed.data?.signedUrl) {
+        const response = await fetch(signed.data.signedUrl, { cache: 'no-store' });
+        if (response.ok) return { file: await response.arrayBuffer(), path: candidate };
+      }
+    } catch {}
   }
   return null;
 }
@@ -78,7 +86,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ requestI
 
     const { data: doc, error: docError } = await db
       .from('documents')
-      .select('id,title,storage_path,mime_type')
+      .select('id,title,storage_path')
       .eq('id', requestRow.document_id)
       .eq('law_firm_id', profile.law_firm_id)
       .maybeSingle();
@@ -98,7 +106,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ requestI
     // Isso cobre versões em que o update de signature_requests ocorreu depois do upload.
     const { data: signedRows } = await db
       .from('document_signatures')
-      .select('signed_document_url,signed_at,signer_name')
+      .select('signed_document_url,signed_at')
       .eq('law_firm_id', profile.law_firm_id)
       .eq('document_id', requestRow.document_id)
       .order('signed_at', { ascending: false })
