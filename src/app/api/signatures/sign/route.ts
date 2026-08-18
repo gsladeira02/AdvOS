@@ -178,7 +178,23 @@ export async function POST(req:Request){
   const signatureBuffer=await makeSignatureImage(internal?'Daniel Costa Ladeira':String(s.name||'Cliente')); const signaturePath=`${r.law_firm_id}/${r.id}/${s.id}-signature-${crypto.randomUUID()}.svg`; const sigUpload=await admin.storage.from('signature-evidence').upload(signaturePath,signatureBuffer,{contentType:'image/svg+xml',upsert:false}); if(sigUpload.error)return NextResponse.json({ok:false,error:'Não foi possível salvar a evidência da assinatura.'},{status:400});
   const now=new Date(); const headers=req.headers; const ip=safe(headers.get('x-forwarded-for')||headers.get('x-real-ip')||'').split(',')[0].trim(); const userAgent=safe(headers.get('user-agent')||'');
   await admin.from('signature_signers').update({status:'assinado',signature_image_path:signaturePath,signed_at:now.toISOString(),cpf:(!internal&&cpf)?cpf:s.cpf||null}).eq('id',s.id);
-  await admin.from('signature_events').insert({law_firm_id:r.law_firm_id,request_id:r.id,signer_id:s.id,event_type:'documento_assinado',metadata:{signer_order:s.signer_order,internal,ip,user_agent:userAgent,cpf:(!internal&&cpf)?cpf:s.cpf||null}});
+  const signEvent=await admin.from('signature_events').insert({
+    law_firm_id:r.law_firm_id,
+    request_id:r.id,
+    signer_id:s.id,
+    event_type:'documento_assinado',
+    ip,
+    user_agent:userAgent,
+    metadata:{
+      signer_order:s.signer_order,
+      internal,
+      cpf:(!internal&&cpf)?cpf:s.cpf||null,
+      signature_image_path:signaturePath
+    }
+  });
+  if(signEvent.error){
+    return NextResponse.json({ok:false,error:'Não foi possível registrar o evento da assinatura: '+signEvent.error.message},{status:400});
+  }
   const {data:signers}=await admin.from('signature_signers').select('*').eq('request_id',r.id).order('signer_order',{ascending:true});
   const {data:events}=await admin.from('signature_events').select('signer_id,event_type,metadata,created_at').eq('request_id',r.id).in('event_type',['documento_assinado']);
   const clientSelfie=s.selfie_path&&s.signer_order===1?await readImageFromStorage(admin,'signature-evidence',s.selfie_path):((signers||[]).find((x:any)=>x.signer_order===1)?.selfie_path?await readImageFromStorage(admin,'signature-evidence',(signers||[]).find((x:any)=>x.signer_order===1).selfie_path):null);
