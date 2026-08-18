@@ -76,14 +76,14 @@ export async function POST(req: Request) {
   const local = safe((c as any).city || (c as any).municipio || 'Vila Velha/ES');
   const now = new Date();
   const dataExtenso = now.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
-  const office = safe(lf.name) || 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA';
+  const office = 'DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA';
   const officeAddress = safe(lf.address) || 'Rodovia do Sol, 2070, Ed. Royal Blue Corporate, sala 1008, Praia de Itaparica, Vila Velha/ES';
   const officeCnpj = safe(lf.cnpj) || '57.377.637/0001-19';
   const officePhone = safe(lf.phone) || '(27) 99794-0089';
   const officeEmail = safe(lf.email) || 'dladadeiradv@gmail.com';
   const danielLine = `DANIEL COSTA LADEIRA, brasileiro, casado, advogado, OAB/ES 23.416, representando ${office}`;
   const clientQualification = `${clientName}, ${safe((c as any).nationality || 'brasileiro(a)')}, ${safe((c as any).marital_status || 'estado civil não informado')}, ${safe((c as any).profession || 'profissão não informada')}, RG ${clientRg || 'não informado'}, CPF ${clientCpf || 'não informado'}, residente e domiciliado(a) em ${clientAddress || 'endereço não informado'}.`;
-  const officeQualification = `${office}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ${officeCnpj}, com endereço profissional em ${officeAddress}, contato ${officePhone}, e-mail ${officeEmail}, representada neste ato por Dr. ${danielLine}.`;
+  const officeQualification = `${office}, sociedade individual de advocacia, inscrita no CNPJ sob o nº ${officeCnpj}, com endereço profissional em ${officeAddress}, contato ${officePhone}, e-mail ${officeEmail}, representada por Daniel Costa Ladeira, advogado, inscrito na OAB/ES sob o nº 23.416.`;
 
   let content = safe(t.content);
   const values: Record<string,string> = {
@@ -94,7 +94,9 @@ export async function POST(req: Request) {
     valor_total: safe(f.get('valor_total')) || '', valor_total_extenso: safe(f.get('valor_total_extenso')) || '',
     pagamento_detalhado: paymentDetails, clausula_exito: successPercent ? `Parágrafo segundo. Eventual benefício econômico será remunerado em ${successPercent}% (por cento).` : '',
     multa_rescisao: rescissionFine || '', foro: foro || local || 'Vila Velha/ES',
-    contratado_assinatura: 'DANIEL COSTA LADEIRA', data: now.toLocaleDateString('pt-BR'), data_extenso: dataExtenso,
+    contratado_assinatura: office,
+    contratado_nome: office,
+    contratado_representante: 'DANIEL COSTA LADEIRA', data: now.toLocaleDateString('pt-BR'), data_extenso: dataExtenso,
     local: local, local_em_maiusculas: local.toUpperCase(), declaracao_hipossuficiencia: hypo ? `DECLARAÇÃO DE HIPOSSUFICIÊNCIA ECONÔMICA\nDeclaro, sob as penas da lei, que não disponho de rendimentos suficientes para suportar as despesas processuais, requerendo os benefícios da gratuidade de justiça.` : '',
   };
   for (const [k,v] of Object.entries(values)) content = content.replaceAll(`{{${k}}}`,v);
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
   const italic = await pdf.embedFont(StandardFonts.TimesRomanItalic);
   let logo:any=null;
   try { const bytes = fs.readFileSync(path.join(process.cwd(),'public','brand','ladeira-advogados.png')); logo=await pdf.embedPng(bytes); } catch {}
-  const pageMarginX = 56, textWidth = A4.width - pageMarginX*2;
+  const pageMarginX = 62, textWidth = A4.width - pageMarginX*2;
   let pageNo=1; let page=pdf.addPage([A4.width,A4.height]); drawHeader(page,logo,bold); let y=A4.height-116;
   const titleText = String(t.name||title).replace('Ladeira Advogados - ','').toUpperCase();
   const titleLines = wrap(titleText, bold, 15, textWidth);
@@ -121,12 +123,12 @@ export async function POST(req: Request) {
     if(!line){y-=8; continue;}
     const isHeading = /^(DO |DAS |PODERES$|DECLARAÇÃO DE|LADEIRA ADVOGADOS$|PROCURAÇÃO$)/i.test(line) || (/^[A-ZÀ-Ú][A-ZÀ-Ú0-9 \-]{5,}$/.test(line) && line.length<80);
     if (isHeading) y-=5;
-    const baseSize = isHeading ? 11 : 10.5;
+    const baseSize = isHeading ? 11.2 : 10.3;
     const baseFont = isHeading ? bold : regular;
     const maxW = textWidth;
     for (const wl of wrap(line,baseFont,baseSize,maxW)) {
-      if (y<65){ drawFooter(page, regular, pageNo); pageNo++; page=pdf.addPage([A4.width,A4.height]); drawHeader(page,logo,bold); y=A4.height-116; }
-      page.drawText(wl,{x:pageMarginX,y,size:baseSize,font:baseFont,color:COLORS.ink}); y-=14.2;
+      if (y<82){ drawFooter(page, regular, pageNo); pageNo++; page=pdf.addPage([A4.width,A4.height]); drawHeader(page,logo,bold); y=A4.height-116; }
+      page.drawText(wl,{x:pageMarginX,y,size:baseSize,font:baseFont,color:COLORS.ink}); y-=14.6;
     }
     y -= isHeading ? 4 : 1.5;
   }

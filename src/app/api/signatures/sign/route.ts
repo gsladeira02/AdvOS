@@ -67,8 +67,8 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
   let y=620;
   for(const s of sorted){
     const signed=String(s.status||'')==='assinado';
-    const boxH=172;
-    p.drawRectangle({x:45,y:y-boxH,width:505,height:154,borderWidth:1,borderColor:line,color:pale});
+    const boxH=190;
+    p.drawRectangle({x:45,y:y-boxH,width:505,height:174,borderWidth:1,borderColor:line,color:pale});
     const image=s.signer_order===1?clientSelfie:danielPhoto;
     if(image){
       try{
@@ -98,12 +98,13 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
       p.drawLine({start:{x:165,y:y-119},end:{x:420,y:y-119},thickness:0.8,color:rgb(0.65,0.68,0.72)});
       p.drawText('Assinatura eletrônica registrada',{x:430,y:y-118,size:7.5,font:bold,color:teal});
     }
-    y-=182;
+    y-=202;
   }
   const cert=pdf.addPage([595.28,841.89]);
   if(logo) cert.drawImage(logo,{x:468,y:776,width:66,height:50});
   cert.drawText('CERTIFICADO DE ASSINATURA ELETRÔNICA',{x:45,y:785,size:12,font:bold,color:ink});
   cert.drawText('EVIDÊNCIAS DO PROCESSO',{x:45,y:750,size:16,font:bold,color:teal});
+  cert.drawText('Contratado: DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA',{x:45,y:728,size:9,font:bold,color:ink});
   const finalHashPlaceholder='Será calculado no arquivo final';
   let cy=720;
   const meta=[

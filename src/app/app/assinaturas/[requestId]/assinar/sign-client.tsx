@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {CheckCircle2,Eye,Loader2,RefreshCw,ShieldCheck} from 'lucide-react';
+import {CheckCircle2,Eye,ExternalLink,Loader2,RefreshCw,ShieldCheck} from 'lucide-react';
 
 export default function InternalSignClient({requestId,signerId,title,status,signer}:{requestId:string,signerId:string,title:string,status:string,signer:any}){
  const previewUrl=`/api/app/documents/${requestId}/preview`;
@@ -68,7 +68,7 @@ export default function InternalSignClient({requestId,signerId,title,status,sign
      <div className="relative aspect-[1/1.3] bg-slate-100">
        {previewState==='loading'&&<div className="absolute inset-0 z-10 grid place-items-center bg-slate-100"><div className="text-center"><Loader2 className="mx-auto animate-spin text-[#075e54]" size={34}/><p className="mt-3 text-sm font-black text-slate-700">Carregando documento...</p></div></div>}
        {previewState==='error'&&<div className="absolute inset-0 z-10 grid place-items-center bg-slate-100 p-6"><div className="max-w-sm text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-100 text-red-700">!</div><h2 className="mt-3 text-base font-black text-slate-900">Documento indisponível</h2><p className="mt-1 text-sm text-slate-600">Não foi possível carregar o PDF para conferência.</p><button onClick={checkPreview} className="btn btn-secondary mt-4 inline-flex items-center gap-2"><RefreshCw size={15}/> Tentar novamente</button></div></div>}
-       <iframe title="Documento" src={previewBlobUrl || undefined} className={`h-full w-full border-0 ${previewState==='error'||!previewBlobUrl?'invisible':''}`}/>
+       {previewState==='ready'&&previewBlobUrl&&<object title="Documento" data={previewBlobUrl} type="application/pdf" className="h-full w-full"><div className="grid h-full place-items-center p-8 text-center"><p className="text-sm font-black text-slate-700">O navegador não conseguiu exibir o PDF.</p><a href={previewBlobUrl} target="_blank" rel="noreferrer" className="btn btn-primary mt-3 inline-flex items-center gap-2"><ExternalLink size={15}/> Abrir documento</a></div></object>}
      </div>
    </section>
    <aside className="card p-5"><p className="text-[10px] font-black uppercase tracking-wide text-slate-400">Documento</p><h2 className="mt-1 text-lg font-black">{title}</h2><p className="mt-1 text-sm text-slate-500">Signatário: Daniel Costa Ladeira</p>

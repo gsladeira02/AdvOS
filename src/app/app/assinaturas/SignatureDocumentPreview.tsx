@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ChevronDown, Download, ExternalLink, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Download, ExternalLink, FileText, Loader2, RefreshCw, X } from 'lucide-react';
 
 function normalizeStatus(value: unknown) {
   return String(value || '').trim().toLowerCase();
@@ -30,6 +30,7 @@ export default function SignatureDocumentPreview({
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [blobUrl, setBlobUrl] = useState('');
   const [error, setError] = useState('');
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const endpoint = signed ? `/api/signatures/${requestId}/final` : `/api/app/documents/${requestId}/preview`;
 
@@ -54,6 +55,7 @@ export default function SignatureDocumentPreview({
       const url = URL.createObjectURL(blob);
       setBlobUrl(url);
       setState('ready');
+      setViewerOpen(true);
     } catch (e: any) {
       setState('error');
       setError(e?.message || 'Não foi possível carregar o documento.');
@@ -68,6 +70,12 @@ export default function SignatureDocumentPreview({
     const next = !open;
     setOpen(next);
     if (next && state === 'idle') void load();
+    if (!next) setViewerOpen(false);
+  };
+
+  const openNewWindow = () => {
+    if (!blobUrl) return;
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -139,8 +147,45 @@ export default function SignatureDocumentPreview({
           )}
 
           {state === 'ready' && blobUrl && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <iframe title={`Visualização de ${title}`} src={blobUrl} className="h-[72vh] min-h-[520px] w-full border-0" />
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-slate-900">Documento carregado</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">Clique em visualizar para abrir o PDF.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setViewerOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#075e54] px-3 py-2 text-[11px] font-black text-white">
+                    <FileText size={14}/> Visualizar
+                  </button>
+                  <button type="button" onClick={openNewWindow} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700">
+                    <ExternalLink size={14}/> Nova janela
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {viewerOpen && blobUrl && (
+            <div className="fixed inset-0 z-[100] bg-slate-950/80 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label={`Visualização de ${title}`}>
+              <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-900">{title}</p>
+                    <p className="text-[11px] font-semibold text-slate-500">Cliente: {clientName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={openNewWindow} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700"><ExternalLink size={14}/> Nova janela</button>
+                    <button type="button" onClick={() => setViewerOpen(false)} className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700" aria-label="Fechar visualização"><X size={18}/></button>
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1 bg-slate-100 p-2 sm:p-4">
+                  <object data={blobUrl} type="application/pdf" className="h-full w-full rounded-xl bg-white">
+                    <div className="grid h-full place-items-center p-8 text-center">
+                      <div><p className="text-sm font-black text-slate-900">O navegador não conseguiu exibir o PDF.</p><button type="button" onClick={openNewWindow} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#075e54] px-4 py-2 text-xs font-black text-white"><ExternalLink size={14}/> Abrir documento</button></div>
+                    </div>
+                  </object>
+                </div>
+              </div>
             </div>
           )}
 
