@@ -13,7 +13,7 @@ type Props = {
   status: string;
 };
 
-type Step = 'preview' | 'camera' | 'identity' | 'confirm' | 'done';
+type Step = 'preview' | 'camera' | 'confirm' | 'done';
 
 export default function SignClient({ token, requestId, signerId, title, signer, settings, status }: Props) {
   const [step, setStep] = useState<Step>(status === 'assinado' ? 'done' : 'preview');
@@ -57,12 +57,10 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   };
 
   const markViewed = async () => {
-    if (!consent) {
-      setMessage('Confirme que visualizou o documento completo.');
-      return;
-    }
+    if (!nameConfirm.trim()) { setMessage('Informe seu nome completo.'); return; }
     const cpfDigits = normalizeCpf(cpfConfirm);
     if (cpfDigits.length !== 11) { setMessage('Informe um CPF válido com 11 dígitos.'); return; }
+    if (!consent) { setMessage('Confirme que visualizou o documento completo.'); return; }
     const storedCpf = normalizeCpf(String(signer?.cpf || ''));
     if (storedCpf && storedCpf !== cpfDigits) { setMessage('O CPF informado não confere com o cadastro do cliente.'); return; }
     setBusy(true);
@@ -77,7 +75,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       if (!response.ok || !json.ok) throw new Error(json.error || 'Não foi possível registrar a visualização.');
       setViewConfirmed(true);
       setConsent(false);
-      setStep(settings.requireSelfie ? 'camera' : 'identity');
+      setStep(settings.requireSelfie ? 'camera' : 'confirm');
     } catch (error: any) {
       setMessage(error.message || 'Não foi possível registrar a visualização.');
     } finally {
@@ -105,10 +103,6 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     }
   };
 
-  const continueIdentity = () => {
-    if (settings.requireSelfie && !selfie) { setMessage('Capture a selfie para continuar.'); return; }
-    setStep('confirm');
-  };
 
   const normalizeCpf = (v:string) => v.replace(/\D/g,'').slice(0,11);
   const formatCpf = (v:string) => { const d=normalizeCpf(v); if(d.length<=3) return d; if(d.length<=6) return `${d.slice(0,3)}.${d.slice(3)}`; if(d.length<=9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`; return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`; };
@@ -214,11 +208,18 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
                   <div className="flex items-center gap-2 font-black text-emerald-950"><Eye size={17} /> 1. Visualize o documento</div>
                   <p className="mt-2 text-xs font-semibold text-emerald-900">Leia o documento completo no painel ao lado. A assinatura somente será liberada depois dessa etapa.</p>
                 </div>
+                <div className="rounded-2xl border p-4">
+                  <p className="text-sm font-black">2. Seus dados</p>
+                  <label className="label mt-4">Nome completo</label>
+                  <input className="input mt-1" value={nameConfirm} onChange={(e)=>setNameConfirm(e.target.value)} placeholder="Digite seu nome completo" autoComplete="name" />
+                  <label className="label mt-4">CPF</label>
+                  <input inputMode="numeric" className="input mt-1" value={formatCpf(cpfConfirm)} onChange={(e)=>setCpfConfirm(normalizeCpf(e.target.value))} placeholder="Digite seu CPF" autoComplete="off" />
+                </div>
                 <label className="flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold">
                   <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
                   Confirmo que visualizei o documento completo.
                 </label>
-                <button onClick={markViewed} disabled={!consent || busy} className="btn btn-primary w-full">
+                <button onClick={markViewed} disabled={!consent || !nameConfirm.trim() || normalizeCpf(cpfConfirm).length!==11 || busy} className="btn btn-primary w-full">
                   {busy ? <Loader2 className="animate-spin" /> : <FileCheck2 size={16} />} Continuar
                 </button>
               </div>
@@ -242,23 +243,11 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
               </div>
             )}
 
-            {step === 'identity' && (
-              <div className="space-y-4">
-                <div className="rounded-2xl border p-4">
-                  <p className="text-sm font-black">3. Confirme seus dados</p>
-                  <label className="label mt-4">Nome completo</label>
-                  <input className="input mt-1" value={nameConfirm} onChange={(e)=>setNameConfirm(e.target.value)} placeholder="Digite seu nome completo" />
-                  <label className="label mt-4">CPF</label>
-                  <input inputMode="numeric" className="input mt-1" value={formatCpf(cpfConfirm)} onChange={(e)=>setCpfConfirm(normalizeCpf(e.target.value))} placeholder="Digite seu CPF" />
-                </div>
-                <button onClick={continueIdentity} disabled={!nameConfirm.trim() || normalizeCpf(cpfConfirm).length!==11} className="btn btn-primary w-full">Continuar</button>
-              </div>
-            )}
 
             {step === 'confirm' && (
               <div className="space-y-4">
                 <div className="rounded-2xl border p-4">
-                  <p className="text-sm font-black">3. Assinatura eletrônica</p>
+                  <p className="text-sm font-black">4. Assinatura eletrônica</p>
                   <p className="mt-1 text-xs text-slate-500">Não é necessário desenhar uma assinatura.</p>
                   {settings.requireOtp && (
                     <div className="mt-4">
