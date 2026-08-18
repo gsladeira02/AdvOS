@@ -30,19 +30,44 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => () => stream?.getTracks().forEach((track) => track.stop()), [stream]);
+
+  useEffect(() => {
+    if (!cameraOpen || !stream || !videoRef.current) return;
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.play().catch(() => undefined);
+    return () => {
+      if (video.srcObject === stream) video.srcObject = null;
+    };
+  }, [cameraOpen, stream]);
 
   const startCamera = async () => {
     setMessage('');
     try {
-      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        fileInputRef.current?.click();
+        return;
+      }
+      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
       setStream(media);
       setCameraOpen(true);
-      requestAnimationFrame(() => { if (videoRef.current) videoRef.current.srcObject = media; });
-    } catch {
-      setMessage('Não foi possível acessar a câmera. Autorize a câmera para continuar.');
+    } catch (error: any) {
+      // Em dispositivos/navegadores que não permitem câmera web, abre a câmera nativa via input capture.
+      if (fileInputRef.current) fileInputRef.current.click();
+      else setMessage('Não foi possível acessar a câmera. Autorize a câmera para continuar.');
     }
+  };
+
+  const handleCameraFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSelfie(file);
+    setCameraOpen(true);
+    setMessage('Selfie capturada ✓');
+    event.target.value = '';
   };
 
   const captureSelfie = () => {
@@ -134,7 +159,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
       setMessage('Capture a selfie antes de assinar.');
       return;
     }
-    if (settings.requireOtp && !otpSent) { setMessage('Clique em “Enviar token por WhatsApp” para receber o código.'); return; }
+    if (settings.requireOtp && !otpSent) { setMessage('Clique em “Receber token por WhatsApp” para receber o código.'); return; }
     if (settings.requireOtp && !otp) { setMessage('Informe o código de segurança enviado por WhatsApp.'); return; }
     if (nameConfirm.trim().toLowerCase() !== String(signer?.name || '').trim().toLowerCase()) {
       setMessage('Confirme seu nome completo exatamente como aparece no documento.');
@@ -242,16 +267,17 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
                 <div className="rounded-2xl border p-4">
                   <div className="flex items-center gap-2 font-black"><Camera size={17} /> 2. Selfie de segurança</div>
                   <p className="mt-1 text-xs text-slate-500">Abra a câmera primeiro. O botão para capturar a selfie aparece somente depois que a câmera estiver ativa.</p>
-                  {!cameraOpen && <button className="btn btn-primary mt-4 w-full" onClick={startCamera}><Camera size={16}/> Abrir câmera</button>}
+                  <input ref={fileInputRef} type="file" accept="image/*" capture="user" onChange={handleCameraFile} className="hidden" aria-hidden="true" />
+                  {!cameraOpen && <button type="button" className="btn btn-primary mt-4 w-full" onClick={startCamera}><Camera size={16}/> Abrir câmera</button>}
                   {cameraOpen && (
                     <>
                       <video ref={videoRef} id="advos-sign-camera" autoPlay playsInline className="mt-3 aspect-video w-full rounded-2xl bg-slate-900 object-cover" />
-                      <button className="btn btn-primary mt-3 w-full" onClick={captureSelfie}><Camera size={16}/> Capturar selfie</button>
+                      <button type="button" className="btn btn-primary mt-3 w-full" onClick={captureSelfie}><Camera size={16}/> Capturar selfie</button>
                       {selfie && <p className="mt-2 text-xs font-black text-emerald-700">Selfie capturada ✓</p>}
                     </>
                   )}
                 </div>
-                <button onClick={continueIdentity} disabled={settings.requireSelfie && !selfie} className="btn btn-primary w-full">Continuar</button>
+                <button type="button" onClick={continueIdentity} disabled={settings.requireSelfie && !selfie} className="btn btn-primary w-full">Continuar</button>
               </div>
             )}
 
@@ -260,13 +286,12 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
               <div className="space-y-4">
                 <div className="rounded-2xl border p-4">
                   <p className="text-sm font-black">4. Assinatura eletrônica</p>
-                  <p className="mt-1 text-xs text-slate-500">Não é necessário desenhar uma assinatura.</p>
-                  {settings.requireOtp && (
+                                    {settings.requireOtp && (
                     <div className="mt-4">
                       <label className="label">Código de segurança</label>
                       <div className="mt-1 flex gap-2">
                         <input disabled={!otpSent} className="input flex-1" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 dígitos" />
-                        <button className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp ? 'Enviando…' : 'Enviar token por WhatsApp'}</button>
+                        <button type="button" className="btn btn-secondary" onClick={sendOtp} disabled={sendingOtp}>{sendingOtp ? 'Enviando…' : 'Receber token por WhatsApp'}</button>
                       </div>
                     </div>
                   )}
