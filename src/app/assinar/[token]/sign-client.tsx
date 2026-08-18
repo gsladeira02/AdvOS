@@ -30,6 +30,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [validatingSelfie, setValidatingSelfie] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -62,16 +63,60 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     }
   };
 
-  const handleCameraFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const validateFace = async (image: Blob) => {
+    const bitmap = await createImageBitmap(image);
+    try {
+      const FaceDetectorCtor = typeof window !== 'undefined' ? (window as any).FaceDetector : null;
+      if (FaceDetectorCtor) {
+        const detector = new FaceDetectorCtor({ fastMode: true, maxDetectedFaces: 3 });
+        const faces = await detector.detect(bitmap);
+        if (faces.length === 0) throw new Error('Não foi possível detectar um rosto na selfie. Tire uma nova foto mostrando seu rosto inteiro.');
+        if (faces.length > 1) throw new Error('Foi detectado mais de um rosto na selfie. Tire uma nova foto somente com você.');
+        return true;
+      }
+
+      // Fallback multiplataforma para navegadores que não implementam a Shape Detection API.
+      const { FaceDetector, FilesetResolver } = await import('@mediapipe/tasks-vision');
+      const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm');
+      const detector = await FaceDetector.createFromModelPath(
+        vision,
+        'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
+      );
+      const result = detector.detect(bitmap);
+      const faces = result.detections || [];
+      if (faces.length === 0) throw new Error('Não foi possível detectar um rosto na selfie. Tire uma nova foto mostrando seu rosto inteiro.');
+      if (faces.length > 1) throw new Error('Foi detectado mais de um rosto na selfie. Tire uma nova foto somente com você.');
+      return true;
+    } finally {
+      bitmap.close();
+    }
+  };
+
+  const acceptSelfie = async (image: Blob) => {
+    setValidatingSelfie(true);
+    setMessage('');
+    try {
+      await validateFace(image);
+      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+      setSelfie(image);
+      setSelfiePreviewUrl(URL.createObjectURL(image));
+      stream?.getTracks().forEach((track) => track.stop());
+      setStream(null);
+      setCameraOpen(false);
+      setMessage('Selfie capturada ✓');
+    } catch (error: any) {
+      setSelfie(null);
+      if (selfiePreviewUrl) { URL.revokeObjectURL(selfiePreviewUrl); setSelfiePreviewUrl(null); }
+      setMessage(error?.message || 'Não foi possível validar a selfie.');
+    } finally {
+      setValidatingSelfie(false);
+    }
+  };
+
+  const handleCameraFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
-    setSelfie(file);
-    setSelfiePreviewUrl(URL.createObjectURL(file));
-    stream?.getTracks().forEach((track) => track.stop());
-    setStream(null);
-    setCameraOpen(false);
-    setMessage('Selfie capturada ✓');
+    await acceptSelfie(file);
     event.target.value = '';
   };
 
@@ -85,14 +130,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
     canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
       if (!blob) return;
-      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
-      const nextUrl = URL.createObjectURL(blob);
-      setSelfie(blob);
-      setSelfiePreviewUrl(nextUrl);
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-      setCameraOpen(false);
-      setMessage('Selfie capturada ✓');
+      void acceptSelfie(blob);
     }, 'image/jpeg', 0.88);
   };
 
@@ -292,7 +330,7 @@ export default function SignClient({ token, requestId, signerId, title, signer, 
                   ) : cameraOpen ? (
                     <>
                       <video ref={videoRef} id="advos-sign-camera" autoPlay playsInline className="mt-3 aspect-video w-full rounded-2xl bg-slate-900 object-cover" />
-                      <button type="button" className="btn btn-primary mt-3 w-full" onClick={captureSelfie}><Camera size={16}/> Capturar selfie</button>
+                      <button type="button" className="btn btn-primary mt-3 w-full" onClick={captureSelfie} disabled={validatingSelfie}><Camera size={16}/> {validatingSelfie ? 'Validando selfie...' : 'Capturar selfie'}</button>
                     </>
                   ) : null}
                 </div>

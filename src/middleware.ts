@@ -63,7 +63,7 @@ function csp(nonce: string) {
     supabaseWs = parsed.origin.replace(/^http/, 'ws');
   } catch {}
 
-  const connect = ["'self'", supabaseOrigin, supabaseWs, 'https://huggingface.co', 'https://*.huggingface.co', 'https://*.hf.co', 'https://*.xethub.hf.co'].filter(Boolean).join(' ');
+  const connect = ["'self'", supabaseOrigin, supabaseWs, 'https://huggingface.co', 'https://*.huggingface.co', 'https://*.hf.co', 'https://*.xethub.hf.co', 'https://cdn.jsdelivr.net', 'https://storage.googleapis.com'].filter(Boolean).join(' ');
   const devEval = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : '';
   const upgrade = process.env.NODE_ENV === 'production' ? '; upgrade-insecure-requests' : '';
   return [

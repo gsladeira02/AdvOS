@@ -22,9 +22,10 @@ async function resolveSignerWithPublicToken(db:any, signerId:string, token:strin
 
 
 const sha256=(b:Buffer)=>crypto.createHash('sha256').update(b).digest('hex');
+const formatGMT3=(value:Date|string)=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'medium'}).format(new Date(value));
 const safe=(v:unknown)=>String(v??'').trim();
 const esc=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const makeSignatureImage=async(name:string)=>Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220"><rect width="100%" height="100%" fill="white"/><path d="M25 165 H875" stroke="#cbd5e1" stroke-width="2"/><text x="25" y="120" font-family="Georgia, Times New Roman, serif" font-size="42" font-style="italic" fill="#111827">${esc(name)}</text><text x="25" y="195" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b">Assinatura eletrônica</text></svg>`);
+const makeSignatureImage=async(name:string)=>Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" viewBox="0 0 900 220"><rect width="100%" height="100%" fill="white"/><path d="M25 165 H875" stroke="#cbd5e1" stroke-width="2"/><text x="25" y="120" font-family="Georgia, Times New Roman, serif" font-size="42" font-style="italic" fill="#111827">${esc(name)}</text></svg>`);
 
 async function readImageFromStorage(db:any,bucket:string,imagePath:string){
   if(!imagePath) return null;
@@ -110,7 +111,7 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
 
     if(signed){
       const ev=events.find((e:any)=>e.signer_id===s.id && e.event_type==='documento_assinado');
-      const when=s.signed_at?new Date(s.signed_at).toLocaleString('pt-BR'):'—';
+      const when=s.signed_at?formatGMT3(s.signed_at):'—';
       const evidenceY=infoY-18;
       p.drawLine({start:{x,y:evidenceY+8},end:{x:530,y:evidenceY+8},thickness:0.5,color:line});
       p.drawText(`Assinado em: ${when}`,{x,y:evidenceY-6,size:7.4,font:regular,color:muted});
@@ -140,7 +141,7 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
     ['Status',finalizing?'Assinado':'Aguardando assinatura'],
     ['Hash original SHA-256',sha256(original)],
     ['Assinaturas',`${sorted.filter((s:any)=>s.status==='assinado').length} de ${sorted.length}`],
-    ['Última atualização',new Date().toLocaleString('pt-BR')],
+    ['Última atualização',formatGMT3(new Date())],
   ];
   for(const [k,v] of meta){cert.drawText(k,{x:45,y:cy,size:9,font:bold,color:muted});cert.drawText(v.slice(0,110),{x:185,y:cy,size:9,font:regular,color:ink});cy-=20;}
   cy-=8;
@@ -159,7 +160,6 @@ async function buildSignedPdf({original,doc,request,signers,events,clientSelfie,
     cy-=10;
   }
   cert.drawText('Este relatório é parte integrante do documento e registra as evidências capturadas pelo AdvOS.',{x:45,y:72,size:8,font:regular,color:muted});
-  cert.drawText('A assinatura é eletrônica. Nenhuma assinatura manual foi exigida.',{x:45,y:57,size:8,font:bold,color:ink});
   return Buffer.from(await pdf.save());
 }
 
