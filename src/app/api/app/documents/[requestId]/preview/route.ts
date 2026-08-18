@@ -15,13 +15,45 @@ function safeFilename(value?: string | null, fallback = 'documento') {
     .slice(0, 140) || fallback;
 }
 
+function normalizeStoragePath(value: unknown) {
+  let p = String(value || '').trim();
+  if (!p) return [];
+  if (/^https?:\/\//i.test(p)) return [p];
+  p = p.replace(/^\/+/, '');
+  const candidates = [p];
+  if (p.startsWith('documents/')) candidates.push(p.slice('documents/'.length));
+  try {
+    const decoded = decodeURIComponent(p);
+    if (decoded !== p) candidates.push(decoded);
+  } catch {}
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+async function downloadCandidate(db: any, value: unknown) {
+  for (const candidate of normalizeStoragePath(value)) {
+    if (/^https?:\/\//i.test(candidate)) {
+      try {
+        const response = await fetch(candidate, { cache: 'no-store' });
+        if (response.ok) return { file: await response.arrayBuffer(), path: candidate };
+      } catch {}
+      continue;
+    }
+    const { data, error } = await db.storage.from('documents').download(candidate);
+    if (!error && data) return { file: await data.arrayBuffer(), path: candidate };
+  }
+  return null;
+}
+
 /**
- * Visualização interna do documento de uma solicitação de assinatura.
+ * Visualização interna da assinatura.
  *
- * Depois que o primeiro signatário assina, signature_requests.final_document_path
- * passa a apontar para a versão intermediária que já contém as evidências da
- * assinatura do cliente. Essa versão deve ter prioridade sobre o documento
- * original, para que o escritório confira exatamente o que será finalizado.
+ * Prioridade:
+ * 1. PDF intermediário gravado em signature_requests.final_document_path;
+ * 2. último document_signatures.signed_document_url da solicitação;
+ * 3. documento original.
+ *
+ * A rota também aceita paths antigos com o prefixo "documents/" e URLs http(s),
+ * evitando que um caminho salvo por uma versão anterior quebre o visualizador.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ requestId: string }> }) {
   try {
@@ -44,62 +76,77 @@ export async function GET(req: Request, { params }: { params: Promise<{ requestI
     }
     if (!requestRow) return new NextResponse('Solicitação não encontrada', { status: 404 });
 
-    let storagePath = String(requestRow.final_document_path || '').trim();
-    let contentType = 'application/pdf';
-    let title = 'documento-assinatura';
+    const { data: doc, error: docError } = await db
+      .from('documents')
+      .select('id,title,storage_path,mime_type')
+      .eq('id', requestRow.document_id)
+      .eq('law_firm_id', profile.law_firm_id)
+      .maybeSingle();
 
-    // Após a assinatura do cliente, o PDF intermediário é a fonte correta.
-    if (!storagePath) {
-      const { data: doc, error: docError } = await db
-        .from('documents')
-        .select('storage_path,mime_type,title')
-        .eq('id', requestRow.document_id)
-        .eq('law_firm_id', profile.law_firm_id)
-        .maybeSingle();
-
-      if (docError) {
-        console.error('[AdvOS] Falha ao localizar documento original:', docError);
-        return new NextResponse('Não foi possível localizar o documento.', { status: 500 });
-      }
-      if (!doc?.storage_path) return new NextResponse('Documento não encontrado', { status: 404 });
-
-      storagePath = String(doc.storage_path);
-      contentType = String(doc.mime_type || 'application/pdf').split(';')[0] || 'application/pdf';
-      title = String(doc.title || title);
-    } else {
-      const { data: doc } = await db
-        .from('documents')
-        .select('title')
-        .eq('id', requestRow.document_id)
-        .eq('law_firm_id', profile.law_firm_id)
-        .maybeSingle();
-      title = String(doc?.title || title);
+    if (docError) {
+      console.error('[AdvOS] Falha ao localizar documento:', docError);
+      return new NextResponse('Não foi possível localizar o documento.', { status: 500 });
     }
 
-    const { data: file, error: fileError } = await db.storage.from('documents').download(storagePath);
-    if (fileError || !file) {
-      console.error('[AdvOS] Falha ao baixar documento do preview:', {
+    const title = String(doc?.title || 'documento-assinatura');
+    const candidates: unknown[] = [];
+
+    // A versão intermediária/final é sempre preferida quando existe.
+    if (requestRow.final_document_path) candidates.push(requestRow.final_document_path);
+
+    // Recupera o último arquivo associado a uma assinatura da mesma solicitação.
+    // Isso cobre versões em que o update de signature_requests ocorreu depois do upload.
+    const { data: signedRows } = await db
+      .from('document_signatures')
+      .select('signed_document_url,signed_at,signer_name')
+      .eq('law_firm_id', profile.law_firm_id)
+      .eq('document_id', requestRow.document_id)
+      .order('signed_at', { ascending: false })
+      .limit(10);
+
+    for (const row of signedRows || []) {
+      if (row?.signed_document_url) candidates.push(row.signed_document_url);
+    }
+
+    // Fallback: documento original.
+    if (doc?.storage_path) candidates.push(doc.storage_path);
+
+    let downloaded: { file: ArrayBuffer; path: string } | null = null;
+    const attempted: string[] = [];
+    for (const candidate of candidates) {
+      for (const normalized of normalizeStoragePath(candidate)) attempted.push(normalized);
+      downloaded = await downloadCandidate(db, candidate);
+      if (downloaded) break;
+    }
+
+    if (!downloaded) {
+      console.error('[AdvOS] Nenhum arquivo encontrado para preview:', {
         requestId: id,
-        storagePath,
-        error: fileError,
+        final_document_path: requestRow.final_document_path,
+        original_storage_path: doc?.storage_path,
+        attempted,
       });
-      return new NextResponse('Documento não encontrado', { status: 404 });
+      return new NextResponse('Documento não encontrado', {
+        status: 404,
+        headers: { 'X-AdvOS-Preview-Error': 'storage-file-not-found' },
+      });
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const bytes = Buffer.from(downloaded.file);
     const url = new URL(req.url);
     const forceDownload = url.searchParams.get('download') === '1';
-    const filename = safeFilename(`${title}${contentType === 'application/pdf' ? '.pdf' : ''}`);
+    const filename = safeFilename(`${title}.pdf`);
 
     return new NextResponse(bytes, {
       status: 200,
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'application/pdf',
         'Content-Length': String(bytes.length),
         'Content-Disposition': `${forceDownload ? 'attachment' : 'inline'}; filename="${filename}"`,
         'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
         'Pragma': 'no-cache',
         'X-Content-Type-Options': 'nosniff',
+        'X-AdvOS-Preview-Source': downloaded.path === String(requestRow.final_document_path || '').trim() ? 'signature-request' : 'fallback',
       },
     });
   } catch (error: any) {
