@@ -65,6 +65,59 @@ const emojiOptions = ['😀', '😂', '🙏', '👍', '👏', '❤️', '🔥', 
 const reactionOptions = ['👍', '❤️', '😂', '😮', '😢', '🙏', '✅'];
 const quickStickers = ['👍', '🙏', '✅', '⚖️', '📄', '🤝', '🚀', '⭐'];
 
+
+const AUDIO_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
+
+function pauseOtherAudioPlayers(current: HTMLAudioElement) {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('audio').forEach((node) => {
+    if (node !== current && !node.paused) node.pause();
+  });
+}
+
+function WhatsappAudioPlayer({ src, className = 'w-[260px] max-w-full' }: { src: string; className?: string }) {
+  const [speed, setSpeed] = useState<number>(1);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  function cycleSpeed() {
+    const currentIndex = AUDIO_SPEEDS.findIndex((value) => value === speed);
+    const next = AUDIO_SPEEDS[(currentIndex + 1) % AUDIO_SPEEDS.length];
+    setSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+  }
+
+  return (
+    <div className="flex max-w-full items-center gap-2">
+      <audio
+        ref={audioRef}
+        controls
+        preload="metadata"
+        className={className}
+        src={src}
+        onPlay={(event) => {
+          const current = event.currentTarget;
+          pauseOtherAudioPlayers(current);
+          current.playbackRate = speed;
+        }}
+        onLoadedMetadata={(event) => {
+          event.currentTarget.playbackRate = speed;
+        }}
+      >
+        Seu navegador não suporta reprodução de áudio.
+      </audio>
+      <button
+        type="button"
+        onClick={cycleSpeed}
+        className="shrink-0 rounded-full border border-black/10 bg-white/90 px-2.5 py-1.5 text-[10px] font-black text-slate-700 shadow-sm transition hover:bg-white"
+        title="Alterar velocidade do áudio"
+        aria-label={`Velocidade do áudio: ${String(speed).replace('.', ',')}x`}
+      >
+        {String(speed).replace('.', ',')}x
+      </button>
+    </div>
+  );
+}
+
 function messageTime(value?: string) {
   if (!value) return '';
   try {
@@ -1391,9 +1444,7 @@ export function WhatsappThread({
               {fileSizeLabel(message.file_size) && <span className="text-[10px] font-bold text-slate-500">{fileSizeLabel(message.file_size)}</span>}
             </div>
             {mediaUrl ? (
-              <audio controls preload="metadata" className="w-[260px] max-w-full" src={mediaUrl}>
-                Seu navegador não suporta reprodução de áudio.
-              </audio>
+              <WhatsappAudioPlayer src={mediaUrl} />
             ) : (
               <div className="text-[11px] font-bold text-slate-500">Áudio recebido. Aguarde a mídia ficar disponível.</div>
             )}
@@ -1670,9 +1721,7 @@ export function WhatsappThread({
                 <X size={14} />
               </button>
             </div>
-            <audio controls preload="metadata" className="w-full" src={recordedAudio.url}>
-              Seu navegador não suporta reprodução de áudio.
-            </audio>
+            <WhatsappAudioPlayer src={recordedAudio.url} className="w-full" />
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-bold text-slate-500">{recordedAudio.preparing ? 'Convertendo para MP3...' : recordedAudio.error ? recordedAudio.error : 'Áudio pronto em MP3. Escute antes de enviar.'}</span>
               <button type="button" onClick={() => sendRecordedAudio(recordedAudio.file)} disabled={sending || recordedAudio.preparing || !recordedAudio.ready} className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-50">
