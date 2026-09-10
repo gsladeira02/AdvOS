@@ -427,3 +427,99 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
   .whatsapp-conversation-controls{padding:5px 6px!important}
   .whatsapp-central{height:calc(100dvh - 144px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
 }
+
+/* V9.87 — identidade visual AdvOS: jurídico contemporâneo, denso e legível. */
+:root{
+  --ink:#101828;
+  --ink-soft:#344054;
+  --canvas:#f3f5f7;
+  --surface:#ffffff;
+  --surface-muted:#f8fafc;
+  --line-soft:#e4e7ec;
+  --gold:#b08d57;
+  --gold-soft:#f8f3ea;
+  --navy:#111827;
+  --navy-2:#1d2939;
+  --teal:#0b6b61;
+}
+body{
+  background:linear-gradient(135deg,#f8fafc 0%,#f1f4f7 48%,#edf0f3 100%)!important;
+  color:var(--ink);
+  font-family:"Aptos","Segoe UI Variable","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  letter-spacing:-.006em;
+}
+::selection{background:#d7e9e5;color:#0f172a}
+
+/* Navegação: contraste alto e estrutura de escritório. */
+@media(min-width:768px){
+  .sidebar{
+    border-color:rgba(255,255,255,.07)!important;
+    background:linear-gradient(180deg,#111827 0%,#172033 100%)!important;
+    box-shadow:12px 0 32px rgba(15,23,42,.12)!important;
+  }
+  .sidebar .brand-block{height:48px!important;border:1px solid rgba(255,255,255,.1);background:#fff!important;box-shadow:0 8px 18px rgba(0,0,0,.16)!important}
+  .desktop-nav{gap:3px!important;padding-top:2px!important}
+  .desktop-nav-label{margin:10px 8px 4px!important;color:#94a3b8!important;font-size:8px!important;letter-spacing:.12em!important}
+  .desktop-nav-link{min-height:35px!important;border-radius:9px!important;color:#cbd5e1!important;font-size:10.5px!important}
+  .desktop-nav-link svg{color:#94a3b8!important}
+  .desktop-nav-link:hover{background:rgba(255,255,255,.075)!important;color:#fff!important}
+  .desktop-nav-link:hover svg{color:#e2e8f0!important}
+  .desktop-nav-link.is-active{border-color:rgba(255,255,255,.08)!important;background:linear-gradient(90deg,rgba(176,141,87,.26),rgba(176,141,87,.09))!important;box-shadow:inset 3px 0 0 var(--gold)!important;color:#fff!important}
+  .desktop-nav-link.is-active svg{color:#e7c98f!important}
+  .sidebar>div.mt-3{border-color:rgba(255,255,255,.09)!important;background:rgba(255,255,255,.055)!important}
+  .sidebar>div.mt-3 p:first-child{color:#f8fafc!important}.sidebar>div.mt-3 p:last-child{color:#94a3b8!important}
+  .sidebar .btn-secondary,.sidebar .btn-ghost{border-color:rgba(255,255,255,.13)!important;background:rgba(255,255,255,.06)!important;color:#e2e8f0!important}
+  .sidebar .btn-secondary:hover,.sidebar .btn-ghost:hover{background:rgba(255,255,255,.12)!important}
+}
+
+/* Superfícies e tipografia. */
+.app-content{max-width:1720px!important}
+.card,.panel{
+  border-color:var(--line-soft)!important;
+  background:rgba(255,255,255,.98)!important;
+  box-shadow:0 8px 24px rgba(16,24,40,.045)!important;
+}
+.card:hover,.panel:hover{border-color:#d8dee8!important;box-shadow:0 10px 28px rgba(16,24,40,.06)!important}
+.page-header{border-color:var(--line-soft)!important;background:rgba(255,255,255,.93)!important;box-shadow:0 5px 18px rgba(16,24,40,.04)!important}
+.page-header h1{font-weight:800!important;letter-spacing:-.035em!important;color:var(--ink)!important}
+.page-header-subtitle{color:#667085!important}
+h1,h2,h3{color:var(--ink);letter-spacing:-.02em}
+.label{color:#667085!important;font-size:.62rem!important;letter-spacing:.075em!important}
+
+/* Controles: mesma altura, contraste e retorno visual. */
+.btn{border-radius:9px!important;font-weight:800!important;letter-spacing:-.01em;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.btn-primary,.btn:not(.btn-secondary):not(.btn-ghost){background:var(--navy)!important;color:#fff!important}
+.btn-primary:hover,.btn:not(.btn-secondary):not(.btn-ghost):hover{background:#27364d!important;transform:translateY(-1px)}
+.btn-secondary,.btn-ghost{border-color:#d7dde6!important;background:#fff!important;color:#344054!important}
+.btn-secondary:hover,.btn-ghost:hover{border-color:#bfc8d5!important;background:#f8fafc!important;color:#101828!important}
+.btn:focus-visible,.input:focus-visible,.sheet-input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(11,107,97,.17);outline-offset:1px}
+.input,.sheet-input,select,textarea{border-color:#d7dde6!important;background:#fff!important;color:#101828!important;box-shadow:inset 0 1px 1px rgba(16,24,40,.02)}
+.input::placeholder,textarea::placeholder{color:#98a2b3!important}
+.input:focus,.sheet-input:focus,select:focus,textarea:focus{border-color:#0b6b61!important;box-shadow:0 0 0 3px rgba(11,107,97,.11)!important}
+
+/* Dados: leitura rápida, cabeçalho discreto e linhas mais nítidas. */
+.table,.professional-table{border-color:var(--line-soft)!important;border-radius:13px!important;box-shadow:0 5px 16px rgba(16,24,40,.035)!important}
+.table th,.professional-table thead th{background:#f8fafc!important;border-bottom-color:#e5e9f0!important;color:#667085!important}
+.table td,.professional-table tbody td{border-bottom-color:#edf0f4!important;color:#475467!important}
+.table tr:hover td,.professional-table tbody tr:hover td{background:#f7faf9!important}
+.spreadsheet th{background:#f8fafc!important;color:#667085!important;border-bottom-color:#e5e9f0!important}
+.spreadsheet td{border-bottom-color:#edf0f4!important}.spreadsheet tr:hover td{background:#f7faf9!important}
+.table-primary-link{color:#101828!important}.table-primary-link:hover{color:#0b6b61!important}
+.status-filter-chip{border-color:#d7dde6!important;background:#fff!important;color:#667085!important}.status-filter-chip.is-active{border-color:var(--navy)!important;background:var(--navy)!important;color:#fff!important}
+.badge{border:1px solid transparent;box-shadow:none}.badge-ok{background:#ecfdf3!important;color:#027a48!important;border-color:#d1fadf!important}.badge-warn{background:#fffaeb!important;color:#b54708!important;border-color:#fedf89!important}.badge-danger{background:#fef3f2!important;color:#b42318!important;border-color:#fecdca!important}.badge-info{background:#eff8ff!important;color:#175cd3!important;border-color:#b2ddff!important}
+
+/* WhatsApp mantém sua linguagem operacional, com verde mais sóbrio. */
+.whatsapp-workspace-nav{border-color:#dde5e2!important;background:rgba(255,255,255,.96)!important;box-shadow:0 5px 18px rgba(16,24,40,.035)!important}
+.whatsapp-workspace-nav>button{color:#667085!important}.whatsapp-workspace-nav>button:hover{background:#f3f7f6!important;color:#0b6b61!important}
+.whatsapp-workspace-nav>button.bg-\[\#075e54\]{background:#0b6b61!important;box-shadow:0 3px 8px rgba(11,107,97,.2)}
+.whatsapp-panel{border-color:#d9e1df!important;box-shadow:0 8px 22px rgba(16,24,40,.055)!important}.whatsapp-thread{border-color:#d9e1df!important;box-shadow:0 8px 22px rgba(16,24,40,.065)!important}
+
+/* PWA: preserva alcance e leitura com acabamento próprio de app. */
+@media(max-width:760px){
+  body{background:#f2f4f7!important}
+  .mobile-pwa-top{background:linear-gradient(135deg,#111827,#1d2939)!important;box-shadow:0 5px 16px rgba(16,24,40,.16)!important}
+  .mobile-bottom-nav{border-top-color:#e4e7ec!important;background:rgba(255,255,255,.98)!important}
+  .mobile-bottom-nav-item{color:#667085!important}.mobile-bottom-nav-item svg{color:#667085!important}
+  .mobile-bottom-nav-item.is-active{background:#f1f5f4!important;color:#0b6b61!important}.mobile-bottom-nav-item.is-active svg{color:#0b6b61!important}.mobile-bottom-nav-item.is-active:after{background:#0b6b61!important}
+  .card,.panel{box-shadow:0 4px 14px rgba(16,24,40,.035)!important}
+}
