@@ -405,3 +405,25 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
   .whatsapp-attribution>summary::after{content:'Ver origem';margin-left:7px;color:#64748b;font-weight:700}
   .whatsapp-attribution[open]>summary::after{content:'Ocultar origem'}
 }
+
+/* V9.86 — conversa dominante: controles em uma única faixa horizontal. */
+.whatsapp-conversation-controls{display:flex!important;align-items:center!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;padding:6px 8px!important;scrollbar-width:none!important}
+.whatsapp-conversation-controls::-webkit-scrollbar{display:none}
+.whatsapp-conversation-controls>.whatsapp-control-row,.whatsapp-conversation-controls>.whatsapp-tag-row,.whatsapp-conversation-controls>.whatsapp-operations-row{margin:0!important;display:flex!important;flex:none!important;flex-wrap:nowrap!important;align-items:center!important;gap:5px!important;border:0!important;padding:0!important;white-space:nowrap!important}
+.whatsapp-conversation-controls>.whatsapp-attribution{display:none!important}
+.whatsapp-conversation-controls .whatsapp-control-row>* ,.whatsapp-conversation-controls .whatsapp-tag-row>* ,.whatsapp-conversation-controls .whatsapp-operations-row>*{flex:none!important}
+.whatsapp-conversation-controls .whatsapp-operations-row>span:first-child{display:none!important}
+.whatsapp-conversation-controls button,.whatsapp-conversation-controls select{min-height:27px!important;padding-top:5px!important;padding-bottom:5px!important;font-size:9px!important}
+.whatsapp-shortcut-chips{display:none!important}
+
+@media(min-width:768px){
+  .whatsapp-central{height:calc(100dvh - 76px)!important}
+  .whatsapp-thread>div:last-child{padding:7px 9px!important}
+  .whatsapp-thread textarea{min-height:42px!important;max-height:76px!important;padding:10px 14px!important}
+  .whatsapp-thread .relative.flex.items-end>button,.whatsapp-thread .relative.flex.items-end>div>button{height:38px!important;width:38px!important;min-width:38px!important}
+}
+
+@media(max-width:760px){
+  .whatsapp-conversation-controls{padding:5px 6px!important}
+  .whatsapp-central{height:calc(100dvh - 144px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
+}

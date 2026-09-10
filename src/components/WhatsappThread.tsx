@@ -1814,7 +1814,7 @@ export function WhatsappThread({
         )}
 
         {shortcuts.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="whatsapp-shortcut-chips mt-2 flex flex-wrap gap-1.5">
             {shortcuts.slice(0, 10).map((template) => (
               <button key={template.id} type="button" className="rounded-full border border-[#d7ded4] bg-white px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-[#fffaf2]" onClick={() => insertTemplate(template)} title={template.name}>
                 /{template.normalizedShortcut}
