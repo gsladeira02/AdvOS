@@ -586,3 +586,38 @@ h1,h2,h3{letter-spacing:-.015em!important}.label{font-size:.66rem!important;colo
   .whatsapp-thread-header h2{font-size:12px!important}
   .whatsapp-message-scroll{padding:8px!important}
 }
+
+/* V9.90 — contraste tipográfico único em todas as telas. */
+.app-content{color:#344054!important}
+.app-content .text-ink{color:#172033!important}
+.app-content .text-slate-950,.app-content .text-gray-950{color:#111827!important}
+.app-content .text-slate-900,.app-content .text-gray-900{color:#172033!important}
+.app-content .text-slate-800,.app-content .text-gray-800{color:#253247!important}
+.app-content .text-slate-700,.app-content .text-gray-700{color:#344054!important}
+.app-content .text-slate-600,.app-content .text-gray-600{color:#475467!important}
+.app-content .text-slate-500,.app-content .text-gray-500{color:#667085!important}
+.app-content .text-slate-400,.app-content .text-gray-400{color:#7b8798!important}
+.app-content .text-slate-300,.app-content .text-gray-300{color:#98a2b3!important}
+.app-content p,.app-content li,.app-content td,.app-content dd{font-weight:inherit}
+.app-content h1,.app-content h2,.app-content h3,.app-content h4,.app-content b,.app-content strong{color:#172033}
+.app-content .label{color:#475467!important}
+.app-content input,.app-content textarea,.app-content select{color:#172033!important}
+.app-content input::placeholder,.app-content textarea::placeholder{color:#8490a1!important;opacity:1!important}
+.app-content .table th,.app-content .professional-table th,.app-content .spreadsheet th{color:#526174!important}
+.app-content .table td,.app-content .professional-table td,.app-content .spreadsheet td{color:#344054!important}
+.app-content .mobile-record-main strong,.app-content .mobile-detail-grid b{color:#172033!important}.app-content .mobile-record-main span,.app-content .mobile-detail-grid span{color:#667085!important}
+.app-content .empty-state,.app-content .compact-alert{color:#475467!important}
+
+/* Mantém texto branco apenas em superfícies realmente escuras. */
+.app-content .bg-\[\#075e54\],.app-content .bg-\[\#0f172a\],.app-content .bg-\[\#172033\],.app-content .bg-\[\#25D366\]{color:#fff!important}
+.app-content .bg-\[\#075e54\] *, .app-content .bg-\[\#0f172a\] *, .app-content .bg-\[\#172033\] *{color:inherit}
+.app-content .btn-primary,.app-content .btn-primary *{color:#fff!important}
+.app-content .badge-ok{color:#166534!important}.app-content .badge-warn{color:#92400e!important}.app-content .badge-danger{color:#991b1b!important}.app-content .badge-info{color:#1e40af!important}
+
+@media(min-width:768px){
+  .desktop-nav-link{color:#475569!important}.desktop-nav-link svg{color:#7b8798!important}.desktop-nav-link.is-active{color:#172033!important}.desktop-nav-link.is-active svg{color:#172033!important}
+  .desktop-nav-label{color:#7b8798!important}
+}
+@media(max-width:760px){
+  .mobile-bottom-nav-item{color:#526174!important}.mobile-bottom-nav-item svg{color:#64748b!important}.mobile-bottom-nav-item.is-active{color:#172033!important}.mobile-bottom-nav-item.is-active svg{color:#172033!important}
+}
