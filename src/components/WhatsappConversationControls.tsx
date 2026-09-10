@@ -200,7 +200,11 @@ export function WhatsappConversationControls({
         </div>
 
         {isLead && paidPlatform && (
-          <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+          <details className="whatsapp-attribution mt-2 rounded-xl border border-emerald-200 bg-emerald-50/70">
+            <summary className="cursor-pointer list-none px-3 py-2 text-[9px] font-black text-emerald-800">
+              <span className="inline-flex items-center gap-1"><Megaphone size={10}/>{paidPlatform}</span>
+            </summary>
+          <div className="border-t border-emerald-100 px-3 py-2">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[9px] font-black text-emerald-800 shadow-sm"><Megaphone size={10}/>{paidPlatform}</span>
               {attributionLead?.qualified_automatically && <span className="rounded-full bg-emerald-700 px-2 py-1 text-[9px] font-black text-white">Qualificado automaticamente · {Number(attributionLead?.qualification_score || 0)}/100</span>}
@@ -214,6 +218,7 @@ export function WhatsappConversationControls({
               {attributionClick && <p className="min-w-0 truncate" title={String(attributionClick)}><b className="text-slate-800">Clique:</b> {attributionClick}</p>}
             </div>
           </div>
+          </details>
         )}
 
         {!conversation?.virtual && (
@@ -238,8 +243,8 @@ export function WhatsappConversationControls({
 
         <WhatsappOperationsPanel conversation={conversation} teamUsers={teamUsers} currentUserId={currentUserId} canConfigure={canConfigure} onChanged={onChanged} />
 
-        {isClosed && <p className="mt-1.5 text-[9px] font-bold text-slate-500">Encerrada em {closedAtLabel(conversation?.closed_at) || 'data não informada'}. O histórico permanece disponível.</p>}
-        {isLead && <p className="mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'}{!isClient ? ' · só vira cliente após confirmação manual.' : ' · cliente vinculado ao funil comercial.'}</p>}
+        {isClosed && <p className="whatsapp-control-meta mt-1.5 text-[9px] font-bold text-slate-500">Encerrada em {closedAtLabel(conversation?.closed_at) || 'data não informada'}. O histórico permanece disponível.</p>}
+        {isLead && <p className="whatsapp-control-meta mt-1.5 text-[9px] font-bold text-amber-700">{leadLabel}: {currentStage?.name || conversation?.lead?.stage || 'Sem etapa'}{!isClient ? ' · só vira cliente após confirmação manual.' : ' · cliente vinculado ao funil comercial.'}</p>}
         {isLead && currentStage?.outcome === 'lost' && conversation?.lead?.loss_reason && <p className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-[9px] font-bold text-red-700">Motivo da perda: {LOSS_REASON_OPTIONS.find(([key]) => key === conversation.lead.loss_reason)?.[1] || conversation.lead.loss_reason}{conversation?.lead?.loss_notes ? ` · ${conversation.lead.loss_notes}` : ''}</p>}
         {feedback && <p className="mt-1.5 text-[9px] font-bold text-slate-600">{feedback}</p>}
       </div>

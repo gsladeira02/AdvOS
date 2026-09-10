@@ -1823,7 +1823,7 @@ export function WhatsappThread({
           </div>
         )}
 
-        <div className="mt-2 min-h-[16px]">
+        <div className="whatsapp-composer-hint mt-2 min-h-[16px]">
           {recording ? <p className="break-safe text-[10px] font-black leading-relaxed text-red-600">Gravando áudio... {recordingSeconds}s — clique no botão vermelho para parar e escutar.</p> : feedback ? <p className="break-safe text-[10px] font-bold leading-relaxed text-slate-600">{feedback}</p> : <p className="break-safe text-[10px] leading-relaxed text-slate-500">Digite / para listar modelos. Use 😊 para emojis, ✨ para figurinhas, clipe para documentos ou microfone para gravar áudio.</p>}
         </div>
       </div>

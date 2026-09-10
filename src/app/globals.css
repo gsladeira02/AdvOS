@@ -373,3 +373,35 @@ body{background:linear-gradient(180deg,#f7f6f2 0%,#f1eee8 100%)}
   .whatsapp-filter-control{height:auto!important;min-height:42px!important;padding:8px 10px 9px!important;font-size:16px!important;line-height:1.35!important}
   .whatsapp-filter-panel label{line-height:1.4!important}
 }
+
+/* V9.85 — central mais profissional: foco na conversa, sem textos redundantes. */
+@media(min-width:768px){
+  .desktop-grid{grid-template-columns:184px minmax(0,1fr)!important}
+  .sidebar{padding-left:9px!important;padding-right:9px!important}
+  .app-main{padding:12px 14px 14px!important}
+  .whatsapp-page>.page-header{display:none!important}
+  .whatsapp-workspace{gap:8px!important}
+  .whatsapp-workspace-nav{min-height:42px!important;align-items:center!important;padding:4px 6px!important;border-radius:13px!important;box-shadow:0 3px 12px rgba(15,23,42,.03)!important}
+  .whatsapp-workspace-nav>button{min-height:32px!important;padding:6px 9px!important;border-radius:9px!important;font-size:10px!important}
+  .whatsapp-central{height:calc(100dvh - 98px)!important;min-height:480px!important;gap:10px!important;grid-template-columns:292px minmax(0,1fr)!important}
+  .whatsapp-panel,.whatsapp-thread{border-radius:14px!important}
+  .whatsapp-panel>div:first-child{padding:9px!important}
+  .whatsapp-sync-status{display:none!important}
+  .whatsapp-composer-hint{display:none!important}
+  .whatsapp-control-meta{display:none!important}
+  .whatsapp-attribution>summary::-webkit-details-marker{display:none}
+  .whatsapp-attribution>summary::after{content:'Ver origem';margin-left:7px;color:#64748b;font-weight:700}
+  .whatsapp-attribution[open]>summary::after{content:'Ocultar origem'}
+}
+
+@media(max-width:760px){
+  .whatsapp-workspace-nav{min-height:40px!important;padding:3px 4px!important}
+  .whatsapp-workspace-nav>button{min-height:31px!important;padding:5px 8px!important}
+  .whatsapp-central{height:calc(100dvh - 156px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
+  .whatsapp-panel>div:first-child{padding:8px!important}
+  .whatsapp-panel>div:first-child h2{font-size:12px!important}
+  .whatsapp-sync-status,.whatsapp-composer-hint,.whatsapp-control-meta{display:none!important}
+  .whatsapp-attribution>summary::-webkit-details-marker{display:none}
+  .whatsapp-attribution>summary::after{content:'Ver origem';margin-left:7px;color:#64748b;font-weight:700}
+  .whatsapp-attribution[open]>summary::after{content:'Ocultar origem'}
+}

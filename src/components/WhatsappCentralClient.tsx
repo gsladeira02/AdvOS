@@ -788,10 +788,7 @@ export function WhatsappCentralClient({
       <section className={`whatsapp-panel flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-white shadow-sm ${mobileListOpen ? 'flex' : 'hidden xl:flex'}`}>
         <div className="shrink-0 border-b border-[#d6ddd6] bg-[#f0f2f5] p-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-black text-slate-950">WhatsApp</h2>
-              <p className="truncate text-[10px] text-slate-500">Atendimento, funil e relacionamento jurídico.</p>
-            </div>
+            <div className="min-w-0"><h2 className="truncate text-sm font-black text-slate-950">Conversas</h2></div>
             <button
               type="button"
               title="Atualizar agora"
@@ -805,7 +802,7 @@ export function WhatsappCentralClient({
 
 
           {workspaceView === 'encerrados' ? (
-            <div className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[9px] font-bold text-slate-600">Atendimentos concluídos. Uma nova mensagem do cliente reabre a conversa automaticamente.</div>
+            <div className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[9px] font-bold text-slate-600">Atendimentos concluídos</div>
           ) : activeDepartment === 'atendimento' ? (
             <div className="mt-2 grid grid-cols-3 rounded-full bg-[#e2e8e5] p-1 text-[9px] font-black text-slate-600">
               <button type="button" onClick={() => setActiveTab('conversas')} className={`inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-1.5 transition ${activeTab === 'conversas' ? 'bg-white text-[#075e54] shadow-sm' : 'hover:bg-white/50'}`}>
@@ -819,7 +816,7 @@ export function WhatsappCentralClient({
               </button>
             </div>
           ) : (
-            <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Conversas transferidas para acompanhamento jurídico ou financeiro.</div>
+            <div className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-[9px] font-bold text-indigo-700">Financeiro/Jurídico</div>
           )}
 
           <div className="relative mt-2">
@@ -874,7 +871,7 @@ export function WhatsappCentralClient({
           {renderList()}
         </div>
 
-        <div className="shrink-0 border-t border-[#d6ddd6] bg-[#f0f2f5] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
+        <div className="whatsapp-sync-status shrink-0 border-t border-[#d6ddd6] bg-[#f0f2f5] px-2.5 py-1.5 text-[9px] font-bold text-slate-500">
           {error ? error : lastUpdate ? `${realtimeStatus === 'live' ? 'Ao vivo' : 'Atualização automática'} · ${shortTime(lastUpdate)}` : 'Conectando atualização automática...' }
         </div>
       </section>

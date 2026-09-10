@@ -143,7 +143,7 @@ export default async function WhatsAppCentral({ searchParams }: { searchParams?:
     <div className="whatsapp-page">
       <PageHeader
         title="WhatsApp"
-        subtitle={`Atendimento, Financeiro/Jurídico e Encerrados com ${String(whatsappSettings.preferences?.lead_label_plural || 'Leads').toLowerCase()}, tags, clientes e histórico centralizado.`}
+        subtitle="Central de atendimento"
         action={<Link href="/app/integracoes" className="btn btn-secondary">Configurar integração</Link>}
       />
 
