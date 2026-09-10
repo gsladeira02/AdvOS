@@ -1508,7 +1508,7 @@ export function WhatsappThread({
 
   return (
     <div className="whatsapp-thread relative flex h-[calc(100vh-116px)] min-h-[540px] flex-col overflow-hidden rounded-[18px] border border-[#d6ddd6] bg-[#efe7dc] shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
+      <div className="whatsapp-thread-header flex items-center justify-between gap-3 border-b border-[#d7ded4] bg-[#075e54] px-3 py-2.5 text-white">
         <div className="flex min-w-0 items-center gap-2">
           {onBack && (
             <button type="button" onClick={onBack} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" title="Fechar conversa (Esc)">

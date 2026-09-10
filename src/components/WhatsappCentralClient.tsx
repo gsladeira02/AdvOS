@@ -649,7 +649,7 @@ export function WhatsappCentralClient({
         type="button"
         key={`${kind}-${item.id}`}
         onClick={() => selectConversation(item, kind)}
-        className={`flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#e7f3ef]' : 'bg-white'}`}
+        className={`whatsapp-list-item flex w-full items-center gap-2 border-b border-[#eef1ef] px-2.5 py-2 text-left transition hover:bg-[#f5f6f6] ${active ? 'bg-[#e7f3ef]' : 'bg-white'}`}
       >
         {item?.client_id || item?.clients?.id ? (
           <ClientAvatar
@@ -704,18 +704,18 @@ export function WhatsappCentralClient({
                   </span>
                 )}
               </div>
-              <div className="mt-1 flex min-w-0 items-center gap-1 text-[8px] font-bold text-slate-400">
+              <div className="whatsapp-list-meta mt-1 flex min-w-0 items-center gap-1 text-[8px] font-bold text-slate-400">
                 <UserCheck size={9} className="shrink-0" />
                 <span className={`truncate ${item?.assigned_user?.full_name ? 'text-slate-500' : 'text-amber-600'}`}>{item?.assigned_user?.full_name || 'Sem responsável'}</span>
               </div>
               {isLead && item?.lead?.qualified_automatically && (
-                <div className="mt-1 flex min-w-0 items-center gap-1 text-[8px] font-black text-emerald-700">
+                <div className="whatsapp-list-meta mt-1 flex min-w-0 items-center gap-1 text-[8px] font-black text-emerald-700">
                   <span className="shrink-0">Qualificado {Number(item?.lead?.qualification_score || 0)}/100</span>
                   {item?.lead?.service_interest && <span className="truncate font-bold text-slate-500">· {item.lead.service_interest}</span>}
                 </div>
               )}
               {itemTags.length > 0 && (
-                <div className="mt-1 flex min-w-0 gap-1 overflow-hidden">
+                <div className="whatsapp-list-meta mt-1 flex min-w-0 gap-1 overflow-hidden">
                   {itemTags.map((tag: string) => <span key={tag} className="max-w-[88px] truncate rounded-full bg-slate-100 px-1.5 py-0.5 text-[7px] font-bold text-slate-600">#{tag}</span>)}
                   {Array.isArray(item?.tags) && item.tags.length > itemTags.length && <span className="text-[7px] font-bold text-slate-400">+{item.tags.length - itemTags.length}</span>}
                 </div>
@@ -881,10 +881,10 @@ export function WhatsappCentralClient({
           <WhatsappThread conversation={selected} messages={messages || []} templates={templateOptions.filter((template: any) => template.active !== false)} availableTags={tagCatalog} leadStages={leadStages} leadLabel={leadSingular} teamUsers={teamUsers} forwardTargets={allTargets} currentUserId={currentUserId} currentUserName={currentUserName} canConfigure={canConfigure} live={realtimeStatus === 'live'} initialDraft={draft} onDraftApplied={() => setDraft('')} onSent={handleThreadSent} onBack={closeConversation} onConversationChanged={handleConversationChanged} />
         </div>
       ) : (
-        <section className="whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">
+        <section className="whatsapp-empty-thread whatsapp-panel hidden min-h-[320px] rounded-[16px] border border-[#e8dfcf] bg-white p-8 text-sm font-bold text-slate-500 shadow-sm xl:block">
           <div className="mx-auto grid max-w-sm place-items-center gap-3 text-center">
             <MessageCircle size={34} className="text-[#075e54]" />
-            <p>Selecione uma conversa, lead ou contato. Nenhuma conversa é aberta automaticamente.</p>
+            <p>Selecione uma conversa</p>
           </div>
         </section>
       )}
