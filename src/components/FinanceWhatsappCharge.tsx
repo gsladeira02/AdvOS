@@ -69,8 +69,11 @@ export function FinanceWhatsappCharge(props: {
       valor: formattedValue,
       vencimento: dueDate,
       vencimento_iso: props.dueDate || '',
-      link_asaas: props.asaasUrl || '',
-      escritorio: props.firmName || 'escritório',
+     link_asaas: props.asaasUrl || '',
+linha_link_asaas: props.asaasUrl
+  ? `Você pode regularizar pelo link abaixo:\n${props.asaasUrl}`
+  : 'Para regularizar, entre em contato conosco por este WhatsApp.',
+escritorio: props.firmName || 'escritório',
       telefone_escritorio: props.firmPhone || '',
       usuario: props.userName || '',
       usuario_nome_completo: props.userName || '',
