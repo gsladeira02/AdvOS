@@ -213,10 +213,23 @@ export function WhatsappCentralClient({
 
   const allTargets = useMemo(() => dedupeById([...(conversations || [])]), [conversations]);
 
-  const selected = useMemo(() => {
-    if (!selectedId) return null;
-    return allTargets.find((item: any) => item.id === selectedId || item.conversation_id === selectedId) || null;
-  }, [allTargets, selectedId]);
+ const selected = useMemo(() => {
+  if (!selectedId) return null;
+
+  return (
+    allTargets.find(
+      (item: any) =>
+        item.id === selectedId ||
+        item.conversation_id === selectedId
+    ) ||
+    contacts.find(
+      (item: any) =>
+        item.id === selectedId ||
+        item.conversation_id === selectedId
+    ) ||
+    null
+  );
+}, [allTargets, contacts, selectedId]);
 
   useEffect(() => {
     if (!selected || selected?.virtual || selected?.contact) return;
