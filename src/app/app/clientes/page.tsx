@@ -27,6 +27,10 @@ export default async function Clientes({ searchParams }: { searchParams?: Promis
     <input className="input compact-input" name="email" placeholder="E-mail"/>
     <select className="input compact-input" name="service_id"><option value="">Serviço prestado</option>{services.map((s:any)=><option value={s.id} key={s.id}>{s.name}{!s.active ? ' (inativo)' : ''}</option>)}</select>
     <input className="input compact-input" name="address" placeholder="Endereço"/>
+    <input className="input compact-input" name="civil_status" maxLength={120} placeholder="Estado civil"/>
+    <input className="input compact-input" name="profession" maxLength={160} placeholder="Profissão"/>
+    <input className="input compact-input" name="rg" maxLength={40} placeholder="RG"/>
+    <input className="input compact-input" name="rg_uf" maxLength={60} placeholder="Órgão/UF do RG (ex.: SSP/ES)"/>
     <label className="block text-xs font-semibold text-slate-600">
       Data de assinatura do contrato
       <input className="input compact-input mt-1 w-full" name="contract_signed_on" type="date" />

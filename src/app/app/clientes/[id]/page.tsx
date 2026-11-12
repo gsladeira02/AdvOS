@@ -155,6 +155,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       </section>
     )}
 
+    {query?.qualificacao === 'salva' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Dados pessoais atualizados com sucesso.</section>}
+    {query?.qualificacao_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível salvar os dados pessoais. Revise os campos.</section>}
     {query?.assinatura === 'salva' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Data de assinatura do contrato salva com sucesso.</section>}
     {query?.assinatura_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível salvar a data de assinatura. Confira a data e tente novamente.</section>}
     {query?.foto_atualizada && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Foto do cliente atualizada com sucesso.</section>}
@@ -190,9 +192,29 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <p><b>WhatsApp:</b> {clientPhone || '-'}</p>
             <p><b>E-mail:</b> {client.email || '-'}</p>
             <p><b>Serviço:</b> {selectedService?.name || '-'}</p>
+            <p><b>Estado civil:</b> {client.civil_status || '-'}</p>
+            <p><b>Profissão:</b> {client.profession || '-'}</p>
+            <p><b>RG:</b> {client.rg || '-'}</p>
+            <p><b>Órgão/UF do RG:</b> {client.rg_uf || '-'}</p>
             <p className="md:col-span-2"><b>Endereço:</b> {client.address || '-'}</p>
             <p className="md:col-span-2"><b>Assinatura do contrato:</b> {client.contract_signed_on ? dateBR(client.contract_signed_on) : 'Não informada'}</p>
           </div>
+          <form action="/api/clients/qualification" method="post" className="mt-4 grid gap-2 md:grid-cols-2">
+            <input type="hidden" name="client_id" value={client.id} />
+            <label className="text-xs font-semibold text-slate-600">Estado civil
+              <input className="input compact-input mt-1 w-full" name="civil_status" maxLength={120} defaultValue={client.civil_status || ''} placeholder="Estado civil" />
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Profissão
+              <input className="input compact-input mt-1 w-full" name="profession" maxLength={160} defaultValue={client.profession || ''} placeholder="Profissão" />
+            </label>
+            <label className="text-xs font-semibold text-slate-600">RG
+              <input className="input compact-input mt-1 w-full" name="rg" maxLength={40} defaultValue={client.rg || ''} placeholder="Número do RG" />
+            </label>
+            <label className="text-xs font-semibold text-slate-600">Órgão/UF do RG
+              <input className="input compact-input mt-1 w-full" name="rg_uf" maxLength={60} defaultValue={client.rg_uf || ''} placeholder="Ex.: SSP/ES" />
+            </label>
+            <button className="btn btn-primary md:col-span-2" type="submit">Salvar dados pessoais</button>
+          </form>
           <form action="/api/clients/contract-signature" method="post" className="mt-4 flex flex-wrap items-end gap-2">
             <input type="hidden" name="client_id" value={client.id} />
             <label className="block min-w-[200px] flex-1 text-xs font-semibold text-slate-600" htmlFor="contract_signed_on">
@@ -305,10 +327,10 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           <div className="grid gap-4 md:grid-cols-4">
             <input className="input md:col-span-2" name="client_name" defaultValue={client.name || ''} placeholder="Nome do contratante/outorgante" />
             <input className="input" name="nationality" placeholder="Nacionalidade" defaultValue="brasileiro(a)" />
-            <input className="input" name="civil_status" placeholder="Estado civil" />
-            <input className="input" name="profession" placeholder="Profissão" />
-            <input className="input" name="rg" placeholder="RG" />
-            <input className="input" name="rg_uf" placeholder="Órgão/UF do RG" />
+            <input className="input" name="civil_status" placeholder="Estado civil" defaultValue={client.civil_status || ''} />
+            <input className="input" name="profession" placeholder="Profissão" defaultValue={client.profession || ''} />
+            <input className="input" name="rg" placeholder="RG" defaultValue={client.rg || ''} />
+            <input className="input" name="rg_uf" placeholder="Órgão/UF do RG" defaultValue={client.rg_uf || ''} />
             <input className="input" name="cpf" defaultValue={client.doc || ''} placeholder="CPF/CNPJ" />
             <input className="input" name="phone" defaultValue={clientPhone || ''} placeholder="WhatsApp/telefone" />
             <input className="input md:col-span-3" name="address" defaultValue={client.address || ''} placeholder="Endereço completo" />

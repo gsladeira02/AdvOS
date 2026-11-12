@@ -447,6 +447,10 @@ export async function POST(req: Request) {
     data.phone = data.phone || clientRow.whatsapp || clientRow.phone || '';
     data.cpf = data.cpf || clientRow.doc || '';
     data.address = data.address || clientRow.address || '';
+    data.civil_status = data.civil_status || clientRow.civil_status || '';
+    data.profession = data.profession || clientRow.profession || '';
+    data.rg = data.rg || clientRow.rg || '';
+    data.rg_uf = data.rg_uf || clientRow.rg_uf || '';
   }
 
   if (!data.client_name) return NextResponse.json({ error: 'Informe o nome do contratante/outorgante.' }, { status: 400 });
