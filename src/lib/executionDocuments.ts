@@ -32,7 +32,7 @@ function renderMatter(matter:ExecutionMatter, calc:ExecutionCalculation): Paragr
   add('title','EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO ___ JUIZADO ESPECIAL CÍVEL DA COMARCA DE '+matter.comarca.toLocaleUpperCase('pt-BR'));
   add('body','DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA, pessoa jurídica de direito privado, inscrita no CNPJ nº 57.377.637/0001-19, com endereço profissional na Rodovia do Sol, nº 2070, Edifício Royal Blue Corporate, Loja 01, Praia de Itaparica, Vila Velha/ES, representada por seu sócio Dr. DANIEL COSTA LADEIRA, advogado inscrito na OAB/ES nº 23.416, vem, respeitosamente, ajuizar');
   add('title','AÇÃO DE EXECUÇÃO DE TÍTULO EXTRAJUDICIAL');
-  add('body','em face de '+c.name.toLocaleUpperCase('pt-BR')+', natural de '+c.naturalidade+', '+c.civil_status+', '+c.profession+', portador(a) do RG nº '+c.rg+' ('+c.rg_uf+'), CPF nº '+cpfPretty(String(c.doc))+', residente e domiciliado(a) em '+c.address+', pelos fatos e fundamentos a seguir expostos.');
+  add('body','em face de '+c.name.toLocaleUpperCase('pt-BR')+', brasileiro(a)'+(c.naturalidade ? ', natural de '+c.naturalidade : '')+', '+c.civil_status+', '+c.profession+', portador(a) do RG nº '+c.rg+' ('+c.rg_uf+'), CPF nº '+cpfPretty(String(c.doc))+', residente e domiciliado(a) em '+c.address+', pelos fatos e fundamentos a seguir expostos.');
   add('heading','1. DA GRATUIDADE DA JUSTIÇA');
   add('body','A parte Exequente requer a apreciação da gratuidade da justiça, caso comprovados os pressupostos previstos na Constituição Federal, art. 5º, LXXIV, e no Código de Processo Civil, art. 98 e seguintes, como formulado no documento de referência.');
   add('heading','I - DOS FATOS');

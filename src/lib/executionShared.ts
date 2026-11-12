@@ -53,7 +53,6 @@ function isoToUTC(value: string) {
 }
 export const EXECUTION_REQUIRED: { key: keyof ExecutionClient; label: string }[] = [
   { key: 'name', label: 'Nome' },
-  { key: 'naturalidade', label: 'Naturalidade' },
   { key: 'civil_status', label: 'Estado civil' },
   { key: 'profession', label: 'Profissão' },
   { key: 'rg', label: 'RG' },

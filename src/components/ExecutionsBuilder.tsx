@@ -60,7 +60,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
         <div><p className="text-xs text-slate-500">Cadastro incompleto</p><p className="text-2xl font-black">{incompleteCount}</p></div>
         <div><p className="text-xs text-slate-500">Menos de 2 vencidas</p><p className="text-2xl font-black">{withoutOverdueCount}</p></div>
       </div>
-      {incompleteCount>0 && <p className="mt-3 text-sm text-slate-600">Apenas clientes com nome, naturalidade, estado civil, profissão, RG, órgão/UF, CPF, endereço, data, valor e número de parcelas do contrato preenchidos aparecem aqui. <Link href="/app/clientes" className="font-bold underline">Completar cadastros</Link>.</p>}
+      {incompleteCount>0 && <p className="mt-3 text-sm text-slate-600">Apenas clientes com nome, estado civil, profissão, RG, órgão/UF, CPF, endereço, data, valor e número de parcelas do contrato preenchidos aparecem aqui. A nacionalidade será informada como brasileiro(a) nas petições; a naturalidade é opcional. <Link href="/app/clientes" className="font-bold underline">Completar cadastros</Link>.</p>}
       <p className="mt-3 text-xs text-slate-500">Data-base: {formatBRDate(today)}. Quitadas e canceladas ficam de fora. Clientes devem ter pelo menos duas parcelas já vencidas e não pagas.</p>
     </section>
     <section className="card p-5">
@@ -76,7 +76,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
       </button>
     </section>
     {clients.length===0 && <section className="card p-5 text-sm text-slate-600">
-      Nenhum cliente apto no momento. A naturalidade precisa ser informada na ficha, e devem existir pelo menos duas parcelas vencidas e não pagas.
+      Nenhum cliente apto no momento. Confira os demais dados obrigatórios e a existência de pelo menos duas parcelas vencidas e não pagas.
     </section>}
     <div className="space-y-3">
       {clients.map(client=>{
