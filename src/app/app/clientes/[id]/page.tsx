@@ -155,6 +155,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       </section>
     )}
 
+    {query?.resumo_contrato === 'salvo' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Condições do contrato atualizadas.</section>}
+    {query?.resumo_contrato_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível salvar as condições do contrato.</section>}
     {query?.qualificacao === 'salva' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Dados pessoais atualizados com sucesso.</section>}
     {query?.qualificacao_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível salvar os dados pessoais. Revise os campos.</section>}
     {query?.assinatura === 'salva' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Data de assinatura do contrato salva com sucesso.</section>}
@@ -198,6 +200,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <p><b>Órgão/UF do RG:</b> {client.rg_uf || '-'}</p>
             <p className="md:col-span-2"><b>Endereço:</b> {client.address || '-'}</p>
             <p className="md:col-span-2"><b>Assinatura do contrato:</b> {client.contract_signed_on ? dateBR(client.contract_signed_on) : 'Não informada'}</p>
+            <p><b>Valor total do contrato:</b> {client.contract_total_amount != null ? money(Number(client.contract_total_amount)) : 'Não informado'}</p>
+            <p><b>Quantidade de parcelas:</b> {client.contract_installment_count != null ? Number(client.contract_installment_count) : 'Não informada'}</p>
           </div>
           <form action="/api/clients/qualification" method="post" className="mt-4 grid gap-2 md:grid-cols-2">
             <input type="hidden" name="client_id" value={client.id} />
@@ -224,6 +228,24 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <button type="submit" className="btn btn-primary">Salvar data</button>
           </form>
           <p className="mt-1 text-xs text-slate-500">A data é opcional. Para remover uma data registrada, deixe o campo vazio e salve.</p>
+          <form action="/api/clients/contract-financial-summary" method="post" className="mt-4 grid gap-2 md:grid-cols-2">
+            <input type="hidden" name="client_id" value={client.id} />
+            <label className="block text-xs font-semibold text-slate-600">
+              Valor total do contrato (R$)
+              <input className="input compact-input mt-1 w-full" type="number" name="contract_total_amount"
+                min="0" max="9999999999.99" step="0.01" defaultValue={client.contract_total_amount ?? ''} placeholder="Ex.: 2500,00" />
+            </label>
+            <label className="block text-xs font-semibold text-slate-600">
+              Quantidade de parcelas
+              <input className="input compact-input mt-1 w-full" type="number" name="contract_installment_count"
+                min="0" max="120" step="1" defaultValue={client.contract_installment_count ?? ''} placeholder="Ex.: 4" />
+            </label>
+            <button className="btn btn-primary md:col-span-2" type="submit">Salvar condições do contrato</button>
+            <p className="text-xs text-slate-500 md:col-span-2">
+              Estes dados descrevem o contrato e não criam, quitam ou alteram cobranças do Asaas.
+              Para remover um campo, deixe-o vazio e salve.
+            </p>
+          </form>
         </div>
         <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-sm text-slate-600">
           <b>Pasta em nuvem</b>
