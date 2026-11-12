@@ -132,8 +132,8 @@ export function extractClientComarca(address: string | null): string | null {
     const city=m[1].trim().replace(/^(?:município|cidade)\s+de\s+/i,'');
     const raw=m[2].trim().toLocaleLowerCase('pt-BR');
     const state=states[raw]||(/^[a-z]{2}$/.test(raw)?raw.toUpperCase():'');
-    if(city.length>=2&&state&&/^[\p{L}0-9 .'-]+$/u.test(city))return city+'/'+state;
+    if(city.length>=2&&state&&!/[<>\/\d]/.test(city))return city+'/'+state;
   }
-  const fallback=value.match(/(?:^|,)\s*([\p{L} .'-]{2,75})\s*\/\s*([A-Z]{2})(?:,|$)/u);
+  const fallback=value.match(/(?:^|,)\s*([^,\/\d<>]{2,75})\s*\/\s*([A-Z]{2})(?:,|$)/);
   return fallback?fallback[1].trim()+'/'+fallback[2]:null;
 }
