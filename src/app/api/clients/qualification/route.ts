@@ -4,7 +4,7 @@ import { createAdminSupabase } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 
-const fields = { civil_status: 120, profession: 160, rg: 40, rg_uf: 60 } as const;
+const fields = { naturalidade: 120, civil_status: 120, profession: 160, rg: 40, rg_uf: 60 } as const;
 
 function redirect(req: Request, clientId: string, ok: boolean) {
   const url = new URL('/app/clientes/' + encodeURIComponent(clientId), req.url);

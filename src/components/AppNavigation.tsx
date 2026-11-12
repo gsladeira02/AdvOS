@@ -25,6 +25,7 @@ const primaryItems = [
   ['/app/clientes', 'Clientes', Users],
   ['/app/servicos', 'Serviços', ListChecks],
   ['/app/processos', 'Processos', Scale],
+  ['/app/execucoes', 'Execuções Judiciais', Scale],
   ['/app/prazos', 'Prazos', CalendarDays],
   ['/app/financeiro', 'Financeiro', Wallet],
   ['/app/whatsapp', 'WhatsApp', MessageCircle],
@@ -117,7 +118,7 @@ export function MobileNavigation() {
 }
 
 export function MobileMoreMenu({ admin }: { admin: boolean }) {
-  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing'].includes(href)), ...regularManagementItems];
+  const items = admin ? [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing','/app/execucoes'].includes(href)), ...adminItems] : [...primaryItems.filter(([href]) => ['/app/servicos','/app/processos','/app/tarefas','/app/atividades','/app/agenda','/app/assinaturas','/app/modelos-documentos','/app/crm','/app/marketing','/app/execucoes'].includes(href)), ...regularManagementItems];
   return (
     <details className="mobile-more-menu md:hidden">
       <summary aria-label="Mais áreas" title="Mais áreas"><Menu size={18} /></summary>

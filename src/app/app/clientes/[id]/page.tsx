@@ -194,6 +194,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <p><b>WhatsApp:</b> {clientPhone || '-'}</p>
             <p><b>E-mail:</b> {client.email || '-'}</p>
             <p><b>Serviço:</b> {selectedService?.name || '-'}</p>
+            <p><b>Naturalidade:</b> {client.naturalidade || '-'}</p>
             <p><b>Estado civil:</b> {client.civil_status || '-'}</p>
             <p><b>Profissão:</b> {client.profession || '-'}</p>
             <p><b>RG:</b> {client.rg || '-'}</p>
@@ -205,6 +206,9 @@ export default async function PastaCliente({ params, searchParams }: { params: P
           </div>
           <form action="/api/clients/qualification" method="post" className="mt-4 grid gap-2 md:grid-cols-2">
             <input type="hidden" name="client_id" value={client.id} />
+            <label className="text-xs font-semibold text-slate-600">Naturalidade (cidade/UF)
+              <input className="input compact-input mt-1 w-full" name="naturalidade" maxLength={120} defaultValue={client.naturalidade || ''} placeholder="Ex.: Serra/ES" />
+            </label>
             <label className="text-xs font-semibold text-slate-600">Estado civil
               <input className="input compact-input mt-1 w-full" name="civil_status" maxLength={120} defaultValue={client.civil_status || ''} placeholder="Estado civil" />
             </label>

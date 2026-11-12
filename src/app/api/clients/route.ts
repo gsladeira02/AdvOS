@@ -36,6 +36,7 @@ export async function POST(req: Request) {
     whatsapp,
     email: clean(f.get('email')),
     address: clean(f.get('address')),
+    naturalidade: clean(f.get('naturalidade'))?.slice(0, 120) || null,
     civil_status: clean(f.get('civil_status'))?.slice(0, 120) || null,
     profession: clean(f.get('profession'))?.slice(0, 160) || null,
     rg: clean(f.get('rg'))?.slice(0, 40) || null,

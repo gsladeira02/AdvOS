@@ -27,6 +27,7 @@ export default async function Clientes({ searchParams }: { searchParams?: Promis
     <input className="input compact-input" name="email" placeholder="E-mail"/>
     <select className="input compact-input" name="service_id"><option value="">Serviço prestado</option>{services.map((s:any)=><option value={s.id} key={s.id}>{s.name}{!s.active ? ' (inativo)' : ''}</option>)}</select>
     <input className="input compact-input" name="address" placeholder="Endereço"/>
+    <input className="input compact-input" name="naturalidade" maxLength={120} placeholder="Naturalidade (cidade/UF)"/>
     <input className="input compact-input" name="civil_status" maxLength={120} placeholder="Estado civil"/>
     <input className="input compact-input" name="profession" maxLength={160} placeholder="Profissão"/>
     <input className="input compact-input" name="rg" maxLength={40} placeholder="RG"/>
