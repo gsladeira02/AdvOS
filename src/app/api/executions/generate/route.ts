@@ -31,14 +31,19 @@ export async function POST(req:Request) {
     const comarca=String(form.comarca||'').trim();
     if(!comarca || comarca.length>120 || /[<>\x00-\x1F]/.test(comarca))
       return NextResponse.json({error:'Comarca inválida.'},{status:400});
+    // A single, user-defined contract fine applies once per selected client.
+    // This is not multiplied by the number of outstanding installments.
+    const additionalFineCents=form.additionalFineCents;
+    if(typeof additionalFineCents!=='number'||!Number.isSafeInteger(additionalFineCents)||
+      additionalFineCents<0||additionalFineCents>1000000000) {
+      return NextResponse.json({error:'Multa contratual inválida.'},{status:400});
+    }
     const selected = form.selections.map((item:unknown)=>{
       const value=item as Record<string,unknown>;
       if(!value || typeof value!=='object')throw Error('Seleção inválida.');
       const id=String(value.clientId||'');
-      const additionalFineCents=Number(value.additionalFineCents);
-      if(!uuidPattern.test(id)||!Number.isSafeInteger(additionalFineCents)||
-        additionalFineCents<0||additionalFineCents>1000000000)throw Error('Cliente ou multa inválida.');
-      return {id,additionalFineCents};
+      if(!uuidPattern.test(id))throw Error('Cliente inválido.');
+      return {id};
     });
     const ids=selected.map(x=>x.id);
     if(new Set(ids).size!==ids.length) return NextResponse.json({error:'Clientes repetidos na seleção.'},{status:400});
@@ -97,7 +102,7 @@ export async function POST(req:Request) {
       if(used.has(root))basename+=' - '+item.id.slice(0,8);
       used.add(root);
       const rendered=await renderExecution({
-        client,installments:remaining,comarca,today,additionalFineCents:item.additionalFineCents,
+        client,installments:remaining,comarca,today,additionalFineCents,
         accelerationConfirmed:form.accelerationConfirmed===true,
       });
       allFiles['Execucoes Judiciais/'+basename+'.docx']=rendered.docx;

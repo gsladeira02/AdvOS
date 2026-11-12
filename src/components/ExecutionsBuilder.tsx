@@ -8,7 +8,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
   today: string; incompleteCount: number; withoutOverdueCount: number;
 }) {
   const [selected,setSelected] = useState<string[]>([]);
-  const [extraFines,setExtraFines] = useState<Record<string,string>>({});
+  const [globalFine,setGlobalFine] = useState('1200.00');
   const [comarca,setComarca] = useState('Serra/ES');
   const [confirmed,setConfirmed] = useState(false);
   const [accelerationConfirmed,setAccelerationConfirmed] = useState(false);
@@ -24,6 +24,12 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
   const principalTotal=selectedClients.reduce((sum,c)=>{
     return sum+(rowsByClient.get(c.id)||[]).reduce((v,i)=>v+Math.round(Number(i.amount)*100),0);
   },0);
+  const globalFineValue=Number(globalFine);
+  const fineIsValid=globalFine.trim()!=='' && Number.isFinite(globalFineValue) &&
+    globalFineValue>=0 && globalFineValue<=10000000 &&
+    Math.abs(globalFineValue*100-Math.round(globalFineValue*100))<0.000001;
+  const globalFineCents=fineIsValid?Math.round(globalFineValue*100):0;
+  const selectedFineTotal=fineIsValid?selectedClients.length*globalFineCents:0;
   const toggle=(id:string)=>setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
 
   async function download() {
@@ -33,16 +39,12 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
     if (hasFuture && !accelerationConfirmed) return setMessage('Confirme a existência de fundamento contratual para cobrar parcelas futuras.');
     if (selectedClients.length>40) return setMessage('Selecione no máximo 40 clientes por ZIP.');
     if (!comarca.trim()||comarca.length>120) return setMessage('Informe a comarca competente.');
+    if (!fineIsValid) return setMessage('Informe um valor válido de multa contratual (de R$ 0,00 a R$ 10.000.000,00).');
     try {
-      const selections=selectedClients.map(c=>{
-        const raw=extraFines[c.id]||'0';
-        const value=Number(raw);
-        if (!Number.isFinite(value)||value<0||value>10000000) throw new Error('Multa inválida para '+c.name);
-        return {clientId:c.id,additionalFineCents:Math.round(value*100)};
-      });
+      const selections=selectedClients.map(c=>({clientId:c.id}));
       setBusy(true);
       const response=await fetch('/api/executions/generate',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({selections,comarca:comarca.trim(),confirmed:true,accelerationConfirmed:hasFuture?accelerationConfirmed:false})});
+        body:JSON.stringify({selections,additionalFineCents:globalFineCents,comarca:comarca.trim(),confirmed:true,accelerationConfirmed:hasFuture?accelerationConfirmed:false})});
       if(!response.ok){const x=await response.json().catch(()=>({}));throw Error(x.error||'Falha ao gerar documentos.');}
       const blob=await response.blob();
       const url=URL.createObjectURL(blob);
@@ -69,6 +71,19 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
           <input className="input mt-1 w-full" value={comarca} maxLength={120} onChange={e=>setComarca(e.target.value)} />
         </label>
         <div className="text-right"><b>{selectedClients.length} cliente(s) selecionado(s)</b><p className="text-xs text-slate-500">Principal total ainda em aberto: {formatReal(principalTotal)}</p></div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="block max-w-sm text-sm font-semibold">
+          Multa contratual adicional por cliente (R$)
+          <input className="input mt-1 w-full" type="number" min="0" max="10000000" step="0.01"
+            value={globalFine} onChange={e=>setGlobalFine(e.target.value)} aria-invalid={!fineIsValid}
+            placeholder="1200.00" />
+          <span className="mt-1 block text-xs font-normal text-slate-500">Predefinida em R$ 1.200,00. Defina uma única vez; o mesmo valor será incluído na execução de cada cliente selecionado.</span>
+        </label>
+        <div className="self-end text-sm text-slate-700">
+          <p>Multa por cliente: <b>{fineIsValid?formatReal(globalFineCents):'Valor inválido'}</b></p>
+          <p>Multas dos {selectedClients.length} cliente(s): <b>{fineIsValid?formatReal(selectedFineTotal):'—'}</b></p>
+        </div>
       </div>
       <p className="mt-3 text-xs text-slate-500">Após atingir duas parcelas vencidas, a minuta incluirá todas as parcelas restantes não pagas do cliente, vencidas ou futuras. Os juros de 5% ao mês incidem apenas pelo tempo já transcorrido de atraso; o encargo fixo de 10% é discriminado por parcela. A antecipação de parcelas futuras depende de previsão contratual ou fundamento legal aplicável.</p>
       <button type="button" className="btn btn-secondary mt-4 text-xs" onClick={()=>setSelected(s=>s.length===clients.length?[]:clients.map(c=>c.id))}>
@@ -100,10 +115,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
               {rows.map(row=><div key={row.id} className="rounded-lg border p-2">{formatBRDate(String(row.due_date))} · {formatReal(Math.round(Number(row.amount)*100))} · {isOverdueCollectible(row,today)?'Vencida':'A vencer (antecipação)'}</div>)}
             </div>
           </details>
-          {selected.includes(client.id) && <label className="mt-3 block max-w-xs text-xs font-bold">Multa contratual adicional (R$)
-            <input className="input mt-1 w-full" type="number" min="0" max="10000000" step="0.01"
-              value={extraFines[client.id]??''} onChange={e=>setExtraFines(x=>({...x,[client.id]:e.target.value}))} placeholder="0,00"/>
-          </label>}
+          {selected.includes(client.id) && <p className="mt-2 text-xs text-slate-600">Multa adicional aplicada: {fineIsValid?formatReal(globalFineCents):'Valor inválido'} · Total com multa: {fineIsValid?formatReal(calculated.amountDueCents+globalFineCents):'—'}</p>}
         </section>;
       })}
     </div>
@@ -116,7 +128,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
         checked={accelerationConfirmed} onChange={e=>setAccelerationConfirmed(e.target.checked)}/>
         <span>Confirmei, nos contratos selecionados, o fundamento de vencimento antecipado que autoriza cobrar também as parcelas ainda não vencidas.</span>
       </label>}
-      <button type="button" className="btn btn-primary" disabled={busy||!confirmed||(hasFuture&&!accelerationConfirmed)||selected.length===0} onClick={()=>void download()}>
+      <button type="button" className="btn btn-primary" disabled={busy||!fineIsValid||!confirmed||(hasFuture&&!accelerationConfirmed)||selected.length===0} onClick={()=>void download()}>
         {busy?'Gerando arquivos...':'Baixar um ZIP com DOCX e PDF de todos os selecionados'}
       </button>
       {message && <p className="text-sm text-slate-700" role="status">{message}</p>}
