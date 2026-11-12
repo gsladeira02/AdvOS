@@ -73,7 +73,7 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
         <section className="card p-6">
           <h2 className="text-2xl font-black">Enviar arquivo exportado</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Use o arquivo exportado do Asaas em formato CSV ou XLSX. O AdvOS tenta identificar automaticamente colunas como cliente, CPF/CNPJ, e-mail, telefone, ID Asaas, valor, vencimento, status e link da cobrança.
+            Use o arquivo exportado do Asaas em formato CSV ou XLSX. O AdvOS reconhece cliente, CPF/CNPJ, telefone, ID Asaas, endereço (rua, número, bairro, cidade, UF e CEP), valor, vencimento, status e link da cobrança. A importação pode ser repetida para atualizar cadastros e pagamentos sem duplicar IDs do Asaas.
           </p>
 
           <form action="/api/asaas/import" method="post" encType="multipart/form-data" className="mt-6 space-y-5">
@@ -115,7 +115,7 @@ export default async function ImportarAsaas({ searchParams }: { searchParams?: P
               <input type="checkbox" name="update_existing_clients" value="true" defaultChecked className="mt-1" />
               <span>
                 <b>Atualizar dados de clientes já encontrados.</b><br />
-                Campos vazios no AdvOS podem ser preenchidos com CPF/CNPJ, telefone, WhatsApp, e-mail e ID Asaas do arquivo.
+                Campos vazios são preenchidos e o endereço é atualizado quando a exportação inclui logradouro e dados de localização. CPF/CNPJ e ID Asaas são priorizados na conciliação para evitar associações incorretas.
               </span>
             </label>
 

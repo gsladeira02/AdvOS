@@ -20,6 +20,7 @@ type ExistingClient = {
   phone: string | null;
   whatsapp: string | null;
   asaas_customer_id: string | null;
+  address: string | null;
   service_id?: string | null;
 };
 
@@ -137,6 +138,13 @@ const FIELD = {
   clientDoc: ['cpf/cnpj', 'cpf cnpj', 'cpfcnpj', 'cpf', 'cnpj', 'documento', 'cpf ou cnpj', 'document', 'cpfCnpj'],
   clientEmail: ['email', 'e-mail', 'email cliente', 'customer email'],
   clientPhone: ['telefone', 'celular', 'whatsapp', 'fone', 'mobile phone', 'mobilePhone', 'phone', 'telefone cliente'],
+  address: ['endereco', 'endereço', 'logradouro', 'rua', 'address', 'endereco cliente'],
+  addressNumber: ['numero', 'número', 'numero endereco', 'numero endereço', 'address number'],
+  addressComplement: ['complemento', 'complement', 'address complement'],
+  district: ['bairro', 'district', 'neighborhood'],
+  city: ['cidade', 'city', 'municipio', 'município'],
+  state: ['estado', 'uf', 'state', 'province'],
+  postalCode: ['cep', 'codigo postal', 'código postal', 'postal code', 'postalcode', 'zip'],
   asaasCustomerId: ['id cliente', 'id do cliente', 'customer id', 'customer', 'cliente id', 'id asaas cliente', 'asaas customer id'],
   paymentId: ['id cobrança', 'id cobranca', 'id da cobrança', 'id da cobranca', 'id pagamento', 'payment id', 'id payment', 'cobrança', 'cobranca'],
   genericId: ['id'],
@@ -149,6 +157,20 @@ const FIELD = {
   paymentUrl: ['link', 'link pagamento', 'link de pagamento', 'link da fatura', 'invoice url', 'invoiceurl', 'payment link', 'paymentlink', 'url'],
   externalReference: ['referência externa', 'referencia externa', 'external reference', 'externalreference'],
 };
+
+function buildAddress(map: Map<string, any>) {
+  const street = pick(map, FIELD.address);
+  if (!street) return '';
+  const number = pick(map, FIELD.addressNumber);
+  const complement = pick(map, FIELD.addressComplement);
+  const district = pick(map, FIELD.district);
+  const city = pick(map, FIELD.city);
+  const state = pick(map, FIELD.state);
+  const cep = onlyNumbers(pick(map, FIELD.postalCode));
+  const line = [street, number ? 'nº ' + number : '', complement].filter(Boolean).join(', ');
+  const place = [district, [city, state].filter(Boolean).join(' - '), cep ? 'CEP ' + cep : ''].filter(Boolean).join(', ');
+  return [line, place].filter(Boolean).join(', ');
+}
 
 function readRows(fileName: string, buffer: Buffer): Record<string, any>[] {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, raw: false });
@@ -165,12 +187,26 @@ function findClient(existing: ExistingClient[], data: { asaasCustomerId?: string
   const phone = onlyNumbers(data.phone);
   const name = normalizeText(data.name);
 
-  return existing.find(c => asaasId && c.asaas_customer_id === asaasId)
-    || existing.find(c => doc && onlyNumbers(c.doc) === doc)
-    || existing.find(c => email && normalizeText(c.email) === email)
-    || existing.find(c => phone && (onlyNumbers(c.whatsapp) === phone || onlyNumbers(c.phone) === phone))
-    || existing.find(c => name && normalizeText(c.name) === name)
-    || null;
+  // Do not merge distinct people solely because they share a name or contact.
+  const compatible = (c: ExistingClient) =>
+    (!doc || !onlyNumbers(c.doc) || onlyNumbers(c.doc) === doc)
+    && (!asaasId || !c.asaas_customer_id || c.asaas_customer_id === asaasId);
+
+  if (asaasId) {
+    const found = existing.find(c => c.asaas_customer_id === asaasId);
+    if (found) return compatible(found) ? found : null;
+  }
+  if (doc.length >= 11) {
+    const found = existing.find(c => onlyNumbers(c.doc) === doc);
+    if (found) return compatible(found) ? found : null;
+  }
+  if (!name) return null;
+  const byContact = existing.filter(c =>
+    compatible(c)
+    && normalizeText(c.name) === name
+    && ((email && normalizeText(c.email) === email)
+      || (phone && (onlyNumbers(c.whatsapp) === phone || onlyNumbers(c.phone) === phone))));
+  return byContact.length === 1 ? byContact[0] : null;
 }
 
 function buildClientPayload(lawFirmId: string, data: any, defaultServiceId: string | null) {
@@ -201,7 +237,7 @@ async function loadAllClients(admin: ReturnType<typeof createAdminSupabase>, law
   for (let from = 0; ; from += chunk) {
     const { data, error } = await admin
       .from('clients')
-      .select('id,name,doc,email,phone,whatsapp,asaas_customer_id,service_id')
+      .select('id,name,doc,email,phone,whatsapp,asaas_customer_id,address,service_id')
       .eq('law_firm_id', lawFirmId)
       .order('id', { ascending: true })
       .range(from, from + chunk - 1);
@@ -273,6 +309,7 @@ export async function POST(req: Request) {
       const doc = pick(map, FIELD.clientDoc);
       const email = pick(map, FIELD.clientEmail);
       const phone = pick(map, FIELD.clientPhone);
+      const address = buildAddress(map);
       const asaasCustomerId = pick(map, FIELD.asaasCustomerId);
       const paymentValue = parseMoney(pick(map, FIELD.paymentValue));
       const dueDate = parseDate(pick(map, FIELD.dueDate));
@@ -298,8 +335,8 @@ export async function POST(req: Request) {
 
         if (shouldImportClient && name) {
           if (!client && createMissingClients) {
-            const payload = buildClientPayload(profile.law_firm_id, { name, doc, email, phone, asaasCustomerId }, defaultServiceId);
-            const { data: created, error } = await admin.from('clients').insert(payload).select('id,name,doc,email,phone,whatsapp,asaas_customer_id,service_id').single();
+            const payload = buildClientPayload(profile.law_firm_id, { name, doc, email, phone, asaasCustomerId, address }, defaultServiceId);
+            const { data: created, error } = await admin.from('clients').insert(payload).select('id,name,doc,email,phone,whatsapp,asaas_customer_id,address,service_id').single();
             if (error) throw error;
             client = created as any;
             existingClients.push(client);
@@ -310,6 +347,8 @@ export async function POST(req: Request) {
             if (!client.email && email) updates.email = email;
             if (!client.phone && phone) updates.phone = phone;
             if (!client.whatsapp && phone) updates.whatsapp = phone;
+            // Update a populated address only when the export supplies a full location.
+            if (address && (!client.address || (pick(map, FIELD.city) && normalizeText(client.address) !== normalizeText(address)))) updates.address = address;
             if (!client.asaas_customer_id && asaasCustomerId) updates.asaas_customer_id = asaasCustomerId;
             if (!client.service_id && defaultServiceId) updates.service_id = defaultServiceId;
             if (Object.keys(updates).length) {

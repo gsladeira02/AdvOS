@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
+import { ClientInstallmentsOverview } from '@/components/ClientInstallmentsOverview';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -101,7 +102,7 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         .select('*')
         .eq('law_firm_id', profile.law_firm_id)
         .in('contract_id', clientFinancialIds)
-        .order('due_date', { ascending: false })
+        .order('due_date', { ascending: true })
     : { data: [] as any[] };
   const clientContractById = new Map(clientFinancialContracts.map((row: any) => [String(row.id), row]));
   const clientFinanceRows = (clientFinanceInstallmentsRes.data || []).map((row: any) => ({
@@ -238,19 +239,10 @@ export default async function PastaCliente({ params, searchParams }: { params: P
         <button className="btn btn-primary md:col-span-2 xl:col-span-6">Cadastrar cobrança para este cliente</button>
       </form>
 
-      <div className="table-responsive mt-5">
-        <table className="table min-w-[920px]">
-          <thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Forma de pagamento / ações</th></tr></thead>
-          <tbody>{clientFinanceRows.map((item: any) => <tr key={item.id}>
-            <td><b>{item.contract?.description || 'Cobrança'}</b>{item.provider === 'asaas' && <span className="ml-2 badge badge-warn">Asaas</span>}</td>
-            <td>{dateBR(item.due_date)}</td>
-            <td className="font-black">{money(item.amount || 0)}</td>
-            <td><span className={`badge ${item.status === 'pago' ? 'badge-ok' : item.status === 'atrasado' ? 'badge-danger' : 'badge-warn'}`}>{item.status === 'pago' ? 'Pagamento recebido' : item.status === 'atrasado' ? 'Em atraso' : 'Aguardando pagamento'}</span></td>
-            <td><FinanceInstallmentActions installmentId={String(item.id)} paymentMethod={item.payment_method} billingType={item.billing_type} compact /></td>
-          </tr>)}</tbody>
-        </table>
-        {!clientFinanceRows.length && <p className="mt-3 text-sm text-slate-500">Nenhuma cobrança cadastrada para este cliente.</p>}
-      </div>
+      <ClientInstallmentsOverview
+        rows={clientFinanceRows}
+        today={new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })}
+      />
       <p className="mt-3 text-xs text-slate-500">Excluir aqui remove a mesma cobrança exibida no Financeiro. Cobranças já criadas no Asaas não são canceladas automaticamente no Asaas.</p>
     </section>
 
