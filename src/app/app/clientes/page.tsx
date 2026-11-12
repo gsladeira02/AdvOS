@@ -27,6 +27,10 @@ export default async function Clientes({ searchParams }: { searchParams?: Promis
     <input className="input compact-input" name="email" placeholder="E-mail"/>
     <select className="input compact-input" name="service_id"><option value="">Serviço prestado</option>{services.map((s:any)=><option value={s.id} key={s.id}>{s.name}{!s.active ? ' (inativo)' : ''}</option>)}</select>
     <input className="input compact-input" name="address" placeholder="Endereço"/>
+    <label className="block text-xs font-semibold text-slate-600">
+      Data de assinatura do contrato
+      <input className="input compact-input mt-1 w-full" name="contract_signed_on" type="date" />
+    </label>
     <input className="input compact-input" name="notes" placeholder="Observações"/>
     <button className="btn btn-primary md:col-span-3">Cadastrar cliente</button>
   </form>;
@@ -34,7 +38,8 @@ export default async function Clientes({ searchParams }: { searchParams?: Promis
   return <div>
     <PageHeader title="Clientes" subtitle="Base central de clientes, serviços, contatos e documentos."/>
     {query?.salvo && <section className="compact-alert mb-3 border-green-200 bg-green-50 text-green-800">Cliente salvo com sucesso.</section>}
-    {query?.erro && <section className="compact-alert mb-3 border-red-200 bg-red-50 text-red-800">Não foi possível salvar o cliente. Revise os dados e tente novamente.</section>}
+    {query?.erro === 'data_assinatura' && <section className="compact-alert mb-3 border-red-200 bg-red-50 text-red-800">A data de assinatura informada é inválida.</section>}
+    {query?.erro && query.erro !== 'data_assinatura' && <section className="compact-alert mb-3 border-red-200 bg-red-50 text-red-800">Não foi possível salvar o cliente. Revise os dados e tente novamente.</section>}
     {servicesRes.error && <section className="compact-alert mb-3 border-red-200 bg-red-50 text-red-800">Não foi possível carregar os serviços.</section>}
     {clientsRes.error && <section className="compact-alert mb-3 border-red-200 bg-red-50 text-red-800">Não foi possível carregar os clientes.</section>}
 

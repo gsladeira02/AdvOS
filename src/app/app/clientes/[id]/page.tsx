@@ -155,6 +155,8 @@ export default async function PastaCliente({ params, searchParams }: { params: P
       </section>
     )}
 
+    {query?.assinatura === 'salva' && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Data de assinatura do contrato salva com sucesso.</section>}
+    {query?.assinatura_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível salvar a data de assinatura. Confira a data e tente novamente.</section>}
     {query?.foto_atualizada && <section className="compact-alert mb-4 border-green-200 bg-green-50 text-green-800">Foto do cliente atualizada com sucesso.</section>}
     {query?.foto_removida && <section className="compact-alert mb-4 border-slate-200 bg-slate-50 text-slate-700">Foto do cliente removida.</section>}
     {query?.foto_erro && <section className="compact-alert mb-4 border-red-200 bg-red-50 text-red-800">Não foi possível atualizar a foto. Use JPG, PNG ou WebP com até 8 MB.</section>}
@@ -189,7 +191,17 @@ export default async function PastaCliente({ params, searchParams }: { params: P
             <p><b>E-mail:</b> {client.email || '-'}</p>
             <p><b>Serviço:</b> {selectedService?.name || '-'}</p>
             <p className="md:col-span-2"><b>Endereço:</b> {client.address || '-'}</p>
+            <p className="md:col-span-2"><b>Assinatura do contrato:</b> {client.contract_signed_on ? dateBR(client.contract_signed_on) : 'Não informada'}</p>
           </div>
+          <form action="/api/clients/contract-signature" method="post" className="mt-4 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="client_id" value={client.id} />
+            <label className="block min-w-[200px] flex-1 text-xs font-semibold text-slate-600" htmlFor="contract_signed_on">
+              Data de assinatura do contrato
+              <input id="contract_signed_on" className="input compact-input mt-1 w-full" type="date" name="contract_signed_on" defaultValue={client.contract_signed_on || ''} />
+            </label>
+            <button type="submit" className="btn btn-primary">Salvar data</button>
+          </form>
+          <p className="mt-1 text-xs text-slate-500">A data é opcional. Para remover uma data registrada, deixe o campo vazio e salve.</p>
         </div>
         <div className="rounded-2xl border border-[#eee4d4] bg-[#fbf7ef] p-4 text-sm text-slate-600">
           <b>Pasta em nuvem</b>

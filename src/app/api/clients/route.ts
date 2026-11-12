@@ -3,6 +3,7 @@ import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { getOrCreateConversation } from '@/lib/whatsappApi';
 import { normalizeBrazilPhone } from '@/lib/whatsapp';
+import { parseContractSignedOn } from '@/lib/clientContractSignatureDate';
 
 function clean(v: FormDataEntryValue | null) {
   const value = String(v || '').trim();
@@ -19,6 +20,12 @@ export async function POST(req: Request) {
 
   const phone = clean(f.get('phone'));
   const whatsapp = clean(f.get('whatsapp'));
+  let contractSignedOn: string | null;
+  try {
+    contractSignedOn = parseContractSignedOn(f.get('contract_signed_on'));
+  } catch {
+    return NextResponse.redirect(new URL('/app/clientes?erro=data_assinatura', req.url), 303);
+  }
 
   const { data: client, error } = await admin.from('clients').insert({
     law_firm_id: profile.law_firm_id,
@@ -30,6 +37,7 @@ export async function POST(req: Request) {
     email: clean(f.get('email')),
     address: clean(f.get('address')),
     notes: clean(f.get('notes')),
+    contract_signed_on: contractSignedOn,
     service_id: clean(f.get('service_id')),
   }).select('id,name,phone,whatsapp').single();
 
