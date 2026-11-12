@@ -3,7 +3,7 @@ import { zipSync } from 'fflate';
 import { getCurrentProfile } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import {
-  missingExecutionFields, isOverdueCollectible, isOutstandingCollectible, todayInBrazil,
+  missingExecutionFields, isOverdueCollectible, isOutstandingCollectible, extractClientComarca, todayInBrazil,
   type ExecutionClient, type ExecutionInstallment,
 } from '@/lib/executionShared';
 import { renderExecution } from '@/lib/executionDocuments';
@@ -25,12 +25,9 @@ export async function POST(req:Request) {
     const { profile } = await getCurrentProfile();
     const form=await req.json();
     if(!form || form.confirmed!==true || !Array.isArray(form.selections) ||
-      form.selections.length<1 || form.selections.length>40) {
-      return NextResponse.json({error:'Selecione de 1 a 40 clientes e confirme o cálculo.'},{status:400});
+      form.selections.length<1 || form.selections.length>200) {
+      return NextResponse.json({error:'Selecione de 1 a 200 clientes e confirme o cálculo.'},{status:400});
     }
-    const comarca=String(form.comarca||'').trim();
-    if(!comarca || comarca.length>120 || /[<>\x00-\x1F]/.test(comarca))
-      return NextResponse.json({error:'Comarca inválida.'},{status:400});
     // A single, user-defined contract fine applies once per selected client.
     // This is not multiplied by the number of outstanding installments.
     const additionalFineCents=form.additionalFineCents;
@@ -88,7 +85,7 @@ export async function POST(req:Request) {
     // Every non-paid, non-cancelled installment is included, never a client-selected subset.
     const allFiles:Record<string,Uint8Array>={};
     const used=new Set<string>();
-    for(const item of selected){
+    for(const [clientIndex,item] of selected.entries()){
       const client=clients.get(item.id)!;
       const missing=missingExecutionFields(client);
       if(missing.length) return NextResponse.json({error:'Cadastro incompleto: '+client.name+' ('+missing.join(', ')+').'},{status:400});
@@ -101,12 +98,15 @@ export async function POST(req:Request) {
       const root=basename.toLowerCase();
       if(used.has(root))basename+=' - '+item.id.slice(0,8);
       used.add(root);
+      const comarca=extractClientComarca(client.address);
+      if(!comarca)return NextResponse.json({error:'Cidade/UF não identificada no endereço de '+client.name},{status:400});
       const rendered=await renderExecution({
         client,installments:remaining,comarca,today,additionalFineCents,
         accelerationConfirmed:form.accelerationConfirmed===true,
       });
-      allFiles['Execucoes Judiciais/'+basename+'.docx']=rendered.docx;
-      allFiles['Execucoes Judiciais/'+basename+'.pdf']=rendered.pdf;
+      const folder=selected.length>40?'Execucoes Judiciais/Pasta '+String(Math.floor(clientIndex/40)+1).padStart(2,'0')+'/':'Execucoes Judiciais/';
+      allFiles[folder+basename+'.docx']=rendered.docx;
+      allFiles[folder+basename+'.pdf']=rendered.pdf;
     }
     const zip=zipSync(allFiles,{level:6});
     return new Response(Buffer.from(zip),{

@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { calculateExecution, isOverdueCollectible, formatReal, formatBRDate, type ExecutionClient, type ExecutionInstallment } from '@/lib/executionShared';
+import { calculateExecution, isOverdueCollectible, extractClientComarca, formatReal, formatBRDate, type ExecutionClient, type ExecutionInstallment } from '@/lib/executionShared';
 
 export function ExecutionsBuilder({clients, installments, today, incompleteCount, withoutOverdueCount}: {
   clients: ExecutionClient[]; installments: ExecutionInstallment[];
@@ -9,7 +9,6 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
 }) {
   const [selected,setSelected] = useState<string[]>([]);
   const [globalFine,setGlobalFine] = useState('1200.00');
-  const [comarca,setComarca] = useState('Serra/ES');
   const [confirmed,setConfirmed] = useState(false);
   const [accelerationConfirmed,setAccelerationConfirmed] = useState(false);
   const [busy,setBusy] = useState(false);
@@ -37,14 +36,12 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
     if (!selectedClients.length) return setMessage('Selecione ao menos um cliente.');
     if (!confirmed) return setMessage('Confira os encargos e confirme as condições contratuais.');
     if (hasFuture && !accelerationConfirmed) return setMessage('Confirme a existência de fundamento contratual para cobrar parcelas futuras.');
-    if (selectedClients.length>40) return setMessage('Selecione no máximo 40 clientes por ZIP.');
-    if (!comarca.trim()||comarca.length>120) return setMessage('Informe a comarca competente.');
     if (!fineIsValid) return setMessage('Informe um valor válido de multa contratual (de R$ 0,00 a R$ 10.000.000,00).');
     try {
       const selections=selectedClients.map(c=>({clientId:c.id}));
       setBusy(true);
       const response=await fetch('/api/executions/generate',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({selections,additionalFineCents:globalFineCents,comarca:comarca.trim(),confirmed:true,accelerationConfirmed:hasFuture?accelerationConfirmed:false})});
+        body:JSON.stringify({selections,additionalFineCents:globalFineCents,confirmed:true,accelerationConfirmed:hasFuture?accelerationConfirmed:false})});
       if(!response.ok){const x=await response.json().catch(()=>({}));throw Error(x.error||'Falha ao gerar documentos.');}
       const blob=await response.blob();
       const url=URL.createObjectURL(blob);
@@ -67,9 +64,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
     </section>
     <section className="card p-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <label className="max-w-sm flex-1 text-sm font-semibold">Comarca (conferir competência)
-          <input className="input mt-1 w-full" value={comarca} maxLength={120} onChange={e=>setComarca(e.target.value)} />
-        </label>
+        <p className="max-w-md flex-1 text-sm text-slate-600">A comarca é definida automaticamente pela cidade do endereço de cada cliente.</p>
         <div className="text-right"><b>{selectedClients.length} cliente(s) selecionado(s)</b><p className="text-xs text-slate-500">Principal total ainda em aberto: {formatReal(principalTotal)}</p></div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -86,6 +81,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
         </div>
       </div>
       <p className="mt-3 text-xs text-slate-500">Após atingir duas parcelas vencidas, a minuta incluirá todas as parcelas restantes não pagas do cliente, vencidas ou futuras. Os juros de 5% ao mês incidem apenas pelo tempo já transcorrido de atraso; o encargo fixo de 10% é discriminado por parcela. A antecipação de parcelas futuras depende de previsão contratual ou fundamento legal aplicável.</p>
+      <p className="mt-3 text-xs text-slate-500">Seleções superiores a 40 clientes geram automaticamente várias pastas, com 40 clientes por pasta, dentro do mesmo arquivo ZIP.</p>
       <button type="button" className="btn btn-secondary mt-4 text-xs" onClick={()=>setSelected(s=>s.length===clients.length?[]:clients.map(c=>c.id))}>
         {selected.length===clients.length?'Desmarcar todos':'Selecionar todos os elegíveis'}
       </button>
@@ -107,6 +103,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
             </label>
             <Link className="text-xs text-emerald-700 underline" href={'/app/clientes/'+client.id}>Ver ficha</Link>
           </div>
+          <p className="mt-1 text-xs text-slate-500">Comarca: {extractClientComarca(client.address)}</p>
           <p className="mt-2 text-sm text-slate-600">{overdue.length} parcela(s) vencida(s) + {future.length} a vencer = {rows.length} parcela(s) restantes cobradas integralmente</p>
           <p className="mt-1 text-xs text-slate-500">Principal: {formatReal(calculated.principalCents)} · juros vencidos: {formatReal(calculated.interestCents)} · acréscimo fixo 10%: {formatReal(calculated.surchargeCents)}</p>
           <p className="mt-1 text-sm font-black">Montante devedor: {formatReal(calculated.amountDueCents)}</p>
@@ -132,7 +129,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
         {busy?'Gerando arquivos...':'Baixar um ZIP com DOCX e PDF de todos os selecionados'}
       </button>
       {message && <p className="text-sm text-slate-700" role="status">{message}</p>}
-      <p className="text-xs text-slate-500">Cada cliente terá dois arquivos: Execucao - Nome do cliente.docx e Execucao - Nome do cliente.pdf, todos juntos no mesmo arquivo ZIP.</p>
+      <p className="text-xs text-slate-500">Cada cliente terá um DOCX e um PDF. A partir de 41 clientes, o ZIP terá duas pastas de até 40; a cada novo grupo de 40 será criada mais uma pasta.</p>
     </section>
   </div>;
 }

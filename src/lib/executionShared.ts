@@ -65,6 +65,7 @@ export const EXECUTION_REQUIRED: { key: keyof ExecutionClient; label: string }[]
 ];
 export function missingExecutionFields(client: ExecutionClient) {
   const missing = EXECUTION_REQUIRED.filter(({key}) => client[key] == null || String(client[key]).trim() === '').map(x => x.label);
+  if (!extractClientComarca(client.address)) missing.push('Cidade/UF identificável no endereço');
   if (client.doc && client.doc.replace(/\D/g, '').length !== 11) missing.push('CPF válido de 11 dígitos');
   if (client.contract_total_amount != null && !(Number(client.contract_total_amount) > 0)) missing.push('Valor do contrato acima de zero');
   if (client.contract_installment_count != null && !(Number(client.contract_installment_count) >= 1)) missing.push('Quantidade de parcelas maior que zero');
@@ -111,4 +112,28 @@ export function formatReal(cents: number) {
 export function formatBRDate(isoDate: string) {
   const [y,m,d] = isoDate.split('-');
   return `${d}/${m}/${y}`;
+}
+
+export function extractClientComarca(address: string | null): string | null {
+  const value=String(address || '').trim();if(!value)return null;
+  const states:Record<string,string>={
+    'espírito santo':'ES','espirito santo':'ES','minas gerais':'MG',
+    'rio de janeiro':'RJ','são paulo':'SP','sao paulo':'SP','bahia':'BA',
+    'paraná':'PR','parana':'PR','pernambuco':'PE','rio grande do sul':'RS',
+    'santa catarina':'SC','goiás':'GO','goias':'GO','distrito federal':'DF',
+    'rio grande do norte':'RN','ceará':'CE','ceara':'CE','pará':'PA','para':'PA',
+    'mato grosso':'MT','mato grosso do sul':'MS','alagoas':'AL','amazonas':'AM',
+    'rondônia':'RO','rondonia':'RO','maranhão':'MA','maranhao':'MA','piauí':'PI',
+    'piaui':'PI','paraíba':'PB','paraiba':'PB','sergipe':'SE','acre':'AC',
+    'tocantins':'TO','roraima':'RR','amapá':'AP','amapa':'AP'
+  };
+  for(const segment of value.split(',').map(x=>x.trim()).reverse()){
+    const m=segment.match(/^(.+?)\s*[-–]\s*(.+)$/);if(!m)continue;
+    const city=m[1].trim().replace(/^(?:município|cidade)\s+de\s+/i,'');
+    const raw=m[2].trim().toLocaleLowerCase('pt-BR');
+    const state=states[raw]||(/^[a-z]{2}$/.test(raw)?raw.toUpperCase():'');
+    if(city.length>=2&&state&&/^[\p{L}0-9 .'-]+$/u.test(city))return city+'/'+state;
+  }
+  const fallback=value.match(/(?:^|,)\s*([\p{L} .'-]{2,75})\s*\/\s*([A-Z]{2})(?:,|$)/u);
+  return fallback?fallback[1].trim()+'/'+fallback[2]:null;
 }
