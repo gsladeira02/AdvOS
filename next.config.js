@@ -18,6 +18,9 @@ const noStoreHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    '/api/executions/generate': ['./src/lib/templates/execucao-modelo-oficial.docx'],
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

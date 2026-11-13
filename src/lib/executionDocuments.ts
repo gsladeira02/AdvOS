@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage, type PDFFont } from 'pdf-lib';
 import {
   calculateExecution, formatReal, formatBRDate, type ExecutionCalculation,
@@ -15,7 +15,12 @@ export type ExecutionMatter = {
   additionalFineCents: number;
   accelerationConfirmed: boolean;
 };
-type Paragraph = { kind:'title'|'heading'|'body'|'citation'|'spacer'|'center'; text:string };
+type Paragraph = {
+  kind:'title'|'heading'|'body'|'citation'|'spacer'|'center';
+  text:string; spans?:StyledSpan[]; fontSize?:number; leftIndentPt?:number;
+  firstIndentPt?:number; beforePt?:number; afterPt?:number;
+  lineMultiple?:number; align?:'left'|'center'|'both'|'right';
+};
 function fullDate(date:string) {
   return new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
 }
@@ -125,7 +130,7 @@ function renderMatter(matter:ExecutionMatter,calc:ExecutionCalculation):Paragrap
   add('body','Ante o exposto, vem a parte autora requerer de Vossa Excelência:');
   add('body','a) a citação da parte ré, nos moldes do art. 18 da Lei nº 9.099/95, para que compareça a Audiência de Conciliação pré-designada, sob pena dos efeitos da revelia;');
   add('body','b) A concessão da gratuidade da justiça à exequente, inclusive para fins de recurso, nos termos do Art. 98 e seguintes do CPC;');
-  add('body','c) julgue totalmente procedente o presente pedido, condenando a parte ré ao pagamento de '+moneyWithWords(calc.amountDueCents)+', todas acrescidas de juros moratórios, multa e correção monetária, além da condenação do réu ao pagamento da multa contratual pela quebra de contrato motivado por si, no previsto previsto em contrato de honorários de '+moneyWithWords(calc.additionalFineCents)+', no total de '+formatReal(calc.totalCents)+'.');
+  add('body','c) julgue totalmente procedente o presente pedido, condenando a parte ré ao pagamento de '+moneyWithWords(calc.amountDueCents)+', todas acrescidas de juros moratórios, multa e correção monetária, além da condenação do réu ao pagamento da multa contratual pela quebra de contrato motivado por si, no previsto em contrato de honorários de '+moneyWithWords(calc.additionalFineCents)+', no total de '+formatReal(calc.totalCents)+'.');
   add('body','d) A condenação do Réu as custas e honorários advocatícios em patamar não inferior a 20% (vinte por cento);');
   add('body','e) Caso o Executado não pague, requer desde já penhora online via BACENJUD, do valor devido, com fulcro no artigo 835, I do CPC;');
   add('body','f) Não sendo encontrados valores no meio acima, requer-se pesquisa, de eventuais ativos, através do sistema RENAJUD e INFOJUD;');
@@ -142,17 +147,170 @@ function renderMatter(matter:ExecutionMatter,calc:ExecutionCalculation):Paragrap
 function xmlEscape(s:string) {
   return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+type RunStyle = { bold?: boolean; italic?: boolean; underline?: boolean; yellow?: boolean };
+type StyledSpan = { text: string; style: RunStyle };
+const ORIGINAL_YELLOW_QUOTE = 'confere ao contrato de prestação de serviços advocatícios a qualidade de título de crédito executivo extrajudicial, independentemente de constar em seu teor a assinatura de duas testemunhas.';
+
+/** This is the original user's five-page Word template. We update only named placeholders
+ * inside w:t nodes and preserve every OOXML part, run format, header, footer and image.
+ */
+function getOfficialTemplate(): Record<string,Uint8Array> {
+  return unzipSync(new Uint8Array(readFileSync(join(process.cwd(),
+    'src','lib','templates','execucao-modelo-oficial.docx'))));
+}
+function contractDate(iso:string):string {
+  const date=new Date(iso+'T12:00:00.000Z');
+  const month=new Intl.DateTimeFormat('pt-BR',{month:'long',timeZone:'UTC'}).format(date);
+  return date.getUTCDate()+' '+month.charAt(0).toLocaleUpperCase('pt-BR')+month.slice(1)+' '+date.getUTCFullYear();
+}
+function fillOfficialTemplate(matter:ExecutionMatter, calc:ExecutionCalculation) {
+  const archive=getOfficialTemplate();
+  const src=archive['word/document.xml'];
+  if(!src)throw new Error('Modelo de execução sem documento principal.');
+  let xml=strFromU8(src);
+  const late=calc.lines.filter(l=>l.alreadyDue).length;
+  const unpaid=calc.lines.length;
+  const situation=late===unpaid
+    ? 'com '+late+' '+(late===1?'parcela vencida':'parcelas vencidas')
+    : 'com '+late+' '+(late===1?'parcela vencida':'parcelas vencidas')+
+      ', de um total de '+unpaid+' '+(unpaid===1?'parcela não paga':'parcelas não pagas');
+  const c=matter.client;
+  const values:Record<string,string>={
+    COMARCA:matter.comarca.toLocaleUpperCase('pt-BR'),
+    NOME:c.name.toLocaleUpperCase('pt-BR'),
+    NACIONALIDADE:'brasileiro(a)',
+    ESTADO_CIVIL:String(c.civil_status),
+    PROFISSAO:String(c.profession),
+    RG_COMPLETO:String(c.rg)+' '+String(c.rg_uf),
+    CPF:cpfPretty(String(c.doc)),
+    ENDERECO:String(c.address),
+    DATA_CONTRATO:contractDate(String(c.contract_signed_on)),
+    VALOR_CONTRATO_EXTENSO:moneyWithWords(Math.round(Number(c.contract_total_amount)*100)),
+    SITUACAO_PARCELAS:situation,
+    MONTANTE_EXTENSO:moneyWithWords(calc.amountDueCents),
+    MULTA_EXTENSO:moneyWithWords(calc.additionalFineCents),
+    VALOR_TOTAL:formatReal(calc.totalCents),
+    DATA_ATUAL:fullDate(matter.today),
+  };
+  for(const [key,value] of Object.entries(values)){
+    const needle='{{'+key+'}}';
+    if(!xml.includes(needle))throw new Error('Modelo de execução incompleto: '+key);
+    xml=xml.split(needle).join(xmlEscape(value));
+  }
+  if(/\{\{[A-Z_]+\}\}/.test(xml))throw new Error('Modelo com campos variáveis não preenchidos.');
+  if(xml.includes('previsto previsto'))throw new Error('Duplicação textual identificada no modelo.');
+  archive['word/document.xml']=strToU8(xml);
+  return {docx:zipSync(archive,{level:6}),xml,logo:archive['word/media/image1.png']||null,watermark:archive['word/media/image2.png']||null};
+}
+function decodeWordText(s:string):string{
+  return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
+    .replace(/&apos;/g,"'").replace(/&amp;/g,'&')
+    .replace(/&#(\d+);/g,(_,n:string)=>String.fromCharCode(Number(n)));
+}
+/** Read text and run-level typography from the SAME filled DOCX used for the download. */
+function paragraphsFromOfficialXml(xml:string):Paragraph[] {
+  const blocks=xml.match(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)||[];
+  return blocks.map(raw=>{
+    const props=raw.match(/<w:pPr(?:\s[^>]*)?>[\s\S]*?<\/w:pPr>/)?.[0]||'';
+    const left=Number(props.match(/<w:ind\b[^>]*w:left="(-?\d+)"/)?.[1]||0)/20;
+    const first=Number(props.match(/<w:ind\b[^>]*w:firstLine="(-?\d+)"/)?.[1]||0)/20;
+    const space=props.match(/<w:spacing\b[^>]*\/>/)?.[0]||'';
+    const before=Number(space.match(/w:before="(\d+)"/)?.[1]||0)/20;
+    const after=Number(space.match(/w:after="(\d+)"/)?.[1]||0)/20;
+    const line=Number(space.match(/w:line="(\d+)"/)?.[1]||240)/240;
+    const alignVal=props.match(/<w:jc\b[^>]*w:val="([^"]+)"/)?.[1]||'both';
+    const align=(['left','center','both','right'].includes(alignVal)?alignVal:'both') as Paragraph['align'];
+    const spans:StyledSpan[]=[];
+    let size:number|undefined;
+    const runs=raw.match(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g)||[];
+    for(const run of runs) {
+      const part=run.replace(/<w:tab\s*\/>/g,'<w:t>    </w:t>').replace(/<w:br\s*\/>/g,'<w:t> </w:t>');
+      const content=(part.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g)||[])
+        .map(t=>decodeWordText(t.replace(/^<w:t\b[^>]*>/,'').replace(/<\/w:t>$/,''))).join('');
+      if(!content)continue;
+      const rPr=run.match(/<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/)?.[0]||'';
+      const rSize=Number(rPr.match(/<w:sz\b[^>]*w:val="(\d+)"/)?.[1]||0)/2;
+      if(rSize&&!size)size=rSize;
+      const bold=/<w:b(?:\s|\/|>)/.test(rPr)&&!/<w:b\b[^>]*w:val="(?:0|false)"/.test(rPr);
+      const italic=/<w:i(?:\s|\/|>)/.test(rPr)&&!/<w:i\b[^>]*w:val="(?:0|false)"/.test(rPr);
+      const underline=/<w:u(?:\s|\/|>)/.test(rPr)&&!/<w:u\b[^>]*w:val="none"/.test(rPr);
+      const yellow=/<w:shd\b[^>]*w:fill="(?:FFD966|FFFF00)"/i.test(rPr)
+        || /<w:highlight\b[^>]*w:val="yellow"/i.test(rPr);
+      const style:RunStyle={bold,italic,underline,yellow};
+      spans.push({text:content,style});
+    }
+    let text=spans.map(x=>x.text).join('');
+    // The first section number is generated by Word's list numbering.
+    if(text==='DA GRATUIDADE DA JUSTIÇA'){text='1. '+text;spans.unshift({text:'1. ',style:{bold:true}});}
+    const trimmed=text.trim();
+    const heading=/^(?:1\. DA GRATUIDADE|I\s*[–-]\s*DOS FATOS|I\s*[–-]\s*DO DIREITO|III\s*[–-]\s*DO PEDIDO)/.test(trimmed);
+    const title=/^(?:EXCELENTÍSSIMO\(A\)|AÇÃO DE EXECUÇÃO DE TÍTULO)/.test(trimmed);
+    const citation=!!size && size<=10.5;
+    const kind:Paragraph['kind']=!trimmed?'spacer':title?'title':heading?'heading':citation?'citation':align==='center'?'center':'body';
+    return {kind,text,spans,fontSize:size||12,leftIndentPt:left,firstIndentPt:first,
+      beforePt:before,afterPt:after,lineMultiple:line,align};
+  });
+}
+
+function styledSpans(p:Paragraph):StyledSpan[] {
+  if (p.spans) return p.spans;
+  const source=p.text;
+  const modifiers:{start:number;end:number;value:RunStyle}[]=[];
+  const mark=(needle:string,value:RunStyle)=>{const start=source.indexOf(needle);if(start>=0)modifiers.push({start,end:start+needle.length,value});};
+  if(p.kind==='title'||p.kind==='heading')modifiers.push({start:0,end:source.length,value:{bold:true}});
+  if(p.kind==='citation'&&source.includes(ORIGINAL_YELLOW_QUOTE))mark(ORIGINAL_YELLOW_QUOTE,{yellow:true});
+  if(source.startsWith('DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA')) {
+    mark('DANIEL LADEIRA SOCIEDADE INDIVIDUAL DE ADVOCACIA',{bold:true});
+    mark('representada neste ato por sócio administrador Dr, DANIEL COSTA LADEIRA',{bold:true});
+  }
+  if(source.startsWith('em face do ')) {
+    const start='em face do '.length; const end=source.indexOf(',',start);
+    if(end>start)modifiers.push({start,end,value:{bold:true}});
+  }
+  if(source.includes('c) julgue totalmente procedente')) {
+    const values=source.match(/R\$\s?[0-9][0-9.,]*/g)||[];
+    if(values.length){mark(values[0],{bold:true});mark(values[values.length-1],{bold:true});}
+  }
+  if(source==='DANIEL COSTA LADEIRA')modifiers.push({start:0,end:source.length,value:{bold:true}});
+  if(!modifiers.length)return [{text:source,style:{}}];
+  const points=Array.from(new Set([0,source.length,...modifiers.flatMap(m=>[m.start,m.end])])).sort((a,b)=>a-b);
+  const spans:StyledSpan[]=[];
+  for(let i=0;i+1<points.length;i++){
+    const a=points[i],b=points[i+1];if(a===b)continue;
+    const style:RunStyle={};
+    for(const mod of modifiers)if(mod.start<=a && mod.end>=b)Object.assign(style,mod.value);
+    const text=source.slice(a,b);
+    if(text)spans.push({text,style});
+  }
+  return spans;
+}
+function isSectionHeading(p:Paragraph) {
+  return p.kind==='heading' && /^(?:I|II|III|IV)\s*[–-]\s*(?:DOS FATOS|DO DIREITO|DO PEDIDO)$/.test(p.text);
+}
 function docxParagraph(p:Paragraph) {
-  if(p.kind==='spacer')return '<w:p><w:pPr><w:spacing w:before="2700" w:after="180"/></w:pPr></w:p>';
-  const alignment=(p.kind==='center'||p.kind==='title')?'center':(p.kind==='heading'?'left':'both');
-  const bold=p.kind==='heading'||p.kind==='title';
-  const fontSize=p.kind==='citation'?20:24;
-  const before=p.kind==='heading'?360:p.kind==='title'?300:160;
-  const firstLine=p.kind==='body' ? '<w:ind w:firstLine="720"/>' : p.kind==='citation' ? '<w:ind w:left="2250"/>' : '';
-  return '<w:p><w:pPr><w:jc w:val="'+alignment+'"/>'+firstLine+
-    '<w:spacing w:before="'+before+'" w:after="200" w:line="300" w:lineRule="auto"/></w:pPr>'+
-    '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="'+fontSize+'"/>'+
-    (bold?'<w:b/>':'')+'</w:rPr><w:t xml:space="preserve">'+xmlEscape(p.text)+'</w:t></w:r></w:p>';
+  if(p.kind==='spacer')return '<w:p><w:pPr><w:spacing w:before="2600" w:after="200"/></w:pPr></w:p>';
+  const isHeading=p.kind==='heading';
+  const isCitation=p.kind==='citation';
+  const align=p.kind==='center'||p.kind==='title'?'center':isHeading?'left':'both';
+  const before=p.kind==='title'?240:isHeading?240:isCitation?60:180;
+  const after=p.kind==='title'?240:isHeading?320:isCitation?40:200;
+  const line=isCitation?276:240;
+  const indent=isCitation?'<w:ind w:left="2268"/>':p.kind==='body'?'<w:ind w:firstLine="720"/>':'';
+  const border=isSectionHeading(p)?'<w:pBdr><w:bottom w:val="single" w:sz="5" w:space="1" w:color="808080"/></w:pBdr>':'';
+  const size=isCitation?20:24; // Arial 10pt citations, Arial 12pt text, exactly as the source.
+  const runs=styledSpans(p).map(({text,style})=>{
+    const rPr='<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="'+size+'"/><w:szCs w:val="'+size+'"/>'+
+      (style.bold?'<w:b/><w:bCs/>':'')+
+      (style.italic?'<w:i/><w:iCs/>':'')+
+      (style.underline?'<w:u w:val="single"/>':'')+
+      (style.yellow?'<w:shd w:val="clear" w:color="auto" w:fill="FFD966"/>':'')+
+      '</w:rPr>';
+    return '<w:r>'+rPr+'<w:t xml:space="preserve">'+xmlEscape(text)+'</w:t></w:r>';
+  }).join('');
+  return '<w:p><w:pPr><w:jc w:val="'+align+'"/>'+indent+border+
+    '<w:spacing w:before="'+before+'" w:after="'+after+'" w:line="'+line+'" w:lineRule="auto"/></w:pPr>'+
+    runs+'</w:p>';
 }
 function makeDocx(paragraphs:Paragraph[], logo:Uint8Array|null) {
   const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -184,70 +342,122 @@ function makeDocx(paragraphs:Paragraph[], logo:Uint8Array|null) {
   if(logo){files['word/media/logo.png']=logo;files['word/_rels/header1.xml.rels']=strToU8(imageRels);}
   return zipSync(files,{level:6});
 }
-async function makePdf(paragraphs:Paragraph[], logoBytes:Uint8Array|null) {
+async function makePdf(paragraphs:Paragraph[], logoBytes:Uint8Array|null, watermarkBytes:Uint8Array|null) {
   const doc=await PDFDocument.create();
-  const font=await doc.embedFont(StandardFonts.Helvetica);
+  const regular=await doc.embedFont(StandardFonts.Helvetica);
   const bold=await doc.embedFont(StandardFonts.HelveticaBold);
+  const italic=await doc.embedFont(StandardFonts.HelveticaOblique);
+  const boldItalic=await doc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const choose=(s:RunStyle):PDFFont => s.bold?(s.italic?boldItalic:bold):(s.italic?italic:regular);
   let logo:PDFImage|null=null;
-  if(logoBytes)try{logo=await doc.embedPng(logoBytes);}catch{/* keep original header text */}
+  let watermark:PDFImage|null=null;
+  if(logoBytes)try{logo=await doc.embedPng(logoBytes);}catch{/* fallback */}
+  if(watermarkBytes)try{watermark=await doc.embedPng(watermarkBytes);}catch{/* fallback */}
+  const pageWidth=595.28, pageHeight=841.89;
   let page:PDFPage;
   let y:number;
-  function startPage(){
-    page=doc.addPage([595.28,841.89]);y=742;
-    if(logo){
-      const h=Math.min(65,90*logo.height/logo.width);
-      page.drawImage(logo,{x:445,y:760,width:90,height:h});
-      page.drawImage(logo,{x:118,y:200,width:350,height:350*logo.height/logo.width,opacity:0.035});
+  const createPage=()=>{
+    page=doc.addPage([pageWidth,pageHeight]);y=746;
+    // Header, watermark and two-line footer from the supplied document.
+    if(logo) {
+      const headerH=Math.min(65,90*logo.height/logo.width);
+      page.drawImage(logo,{x:445,y:762,width:90,height:headerH});
     }
-    page.drawText('LADEIRA ADVOGADOS',{x:416,y:743,font,size:11,color:rgb(0,0,0)});
-    const footer1='Rod. do Sol, 2070. Ed. Royal Blue Corporate, loja 01. Praia de Itaparica,';
-    const footer2='Vila Velha – ES. 29102-020. Contato: (27)99794-0089.';
-    page.drawText(footer1,{x:(595.28-font.widthOfTextAtSize(footer1,9))/2,y:45,font,size:9,color:rgb(0,0,0)});
-    page.drawText(footer2,{x:(595.28-font.widthOfTextAtSize(footer2,9))/2,y:32,font,size:9,color:rgb(0,0,0)});
-  }
-  startPage();
+    if(watermark) {
+      const watermarkW=535;
+      page.drawImage(watermark,{x:29,y:90,width:watermarkW,
+        height:watermarkW*watermark.height/watermark.width,opacity:0.08});
+    }
+    page.drawText('LADEIRA ADVOGADOS',{x:411,y:744,font:italic,size:11,color:rgb(0,0,0)});
+    const f1='Rod. do Sol, 2070. Ed. Royal Blue Corporate, loja 01. Praia de Itaparica,';
+    const f2='Vila Velha – ES. 29102-020. Contato: (27)99794-0089.';
+    page.drawText(f1,{x:(pageWidth-regular.widthOfTextAtSize(f1,9))/2,y:43,font:regular,size:9});
+    page.drawText(f2,{x:(pageWidth-regular.widthOfTextAtSize(f2,9))/2,y:30,font:regular,size:9});
+  };
+  createPage();
+  type StyledToken={text:string;style:RunStyle;width:number};
   for(const p of paragraphs) {
-    if(p.kind==='spacer'){if(y<230)startPage();else y-=125;continue;}
-    const citation=p.kind==='citation';
-    const face=(p.kind==='title'||p.kind==='heading')?bold:font;
-    const size=citation?10:12;
-    const isCentered=p.kind==='center'||p.kind==='title';
-    const isHeading=p.kind==='heading';
-    const left=citation?170.2:isCentered?55:isHeading?56.8:56.8;
-    const firstIndent=p.kind==='body'?36:0;
-    const maxRight=542.1;
-    const leading=citation?13.2:14.8;
-    const gap=(p.kind==='title'?28:isHeading?24:14);
-    const words=p.text.replace(/\s+/g,' ').split(' ');
-    const lines:string[]=[];
-    let line='';
-    for(const word of words){
-      const trial=line?line+' '+word:word;
-      const available=maxRight-left-(lines.length===0?firstIndent:0);
-      if(face.widthOfTextAtSize(trial,size)<=available || !line)line=trial;
-      else {lines.push(line);line=word;}
+    if(p.kind==='spacer'){if(y<92)createPage();else y-=Math.max(10,(p.beforePt||0)+12);continue;}
+    const quote=p.kind==='citation';
+    const title=p.kind==='title';
+    const heading=p.kind==='heading';
+    const center=p.align==='center'||title||p.kind==='center';
+    const left=56.7+(p.leftIndentPt??(quote?113:0));
+    const right=538.6;
+    const indent=p.firstIndentPt??(p.kind==='body'?36:0);
+    const fontSize=p.fontSize|| (quote?10:12);
+    const leading=fontSize*Math.max(1,p.lineMultiple||1.15);
+    const before=p.beforePt??(title?19:heading?23:quote?7:12);
+    const after=p.afterPt??(title?19:heading?14:quote?6:10);
+    const tokens:StyledToken[]=[];
+    for(const span of styledSpans(p)) {
+      const pieces=span.text.replace(/\s+/g,' ').split(/( +)/g).filter(Boolean);
+      for(const piece of pieces)tokens.push({
+        text:piece,style:span.style,width:choose(span.style).widthOfTextAtSize(piece,fontSize),
+      });
     }
-    if(line)lines.push(line);
-    const estimated=gap+lines.length*leading;
-    if(y-estimated<67)startPage();
-    y-=gap;
-    for(let i=0;i<lines.length;i++){
-      if(y<65)startPage();
-      const w=face.widthOfTextAtSize(lines[i],size);
-      const x=isCentered?Math.max(55,(595.28-w)/2):left+(i===0?firstIndent:0);
-      page.drawText(lines[i],{x,y,size,font:face,color:rgb(.04,.04,.04)});
+    const available=right-left;
+    const lines:StyledToken[][]=[];
+    let current:StyledToken[]=[];
+    let width=0;
+    for(const token of tokens){
+      if(!current.length && !token.text.trim())continue;
+      const max=available-(lines.length===0?indent:0);
+      if(current.length && width+token.width>max && token.text.trim()){
+        while(current.length && !current[current.length-1].text.trim()){
+          width-=current[current.length-1].width;current.pop();
+        }
+        if(current.length)lines.push(current);
+        current=[];width=0;
+      }
+      if(!current.length && !token.text.trim())continue;
+      current.push(token);width+=token.width;
+    }
+    while(current.length&&!current[current.length-1].text.trim())current.pop();
+    if(current.length)lines.push(current);
+    if(!lines.length)continue;
+    if(y-before-lines.length*leading-after<70)createPage();
+    y-=before;
+    for(let n=0;n<lines.length;n++) {
+      if(y<67)createPage();
+      const row=lines[n];
+      const rawWidth=row.reduce((sum,t)=>sum+t.width,0);
+      const rowIndent=n===0?indent:0;
+      const rowAvailable=available-rowIndent;
+      const spaces=row.filter(t=>/^ +$/.test(t.text)).reduce((count,t)=>count+t.text.length,0);
+      const justify=!center&&!heading&&n!==lines.length-1&&spaces>0;
+      const extra=justify?Math.max(0,(rowAvailable-rawWidth)/spaces):0;
+      let x=center?Math.max(left,(pageWidth-rawWidth)/2):left+rowIndent;
+      for(const part of row){
+        const font=choose(part.style);
+        const actualWidth=part.width+(justify&&/^ +$/.test(part.text)?extra*part.text.length:0);
+        if(part.style.yellow&&part.text.trim())page.drawRectangle({
+          x,y:y-3,width:part.width,height:fontSize+3,
+          color:rgb(1,217/255,102/255),
+        });
+        if(part.text.trim())page.drawText(part.text,{x,y,font,size:fontSize,color:rgb(.04,.04,.04)});
+        if(part.style.underline&&part.text.trim())page.drawLine({
+          start:{x,y:y-2},end:{x:x+part.width,y:y-2},thickness:.6,
+          color:rgb(.04,.04,.04),
+        });
+        x+=actualWidth;
+      }
+      if(isSectionHeading(p)&&n===lines.length-1)page.drawLine({
+        start:{x:56.7,y:y-3.5},end:{x:538.6,y:y-3.5},
+        thickness:.45,color:rgb(.4,.4,.4),
+      });
       y-=leading;
     }
+    y-=after;
   }
   return doc.save();
 }
-
 function getLogo():Uint8Array|null {
   try {return new Uint8Array(readFileSync(join(process.cwd(),'public','brand','ladeira-advogados.png')));}catch{return null;}
 }
 export async function renderExecution(matter:ExecutionMatter) {
   const calc=calculateExecution(matter.installments,matter.today,matter.additionalFineCents);
-  const paragraphs=renderMatter(matter,calc);
-  const logo=getLogo();
-  return {docx:makeDocx(paragraphs,logo),pdf:await makePdf(paragraphs,logo),calculation:calc};
+  const filled=fillOfficialTemplate(matter,calc);
+  const paragraphs=paragraphsFromOfficialXml(filled.xml);
+  return {docx:filled.docx,pdf:await makePdf(paragraphs,filled.logo,filled.watermark),calculation:calc};
 }
