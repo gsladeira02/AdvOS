@@ -23,14 +23,11 @@ const textNode=/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
 function paragraphText(xml:string):string {
   return Array.from(xml.matchAll(textNode),m=>decodeXml(m[1])).join('');
 }
-/** Substitui spans entre runs conservando todas as propriedades dos runs. */
-function replaceText(xml:string,target:string,value:string):string {
-  if(!target||target===value)return xml;
+/** Substitui trechos entre runs preservando as propriedades w:rPr e w:pPr originais. */
+function replaceAt(xml:string,start:number,end:number,value:string):string {
   const nodes=Array.from(xml.matchAll(textNode),m=>({text:decodeXml(m[1])}));
   const full=nodes.map(x=>x.text).join('');
-  const start=full.indexOf(target);
-  if(start<0)throw new Error('Trecho ausente no modelo: '+target.slice(0,45));
-  const end=start+target.length;
+  if(start<0||end<=start||end>full.length)throw new Error('Intervalo de texto inválido no modelo.');
   let offset=0;
   const range=nodes.map(x=>{const n={start:offset,end:offset+x.text.length};offset=n.end;return n;});
   const first=range.findIndex(n=>n.end>start);
@@ -45,6 +42,19 @@ function replaceText(xml:string,target:string,value:string):string {
   }
   let n=0;
   return xml.replace(textNode,(match,inner:string)=>match.replace(inner,encodeXml(result[n++])));
+}
+function replaceText(xml:string,target:string,value:string):string {
+  if(!target||target===value)return xml;
+  const start=paragraphText(xml).indexOf(target);
+  if(start<0)throw new Error('Trecho ausente no modelo: '+target.slice(0,45));
+  return replaceAt(xml,start,start+target.length,value);
+}
+type Span={start:number;end:number;value:string};
+function replaceSpans(xml:string,spans:Span[]):string {
+  // Do fim para o começo: substituições não afetam os offsets anteriores.
+  return spans.slice().sort((a,b)=>b.start-a.start).reduce((result,span)=>{
+    return replaceAt(result,span.start,span.end,span.value);
+  },xml);
 }
 function generated(lines:GeneratedParagraph[],prefix:string):string {
   const line=lines.find(x=>x.text.startsWith(prefix));
@@ -102,13 +112,15 @@ export function mergeExecutionTemplate(template:Uint8Array,lines:GeneratedParagr
       const oldWords=moneyWords(old),newWords=moneyWords(next);
       if(oldNums.length!==3||newNums.length!==3||oldWords.length!==2||newWords.length!==2)
         throw new Error('O item c do pedido é incompatível com o modelo original.');
-      let result=p;
-      for(let i=0;i<3;i++)result=replaceText(result,oldNums[i],newNums[i]);
-      for(let i=0;i<2;i++)result=replaceText(result,oldWords[i],newWords[i]);
-      if(paragraphText(result).includes('previsto previsto'))
-        result=replaceText(result,'previsto previsto','previsto');
+      const spans:Span[]=[];
+      const amounts=Array.from(old.matchAll(/R\$\s*[0-9][0-9.,]*[0-9]/g));
+      const written=Array.from(old.matchAll(/\([^()]*\b(?:real|reais)\b[^()]*\)/g));
+      amounts.forEach((m,i)=>spans.push({start:m.index,end:m.index+m[0].length,value:newNums[i]}));
+      written.forEach((m,i)=>spans.push({start:m.index,end:m.index+m[0].length,value:newWords[i]}));
+      const duplicate=old.indexOf('previsto previsto');
+      if(duplicate>=0)spans.push({start:duplicate,end:duplicate+'previsto previsto'.length,value:'previsto'});
       seen.add('pedidoC');
-      return result;
+      return replaceSpans(p,spans);
     }
     if(old.startsWith('Dá-se a causa o valor de')){
       const next=generated(lines,'Dá-se a causa o valor de');
