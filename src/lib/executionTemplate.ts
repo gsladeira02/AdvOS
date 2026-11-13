@@ -51,7 +51,7 @@ function generated(lines:GeneratedParagraph[],prefix:string):string {
   if(!line)throw new Error('Texto variável ausente: '+prefix);
   return line.text;
 }
-const moneyNums=(s:string)=>Array.from(s.matchAll(/R\$\s*[0-9][0-9.,]*/g),m=>m[0]);
+const moneyNums=(s:string)=>Array.from(s.matchAll(/R\$\s*[0-9][0-9.,]*[0-9]/g),m=>m[0]);
 const moneyWords=(s:string)=>Array.from(s.matchAll(/\([^()]*\b(?:real|reais)\b[^()]*\)/g),m=>m[0]);
 
 function unzipTemplate(template:Uint8Array):Record<string,Uint8Array> {
