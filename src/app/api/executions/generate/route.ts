@@ -7,6 +7,7 @@ import {
   type ExecutionClient, type ExecutionInstallment,
 } from '@/lib/executionShared';
 import { renderExecution } from '@/lib/executionDocuments';
+import { EXECUTION_TEMPLATE_NAME } from '@/lib/executionTemplate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,14 @@ export async function POST(req:Request) {
       return NextResponse.json({error:'Não foi possível conferir todos os clientes selecionados.'},{status:400});
     }
     const clients=new Map((clientResult.data as ExecutionClient[]).map(x=>[x.id,x]));
+    const templateResult=await db.from('document_templates').select('content')
+      .eq('law_firm_id',firm).eq('name',EXECUTION_TEMPLATE_NAME)
+      .order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(templateResult.error)throw new Error('Não foi possível localizar o modelo Word oficial.');
+    if(!templateResult.data?.content)return NextResponse.json({
+      error:'Cadastre uma vez o DOCX original em Execuções Judiciais para preservar a formatação.'
+    },{status:400});
+    const originalTemplate=new Uint8Array(Buffer.from(String(templateResult.data.content),'base64'));
     const contracts=await db.from('financial_contracts').select('id,client_id,description')
       .eq('law_firm_id',firm).in('client_id',ids);
     if(contracts.error)throw Error('Falha ao consultar contratos financeiros.');
@@ -103,7 +112,7 @@ export async function POST(req:Request) {
       const rendered=await renderExecution({
         client,installments:remaining,comarca,today,additionalFineCents,
         accelerationConfirmed:form.accelerationConfirmed===true,
-      });
+      },originalTemplate);
       const folder=selected.length>40?'Execucoes Judiciais/Pasta '+String(Math.floor(clientIndex/40)+1).padStart(2,'0')+'/':'Execucoes Judiciais/';
       allFiles[folder+basename+'.docx']=rendered.docx;
       allFiles[folder+basename+'.pdf']=rendered.pdf;

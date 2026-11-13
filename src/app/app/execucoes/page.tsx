@@ -1,19 +1,21 @@
 export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/PageHeader';
-import { getCurrentProfile } from '@/lib/current';
+import { getCurrentProfile, isAdminRole } from '@/lib/current';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import { ExecutionsBuilder } from '@/components/ExecutionsBuilder';
+import { EXECUTION_TEMPLATE_NAME } from '@/lib/executionTemplate';
 import { missingExecutionFields, isOverdueCollectible, isOutstandingCollectible, todayInBrazil, type ExecutionClient, type ExecutionInstallment } from '@/lib/executionShared';
 
 export default async function ExecucoesPage() {
   const { profile } = await getCurrentProfile();
   const db = createAdminSupabase();
   const lawFirm = profile.law_firm_id;
-  const [c, f, p] = await Promise.all([
+  const [c, f, p, template] = await Promise.all([
     db.from('clients').select('id,name,naturalidade,civil_status,profession,rg,rg_uf,doc,address,contract_signed_on,contract_total_amount,contract_installment_count').eq('law_firm_id', lawFirm).order('name'),
     db.from('financial_contracts').select('id,client_id,description').eq('law_firm_id', lawFirm),
     db.from('financial_installments').select('id,contract_id,amount,due_date,status,paid_at').eq('law_firm_id', lawFirm),
+    db.from('document_templates').select('id').eq('law_firm_id',lawFirm).eq('name',EXECUTION_TEMPLATE_NAME).limit(1),
   ]);
 
   if (c.error || f.error || p.error) {
@@ -42,6 +44,8 @@ export default async function ExecucoesPage() {
     <PageHeader title="Execuções Judiciais" subtitle="Selecione vários clientes com ao menos duas parcelas vencidas para cobrar todo o saldo em aberto em um único ZIP (DOCX e PDF)." />
     <ExecutionsBuilder
       clients={eligible}
+      hasOfficialTemplate={!template.error && (template.data?.length||0)>0}
+      canManageTemplate={isAdminRole(profile.role)}
       installments={outstanding.filter(row => eligibleIds.has(row.client_id))}
       today={today}
       incompleteCount={allClients.filter(client => missingExecutionFields(client).length > 0).length}

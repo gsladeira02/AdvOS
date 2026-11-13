@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { zipSync, strToU8 } from 'fflate';
+import { mergeExecutionTemplate } from '@/lib/executionTemplate';
 import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage, type PDFFont } from 'pdf-lib';
 import {
   calculateExecution, formatReal, formatBRDate, type ExecutionCalculation,
@@ -76,9 +77,10 @@ function renderMatter(matter:ExecutionMatter,calc:ExecutionCalculation):Paragrap
   const c=matter.client;
   const late=calc.lines.filter(x=>x.alreadyDue).length;
   const outstanding=calc.lines.length;
-  const status=outstanding===late
+  const future=outstanding-late;
+  const status=future===0
     ? late+' '+(late===1?'parcela vencida':'parcelas vencidas')
-    : late+' '+(late===1?'parcela vencida':'parcelas vencidas')+' e '+outstanding+' parcelas não pagas no total';
+    : late+' '+(late===1?'parcela vencida':'parcelas vencidas')+' e '+future+' '+(future===1?'parcela a vencer':'parcelas a vencer')+', todas não pagas';
   const qualification='em face do '+c.name.toLocaleUpperCase('pt-BR')+
     ', brasileiro(a), '+c.civil_status+', '+c.profession+
     ', portador da cédula de identidade número '+c.rg+' '+c.rg_uf+
@@ -125,7 +127,7 @@ function renderMatter(matter:ExecutionMatter,calc:ExecutionCalculation):Paragrap
   add('body','Ante o exposto, vem a parte autora requerer de Vossa Excelência:');
   add('body','a) a citação da parte ré, nos moldes do art. 18 da Lei nº 9.099/95, para que compareça a Audiência de Conciliação pré-designada, sob pena dos efeitos da revelia;');
   add('body','b) A concessão da gratuidade da justiça à exequente, inclusive para fins de recurso, nos termos do Art. 98 e seguintes do CPC;');
-  add('body','c) julgue totalmente procedente o presente pedido, condenando a parte ré ao pagamento de '+moneyWithWords(calc.amountDueCents)+', todas acrescidas de juros moratórios, multa e correção monetária, além da condenação do réu ao pagamento da multa contratual pela quebra de contrato motivado por si, no previsto previsto em contrato de honorários de '+moneyWithWords(calc.additionalFineCents)+', no total de '+formatReal(calc.totalCents)+'.');
+  add('body','c) julgue totalmente procedente o presente pedido, condenando a parte ré ao pagamento de '+moneyWithWords(calc.amountDueCents)+', todas acrescidas de juros moratórios, multa e correção monetária, além da condenação do réu ao pagamento da multa contratual pela quebra de contrato motivado por si, no previsto em contrato de honorários de '+moneyWithWords(calc.additionalFineCents)+', no total de '+formatReal(calc.totalCents)+'.');
   add('body','d) A condenação do Réu as custas e honorários advocatícios em patamar não inferior a 20% (vinte por cento);');
   add('body','e) Caso o Executado não pague, requer desde já penhora online via BACENJUD, do valor devido, com fulcro no artigo 835, I do CPC;');
   add('body','f) Não sendo encontrados valores no meio acima, requer-se pesquisa, de eventuais ativos, através do sistema RENAJUD e INFOJUD;');
@@ -245,9 +247,10 @@ async function makePdf(paragraphs:Paragraph[], logoBytes:Uint8Array|null) {
 function getLogo():Uint8Array|null {
   try {return new Uint8Array(readFileSync(join(process.cwd(),'public','brand','ladeira-advogados.png')));}catch{return null;}
 }
-export async function renderExecution(matter:ExecutionMatter) {
+export async function renderExecution(matter:ExecutionMatter,originalTemplate?:Uint8Array) {
   const calc=calculateExecution(matter.installments,matter.today,matter.additionalFineCents);
   const paragraphs=renderMatter(matter,calc);
   const logo=getLogo();
-  return {docx:makeDocx(paragraphs,logo),pdf:await makePdf(paragraphs,logo),calculation:calc};
+  const docx=originalTemplate?mergeExecutionTemplate(originalTemplate,paragraphs):makeDocx(paragraphs,logo);
+  return {docx,pdf:await makePdf(paragraphs,logo),calculation:calc};
 }

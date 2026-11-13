@@ -3,11 +3,16 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { calculateExecution, isOverdueCollectible, extractClientComarca, formatReal, formatBRDate, type ExecutionClient, type ExecutionInstallment } from '@/lib/executionShared';
 
-export function ExecutionsBuilder({clients, installments, today, incompleteCount, withoutOverdueCount}: {
+export function ExecutionsBuilder({clients, installments, today, incompleteCount, withoutOverdueCount, hasOfficialTemplate, canManageTemplate}: {
   clients: ExecutionClient[]; installments: ExecutionInstallment[];
   today: string; incompleteCount: number; withoutOverdueCount: number;
+  hasOfficialTemplate:boolean; canManageTemplate:boolean;
 }) {
   const [selected,setSelected] = useState<string[]>([]);
+  const [officialTemplate,setOfficialTemplate] = useState(hasOfficialTemplate);
+  const [templateFile,setTemplateFile] = useState<File|null>(null);
+  const [savingTemplate,setSavingTemplate] = useState(false);
+  const [templateMessage,setTemplateMessage] = useState('');
   const [globalFine,setGlobalFine] = useState('1200.00');
   const [confirmed,setConfirmed] = useState(false);
   const [accelerationConfirmed,setAccelerationConfirmed] = useState(false);
@@ -31,8 +36,22 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
   const selectedFineTotal=fineIsValid?selectedClients.length*globalFineCents:0;
   const toggle=(id:string)=>setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
 
+  async function uploadOfficialTemplate(){
+    if(!templateFile)return setTemplateMessage('Selecione o DOCX original.');
+    const body=new FormData();body.append('file',templateFile);
+    setSavingTemplate(true);setTemplateMessage('');
+    try{
+      const response=await fetch('/api/executions/template',{method:'POST',body});
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||'Falha ao salvar o modelo.');
+      setOfficialTemplate(true);
+      setTemplateMessage('Modelo oficial salvo. A formatação original será preservada no DOCX.');
+    }catch(error:unknown){setTemplateMessage(error instanceof Error?error.message:'Falha ao salvar o modelo.');}
+    finally{setSavingTemplate(false);}
+  }
   async function download() {
     setMessage('');
+    if(!officialTemplate)return setMessage('Cadastre o DOCX original antes de gerar execuções.');
     if (!selectedClients.length) return setMessage('Selecione ao menos um cliente.');
     if (!confirmed) return setMessage('Confira os encargos e confirme as condições contratuais.');
     if (hasFuture && !accelerationConfirmed) return setMessage('Confirme a existência de fundamento contratual para cobrar parcelas futuras.');
@@ -53,6 +72,20 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
   }
 
   return <div className="space-y-5">
+    <section className="card p-5">
+      <p className="font-bold">Modelo Word oficial da execução judicial</p>
+      <p className="mt-1 text-sm text-slate-600">
+        {officialTemplate?'Modelo oficial cadastrado: os DOCX gerados preservam cabeçalho, rodapé, imagens, realces, estilos e demais formatos do original.':'Cadastre uma vez o modelo DOCX original. O sistema não substituirá seu modelo por um documento reformatado.'}
+      </p>
+      {canManageTemplate&&<div className="mt-3 flex flex-wrap items-center gap-3">
+        <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="max-w-full text-sm" onChange={e=>setTemplateFile(e.target.files?.[0]||null)} />
+        <button type="button" className="btn btn-secondary" disabled={!templateFile||savingTemplate}
+          onClick={()=>void uploadOfficialTemplate()}>{savingTemplate?'Salvando modelo...':'Salvar modelo Word'}</button>
+      </div>}
+      {templateMessage&&<p className="mt-2 text-sm text-slate-600" role="status">{templateMessage}</p>}
+      <p className="mt-2 text-xs text-slate-500">O PDF é diagramado separadamente e deve ser conferido com o Word antes de protocolar.</p>
+    </section>
     <section className="card p-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <div><p className="text-xs text-slate-500">Elegíveis (2+ atrasadas)</p><p className="text-2xl font-black">{clients.length}</p></div>
@@ -125,7 +158,7 @@ export function ExecutionsBuilder({clients, installments, today, incompleteCount
         checked={accelerationConfirmed} onChange={e=>setAccelerationConfirmed(e.target.checked)}/>
         <span>Confirmei, nos contratos selecionados, o fundamento de vencimento antecipado que autoriza cobrar também as parcelas ainda não vencidas.</span>
       </label>}
-      <button type="button" className="btn btn-primary" disabled={busy||!fineIsValid||!confirmed||(hasFuture&&!accelerationConfirmed)||selected.length===0} onClick={()=>void download()}>
+      <button type="button" className="btn btn-primary" disabled={busy||!officialTemplate||!fineIsValid||!confirmed||(hasFuture&&!accelerationConfirmed)||selected.length===0} onClick={()=>void download()}>
         {busy?'Gerando arquivos...':'Baixar um ZIP com DOCX e PDF de todos os selecionados'}
       </button>
       {message && <p className="text-sm text-slate-700" role="status">{message}</p>}
